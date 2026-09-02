@@ -1,17 +1,24 @@
 import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../theme';
-import { generateQuiz, Question } from '../quiz/generateQuiz';
-import AvatarPlaceholder from '../components/AvatarPlaceholder';
+import { generateQuiz, Question, QuizMode } from '../quiz/generateQuiz';
+import AnimeAvatar from '../components/AnimeAvatar';
 
 type Props = {
+  mode: QuizMode;
   onFinish: (score: number, total: number) => void;
 };
 
 const QUESTION_COUNT = 10;
 
-export default function QuizScreen({ onFinish }: Props) {
-  const questions = useMemo<Question[]>(() => generateQuiz(QUESTION_COUNT), []);
+const MODE_TITLE: Record<QuizMode, string> = {
+  photo: 'Кто это?',
+  description: 'Угадай по описанию',
+  trivia: 'Вопрос про персонажа',
+};
+
+export default function QuizScreen({ mode, onFinish }: Props) {
+  const questions = useMemo<Question[]>(() => generateQuiz(mode, QUESTION_COUNT), [mode]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -55,11 +62,24 @@ export default function QuizScreen({ onFinish }: Props) {
           />
         </View>
 
-        <View style={styles.avatarWrap}>
-          <AvatarPlaceholder color={question.character.color} initial={question.character.name[0]} />
-        </View>
+        {mode === 'trivia' && (
+          <View style={styles.triviaHeader}>
+            <AnimeAvatar avatar={question.character.avatar} size={64} />
+            <View style={styles.triviaHeaderText}>
+              <Text style={styles.triviaName}>{question.character.name}</Text>
+              <Text style={styles.triviaSeries}>{question.character.series}</Text>
+            </View>
+          </View>
+        )}
 
-        <Text style={styles.hint}>{question.character.hint}</Text>
+        {question.promptKind === 'avatar' && (
+          <View style={styles.avatarWrap}>
+            <AnimeAvatar avatar={question.character.avatar} />
+          </View>
+        )}
+
+        <Text style={styles.modeLabel}>{MODE_TITLE[mode]}</Text>
+        <Text style={styles.hint}>{question.prompt}</Text>
 
         <View style={styles.options}>
           {question.options.map((option, i) => {
@@ -111,21 +131,44 @@ const styles = StyleSheet.create({
     borderRadius: 4,
     backgroundColor: theme.border,
     overflow: 'hidden',
-    marginBottom: 24,
+    marginBottom: 20,
   },
   progressBarFill: {
     height: '100%',
     backgroundColor: theme.primary,
     borderRadius: 4,
   },
-  avatarWrap: { alignItems: 'center', marginBottom: 20 },
+  triviaHeader: {
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 16,
+    padding: 10,
+    marginBottom: 16,
+    gap: 12,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+  },
+  triviaHeaderText: { flex: 1 },
+  triviaName: { fontSize: 16, fontWeight: '700', color: theme.text },
+  triviaSeries: { fontSize: 13, color: theme.textMuted },
+  avatarWrap: { alignItems: 'center', marginBottom: 16 },
+  modeLabel: {
+    fontSize: 13,
+    fontWeight: '700',
+    color: theme.accent,
+    textTransform: 'uppercase',
+    letterSpacing: 0.5,
+    textAlign: 'center',
+    marginBottom: 6,
+  },
   hint: {
     fontSize: 17,
     color: theme.text,
     textAlign: 'center',
     lineHeight: 24,
-    marginBottom: 24,
-    minHeight: 72,
+    marginBottom: 22,
+    minHeight: 48,
   },
   options: { gap: 12 },
   option: {
