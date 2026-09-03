@@ -2,6 +2,7 @@ import { useEffect, useState } from 'react';
 import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import QuizScreen from './src/screens/QuizScreen';
@@ -9,12 +10,12 @@ import ResultScreen from './src/screens/ResultScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import { QuizMode } from './src/quiz/generateQuiz';
-import { theme } from './src/theme';
 
 type Screen = 'home' | 'quiz' | 'result' | 'profile' | 'leaderboard';
 
 function AppShell() {
   const { profile, loading, recordQuizResult } = useAuth();
+  const { theme, resolvedScheme } = useTheme();
   const [screen, setScreen] = useState<Screen>('home');
   const [mode, setMode] = useState<QuizMode>('photo');
   const [quizKey, setQuizKey] = useState(0);
@@ -33,7 +34,12 @@ function AppShell() {
   }
 
   if (!profile) {
-    return <AuthScreen />;
+    return (
+      <>
+        <AuthScreen />
+        <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
+      </>
+    );
   }
 
   const startQuiz = (nextMode: QuizMode) => {
@@ -68,15 +74,17 @@ function AppShell() {
       )}
       {screen === 'profile' && <ProfileScreen onBack={() => setScreen('home')} />}
       {screen === 'leaderboard' && <LeaderboardScreen onBack={() => setScreen('home')} />}
-      <StatusBar style="auto" />
+      <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
     </>
   );
 }
 
 export default function App() {
   return (
-    <AuthProvider>
-      <AppShell />
-    </AuthProvider>
+    <ThemeProvider>
+      <AuthProvider>
+        <AppShell />
+      </AuthProvider>
+    </ThemeProvider>
   );
 }

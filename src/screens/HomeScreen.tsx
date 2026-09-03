@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { Theme } from '../theme/palette';
+import { useTheme } from '../theme/ThemeContext';
 import { CHARACTERS } from '../data/characters';
 import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import { useAuth } from '../auth/AuthContext';
@@ -21,6 +23,8 @@ const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[
 
 export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }: Props) {
   const { profile } = useAuth();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -67,7 +71,8 @@ export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   container: {
     flexGrow: 1,
@@ -152,4 +157,5 @@ const styles = StyleSheet.create({
     color: theme.textMuted,
     textAlign: 'center',
   },
-});
+  });
+}

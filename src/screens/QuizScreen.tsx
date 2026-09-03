@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { Theme } from '../theme/palette';
+import { useTheme } from '../theme/ThemeContext';
 import { generateQuiz, Question, QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import AnimeAvatar from '../components/AnimeAvatar';
 import EyesPreview from '../components/EyesPreview';
@@ -19,6 +20,8 @@ const MODE_TITLE: Record<QuizMode, string> = {
 };
 
 export default function QuizScreen({ mode, onFinish }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const questions = useMemo<Question[]>(() => generateQuiz(mode, QUESTIONS_PER_QUIZ), [mode]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -124,7 +127,8 @@ export default function QuizScreen({ mode, onFinish }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
   progressRow: {
@@ -189,11 +193,11 @@ const styles = StyleSheet.create({
   },
   optionCorrect: {
     borderColor: theme.success,
-    backgroundColor: '#EBFBEE',
+    backgroundColor: theme.successBg,
   },
   optionWrong: {
     borderColor: theme.danger,
-    backgroundColor: '#FFF5F5',
+    backgroundColor: theme.dangerBg,
   },
   optionText: { fontSize: 16, color: theme.text, fontWeight: '600' },
   nextButton: {
@@ -204,4 +208,5 @@ const styles = StyleSheet.create({
     alignItems: 'center',
   },
   nextButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
-});
+  });
+}

@@ -1,5 +1,7 @@
+import { useMemo } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { Theme } from '../theme/palette';
+import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
   score: number;
@@ -16,6 +18,8 @@ function getMessage(ratio: number) {
 }
 
 export default function ResultScreen({ score, total, onRestart, onHome }: Props) {
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const ratio = total > 0 ? score / total : 0;
 
   return (
@@ -40,47 +44,49 @@ export default function ResultScreen({ score, total, onRestart, onHome }: Props)
   );
 }
 
-const styles = StyleSheet.create({
-  safe: { flex: 1, backgroundColor: theme.background },
-  container: {
-    flex: 1,
-    alignItems: 'center',
-    justifyContent: 'center',
-    paddingHorizontal: 32,
-  },
-  emoji: { fontSize: 56, marginBottom: 8 },
-  scoreLabel: { fontSize: 16, color: theme.textMuted, marginBottom: 4 },
-  score: {
-    fontSize: 48,
-    fontWeight: '800',
-    color: theme.primary,
-    marginBottom: 16,
-  },
-  message: {
-    fontSize: 16,
-    color: theme.text,
-    textAlign: 'center',
-    lineHeight: 22,
-    marginBottom: 36,
-  },
-  primaryButton: {
-    backgroundColor: theme.primary,
-    paddingVertical: 16,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    marginBottom: 14,
-    width: '100%',
-    alignItems: 'center',
-  },
-  primaryButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
-  secondaryButton: {
-    paddingVertical: 14,
-    paddingHorizontal: 40,
-    borderRadius: 30,
-    borderWidth: 1.5,
-    borderColor: theme.border,
-    width: '100%',
-    alignItems: 'center',
-  },
-  secondaryButtonText: { color: theme.textMuted, fontSize: 16, fontWeight: '600' },
-});
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    container: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      paddingHorizontal: 32,
+    },
+    emoji: { fontSize: 56, marginBottom: 8 },
+    scoreLabel: { fontSize: 16, color: theme.textMuted, marginBottom: 4 },
+    score: {
+      fontSize: 48,
+      fontWeight: '800',
+      color: theme.primary,
+      marginBottom: 16,
+    },
+    message: {
+      fontSize: 16,
+      color: theme.text,
+      textAlign: 'center',
+      lineHeight: 22,
+      marginBottom: 36,
+    },
+    primaryButton: {
+      backgroundColor: theme.primary,
+      paddingVertical: 16,
+      paddingHorizontal: 40,
+      borderRadius: 30,
+      marginBottom: 14,
+      width: '100%',
+      alignItems: 'center',
+    },
+    primaryButtonText: { color: '#fff', fontSize: 17, fontWeight: '700' },
+    secondaryButton: {
+      paddingVertical: 14,
+      paddingHorizontal: 40,
+      borderRadius: 30,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      width: '100%',
+      alignItems: 'center',
+    },
+    secondaryButtonText: { color: theme.textMuted, fontSize: 16, fontWeight: '600' },
+  });
+}

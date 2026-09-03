@@ -1,6 +1,7 @@
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
-import { theme } from '../theme';
+import { Theme } from '../theme/palette';
+import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { getAllProfiles } from '../auth/storage';
 import { Profile } from '../auth/types';
@@ -65,6 +66,8 @@ const MEDALS = ['🥇', '🥈', '🥉'];
 
 export default function LeaderboardScreen({ onBack }: Props) {
   const { profile: me } = useAuth();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
   const [profiles, setProfiles] = useState<Profile[] | null>(null);
   const [category, setCategory] = useState<Category>('overall');
 
@@ -129,7 +132,8 @@ export default function LeaderboardScreen({ onBack }: Props) {
   );
 }
 
-const styles = StyleSheet.create({
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   header: {
     flexDirection: 'row',
@@ -174,10 +178,11 @@ const styles = StyleSheet.create({
     paddingHorizontal: 10,
     gap: 10,
   },
-  rowMe: { borderColor: theme.primary, backgroundColor: '#FFF0F6' },
+  rowMe: { borderColor: theme.primary, backgroundColor: theme.primarySoft },
   rank: { width: 22, textAlign: 'center', fontSize: 12, fontWeight: '800', color: theme.textMuted },
   rowText: { flex: 1 },
   rowName: { fontSize: 14, fontWeight: '700', color: theme.text },
   rowSub: { fontSize: 11, color: theme.textMuted },
   rowScore: { fontSize: 14, fontWeight: '800', color: theme.primary },
-});
+  });
+}
