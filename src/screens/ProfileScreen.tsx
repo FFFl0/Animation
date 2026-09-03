@@ -22,6 +22,7 @@ const MODE_LABEL: Record<QuizMode, string> = {
   description: 'По описанию',
   series: 'Из аниме',
   poster: 'По картинке',
+  clip: 'По вырезке',
   trivia: 'Вопросы',
 };
 

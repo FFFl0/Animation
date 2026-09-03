@@ -19,6 +19,7 @@ const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[
   { mode: 'description', emoji: '📝', title: 'Угадай по описанию', subtitle: 'По короткой подсказке назови персонажа' },
   { mode: 'series', emoji: '🎬', title: 'Из какого аниме?', subtitle: 'По портрету персонажа назови сериал' },
   { mode: 'poster', emoji: '🎞️', title: 'Угадай аниме по картинке', subtitle: 'По постеру-иконке назови сериал' },
+  { mode: 'clip', emoji: '🎥', title: 'Угадай по вырезке из эпизода', subtitle: 'По кадру видео назови аниме' },
   { mode: 'trivia', emoji: '❓', title: 'Вопросы про персонажа', subtitle: 'Факты и детали про конкретных персонажей' },
 ];
 

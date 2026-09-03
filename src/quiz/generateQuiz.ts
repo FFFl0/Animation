@@ -1,13 +1,13 @@
 import { CHARACTERS, Character } from '../data/characters';
 
-export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes' | 'series' | 'poster';
+export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes' | 'series' | 'poster' | 'clip';
 
 export const QUESTIONS_PER_QUIZ = 50;
 
 export type Question = {
   character: Character;
   prompt: string;
-  promptKind: 'avatar' | 'text' | 'eyes' | 'poster';
+  promptKind: 'avatar' | 'text' | 'eyes' | 'poster' | 'clip';
   options: string[];
   correctIndex: number;
 };
@@ -61,7 +61,7 @@ function eyesQuestion(character: Character): Question {
   };
 }
 
-function seriesGuessQuestion(character: Character, promptKind: 'avatar' | 'poster', prompt: string): Question {
+function seriesGuessQuestion(character: Character, promptKind: 'avatar' | 'poster' | 'clip', prompt: string): Question {
   // Options must be distinct anime titles, not distinct characters — several
   // characters share the same series, so dedupe before sampling distractors.
   const otherSeries = Array.from(new Set(CHARACTERS.map((c) => c.series).filter((s) => s !== character.series)));
@@ -88,7 +88,7 @@ function triviaQuestion(character: Character): Question {
 }
 
 export function generateQuiz(mode: QuizMode, questionCount = QUESTIONS_PER_QUIZ): Question[] {
-  const basePool = mode === 'poster' ? uniqueSeriesPool() : CHARACTERS;
+  const basePool = mode === 'poster' || mode === 'clip' ? uniqueSeriesPool() : CHARACTERS;
   const pool = shuffle(basePool).slice(0, Math.min(questionCount, basePool.length));
 
   return pool.map((character) => {
@@ -96,6 +96,7 @@ export function generateQuiz(mode: QuizMode, questionCount = QUESTIONS_PER_QUIZ)
     if (mode === 'eyes') return eyesQuestion(character);
     if (mode === 'series') return seriesGuessQuestion(character, 'avatar', 'Из какого аниме этот персонаж?');
     if (mode === 'poster') return seriesGuessQuestion(character, 'poster', 'Какое это аниме?');
+    if (mode === 'clip') return seriesGuessQuestion(character, 'clip', 'Какое аниме из этого кадра?');
     if (mode === 'trivia') return triviaQuestion(character);
     return nameQuestion(character, 'text', character.description);
   });

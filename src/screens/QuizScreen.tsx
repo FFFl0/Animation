@@ -7,6 +7,7 @@ import { getPoster } from '../data/animePosters';
 import AnimeAvatar from '../components/AnimeAvatar';
 import EyesPreview from '../components/EyesPreview';
 import AnimePoster from '../components/AnimePoster';
+import ClipPreview from '../components/ClipPreview';
 
 type Props = {
   mode: QuizMode;
@@ -20,7 +21,16 @@ const MODE_TITLE: Record<QuizMode, string> = {
   eyes: 'Угадай по глазам',
   series: 'Из какого аниме?',
   poster: 'Угадай аниме по картинке',
+  clip: 'Угадай по вырезке',
 };
+
+function seedFromId(id: string): number {
+  let hash = 0;
+  for (let i = 0; i < id.length; i++) {
+    hash = (hash * 31 + id.charCodeAt(i)) >>> 0;
+  }
+  return hash;
+}
 
 export default function QuizScreen({ mode, onFinish }: Props) {
   const { theme } = useTheme();
@@ -94,6 +104,12 @@ export default function QuizScreen({ mode, onFinish }: Props) {
         {question.promptKind === 'poster' && (
           <View style={styles.avatarWrap}>
             <AnimePoster poster={getPoster(question.character.series)} />
+          </View>
+        )}
+
+        {question.promptKind === 'clip' && (
+          <View style={styles.avatarWrap}>
+            <ClipPreview poster={getPoster(question.character.series)} seed={seedFromId(question.character.id)} />
           </View>
         )}
 
