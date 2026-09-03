@@ -1,7 +1,7 @@
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../theme';
 import { CHARACTERS } from '../data/characters';
-import { QuizMode } from '../quiz/generateQuiz';
+import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import { useAuth } from '../auth/AuthContext';
 import AnimeAvatar from '../components/AnimeAvatar';
 
@@ -12,6 +12,7 @@ type Props = {
 
 const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[] = [
   { mode: 'photo', emoji: '🖼️', title: 'Угадай по фото', subtitle: 'По стилизованному портрету назови персонажа' },
+  { mode: 'eyes', emoji: '👀', title: 'Угадай по глазам', subtitle: 'По одним лишь глазам назови персонажа' },
   { mode: 'description', emoji: '📝', title: 'Угадай по описанию', subtitle: 'По короткой подсказке назови персонажа' },
   { mode: 'trivia', emoji: '❓', title: 'Вопросы про персонажа', subtitle: 'Факты и детали про конкретных героинь' },
 ];
@@ -21,15 +22,15 @@ export default function HomeScreen({ onStart, onOpenProfile }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <View style={styles.container}>
-        {profile && (
-          <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
-            <AnimeAvatar avatar={profile.avatar} size={40} />
-            <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
-            <Text style={styles.profileLink}>Профиль ›</Text>
-          </TouchableOpacity>
-        )}
+      {profile && (
+        <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
+          <AnimeAvatar avatar={profile.avatar} size={40} />
+          <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
+          <Text style={styles.profileLink}>Профиль ›</Text>
+        </TouchableOpacity>
+      )}
 
+      <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.emoji}>🎀</Text>
         <Text style={styles.title}>Angel Quiz</Text>
         <Text style={styles.subtitle}>
@@ -53,8 +54,8 @@ export default function HomeScreen({ onStart, onOpenProfile }: Props) {
           ))}
         </View>
 
-        <Text style={styles.footer}>10 вопросов за раунд · случайный порядок · без интернета</Text>
-      </View>
+        <Text style={styles.footer}>{QUESTIONS_PER_QUIZ} вопросов за раунд · случайный порядок · без интернета</Text>
+      </ScrollView>
     </SafeAreaView>
   );
 }
@@ -62,16 +63,19 @@ export default function HomeScreen({ onStart, onOpenProfile }: Props) {
 const styles = StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   container: {
-    flex: 1,
+    flexGrow: 1,
     alignItems: 'center',
     justifyContent: 'center',
     paddingHorizontal: 28,
+    paddingTop: 76,
+    paddingBottom: 32,
   },
   profileBar: {
     position: 'absolute',
     top: 16,
     left: 20,
     right: 20,
+    zIndex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,

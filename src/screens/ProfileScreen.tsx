@@ -3,7 +3,7 @@ import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-nati
 import { theme } from '../theme';
 import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS, HairStyle } from '../data/characters';
-import { QuizMode } from '../quiz/generateQuiz';
+import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import AnimeAvatar from '../components/AnimeAvatar';
 
 type Props = {
@@ -17,6 +17,7 @@ const BADGE_OPTIONS = ['⭐', '🎀', '🌸', '🦋', '🔥', '💎', '🎵', '�
 
 const MODE_LABEL: Record<QuizMode, string> = {
   photo: 'По фото',
+  eyes: 'По глазам',
   description: 'По описанию',
   trivia: 'Вопросы',
 };
@@ -119,7 +120,7 @@ export default function ProfileScreen({ onBack }: Props) {
           return (
             <View key={mode} style={styles.statCard}>
               <Text style={styles.statTitle}>{MODE_LABEL[mode]}</Text>
-              <Text style={styles.statBig}>{s.bestScore}/10</Text>
+              <Text style={styles.statBig}>{s.bestScore}/{QUESTIONS_PER_QUIZ}</Text>
               <Text style={styles.statLine}>Игр: {s.gamesPlayed}</Text>
               <Text style={styles.statLine}>Точность: {accuracy}%</Text>
             </View>
@@ -221,9 +222,10 @@ const styles = StyleSheet.create({
   favAvatarSelected: { borderColor: theme.primary },
   favName: { fontSize: 11, color: theme.textMuted, marginTop: 4, textAlign: 'center' },
   favSummary: { fontSize: 13, color: theme.text, marginTop: 10 },
-  statsGrid: { flexDirection: 'row', gap: 10 },
+  statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
   statCard: {
-    flex: 1,
+    flexBasis: '47%',
+    flexGrow: 1,
     backgroundColor: theme.card,
     borderRadius: 14,
     borderWidth: 1.5,

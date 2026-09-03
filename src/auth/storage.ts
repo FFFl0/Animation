@@ -19,6 +19,7 @@ const EMPTY_MODE_STATS = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQ
 function emptyStats(): Profile['stats'] {
   return {
     photo: { ...EMPTY_MODE_STATS },
+    eyes: { ...EMPTY_MODE_STATS },
     description: { ...EMPTY_MODE_STATS },
     trivia: { ...EMPTY_MODE_STATS },
   };

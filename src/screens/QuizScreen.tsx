@@ -1,24 +1,24 @@
 import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import { theme } from '../theme';
-import { generateQuiz, Question, QuizMode } from '../quiz/generateQuiz';
+import { generateQuiz, Question, QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import AnimeAvatar from '../components/AnimeAvatar';
+import EyesPreview from '../components/EyesPreview';
 
 type Props = {
   mode: QuizMode;
   onFinish: (score: number, total: number) => void;
 };
 
-const QUESTION_COUNT = 10;
-
 const MODE_TITLE: Record<QuizMode, string> = {
   photo: 'Кто это?',
   description: 'Угадай по описанию',
   trivia: 'Вопрос про персонажа',
+  eyes: 'Угадай по глазам',
 };
 
 export default function QuizScreen({ mode, onFinish }: Props) {
-  const questions = useMemo<Question[]>(() => generateQuiz(mode, QUESTION_COUNT), [mode]);
+  const questions = useMemo<Question[]>(() => generateQuiz(mode, QUESTIONS_PER_QUIZ), [mode]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
   const [selected, setSelected] = useState<number | null>(null);
@@ -75,6 +75,12 @@ export default function QuizScreen({ mode, onFinish }: Props) {
         {question.promptKind === 'avatar' && (
           <View style={styles.avatarWrap}>
             <AnimeAvatar avatar={question.character.avatar} />
+          </View>
+        )}
+
+        {question.promptKind === 'eyes' && (
+          <View style={styles.avatarWrap}>
+            <EyesPreview avatar={question.character.avatar} />
           </View>
         )}
 

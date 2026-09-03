@@ -1,11 +1,13 @@
 import { CHARACTERS, Character } from '../data/characters';
 
-export type QuizMode = 'photo' | 'description' | 'trivia';
+export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes';
+
+export const QUESTIONS_PER_QUIZ = 50;
 
 export type Question = {
   character: Character;
   prompt: string;
-  promptKind: 'avatar' | 'text';
+  promptKind: 'avatar' | 'text' | 'eyes';
   options: string[];
   correctIndex: number;
 };
@@ -25,6 +27,24 @@ function nameQuestion(character: Character, promptKind: 'avatar' | 'text', promp
   return { character, prompt, promptKind, options, correctIndex: options.indexOf(character.name) };
 }
 
+function eyesQuestion(character: Character): Question {
+  // Many characters share the exact same eye-color swatch, so distractors are
+  // drawn only from characters with a visibly different color — otherwise the
+  // question could have more than one indistinguishable-looking option.
+  const distinctColor = CHARACTERS.filter(
+    (c) => c.id !== character.id && c.avatar.eyeColor !== character.avatar.eyeColor
+  );
+  const distractors = shuffle(distinctColor).slice(0, 3);
+  const options = shuffle([character.name, ...distractors.map((d) => d.name)]);
+  return {
+    character,
+    prompt: 'Чьи это глаза?',
+    promptKind: 'eyes',
+    options,
+    correctIndex: options.indexOf(character.name),
+  };
+}
+
 function triviaQuestion(character: Character): Question {
   const options = shuffle([character.answer, ...character.distractors]);
   return {
@@ -36,11 +56,12 @@ function triviaQuestion(character: Character): Question {
   };
 }
 
-export function generateQuiz(mode: QuizMode, questionCount = 10): Question[] {
+export function generateQuiz(mode: QuizMode, questionCount = QUESTIONS_PER_QUIZ): Question[] {
   const pool = shuffle(CHARACTERS).slice(0, Math.min(questionCount, CHARACTERS.length));
 
   return pool.map((character) => {
     if (mode === 'photo') return nameQuestion(character, 'avatar', 'Кто это?');
+    if (mode === 'eyes') return eyesQuestion(character);
     if (mode === 'trivia') return triviaQuestion(character);
     return nameQuestion(character, 'text', character.description);
   });
