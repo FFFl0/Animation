@@ -110,7 +110,7 @@ export default function ProfileScreen({ onBack }: Props) {
         ))}
       </ScrollView>
       {favoriteCharacter && (
-        <Text style={styles.favSummary}>Любимица: {favoriteCharacter.name} ({favoriteCharacter.series})</Text>
+        <Text style={styles.favSummary}>Любимый персонаж: {favoriteCharacter.name} ({favoriteCharacter.series})</Text>
       )}
 
       <Text style={styles.sectionTitle}>Статистика</Text>

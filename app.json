@@ -1,7 +1,7 @@
 {
   "expo": {
-    "name": "Angel Quiz",
-    "slug": "angel-quiz",
+    "name": "Anime Quiz",
+    "slug": "anime-quiz",
     "version": "1.0.0",
     "orientation": "portrait",
     "icon": "./assets/icon.png",

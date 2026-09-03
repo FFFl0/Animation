@@ -52,8 +52,8 @@ export default function AuthScreen() {
         behavior={Platform.OS === 'ios' ? 'padding' : undefined}
       >
         <View style={styles.container}>
-          <Text style={styles.emoji}>🎀</Text>
-          <Text style={styles.title}>Angel Quiz</Text>
+          <Text style={styles.emoji}>🎌</Text>
+          <Text style={styles.title}>Anime Quiz</Text>
 
           <View style={styles.tabs}>
             <TouchableOpacity
