@@ -3,8 +3,10 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
 import { generateQuiz, Question, QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
+import { getPoster } from '../data/animePosters';
 import AnimeAvatar from '../components/AnimeAvatar';
 import EyesPreview from '../components/EyesPreview';
+import AnimePoster from '../components/AnimePoster';
 
 type Props = {
   mode: QuizMode;
@@ -17,6 +19,7 @@ const MODE_TITLE: Record<QuizMode, string> = {
   trivia: 'Вопрос про персонажа',
   eyes: 'Угадай по глазам',
   series: 'Из какого аниме?',
+  poster: 'Угадай аниме по картинке',
 };
 
 export default function QuizScreen({ mode, onFinish }: Props) {
@@ -85,6 +88,12 @@ export default function QuizScreen({ mode, onFinish }: Props) {
         {question.promptKind === 'eyes' && (
           <View style={styles.avatarWrap}>
             <EyesPreview avatar={question.character.avatar} />
+          </View>
+        )}
+
+        {question.promptKind === 'poster' && (
+          <View style={styles.avatarWrap}>
+            <AnimePoster poster={getPoster(question.character.series)} />
           </View>
         )}
 

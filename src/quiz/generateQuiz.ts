@@ -1,13 +1,13 @@
 import { CHARACTERS, Character } from '../data/characters';
 
-export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes' | 'series';
+export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes' | 'series' | 'poster';
 
 export const QUESTIONS_PER_QUIZ = 50;
 
 export type Question = {
   character: Character;
   prompt: string;
-  promptKind: 'avatar' | 'text' | 'eyes';
+  promptKind: 'avatar' | 'text' | 'eyes' | 'poster';
   options: string[];
   correctIndex: number;
 };
@@ -19,6 +19,22 @@ function shuffle<T>(items: T[]): T[] {
     [arr[i], arr[j]] = [arr[j], arr[i]];
   }
   return arr;
+}
+
+// One character per unique series, for modes where the picture represents
+// the show rather than the character — picking straight from CHARACTERS
+// could otherwise show the exact same picture twice in one round whenever
+// two selected characters share a series.
+function uniqueSeriesPool(): Character[] {
+  const seen = new Set<string>();
+  const representatives: Character[] = [];
+  for (const c of shuffle(CHARACTERS)) {
+    if (!seen.has(c.series)) {
+      seen.add(c.series);
+      representatives.push(c);
+    }
+  }
+  return representatives;
 }
 
 function nameQuestion(character: Character, promptKind: 'avatar' | 'text', prompt: string): Question {
@@ -45,7 +61,7 @@ function eyesQuestion(character: Character): Question {
   };
 }
 
-function seriesQuestion(character: Character): Question {
+function seriesGuessQuestion(character: Character, promptKind: 'avatar' | 'poster', prompt: string): Question {
   // Options must be distinct anime titles, not distinct characters — several
   // characters share the same series, so dedupe before sampling distractors.
   const otherSeries = Array.from(new Set(CHARACTERS.map((c) => c.series).filter((s) => s !== character.series)));
@@ -53,8 +69,8 @@ function seriesQuestion(character: Character): Question {
   const options = shuffle([character.series, ...distractors]);
   return {
     character,
-    prompt: 'Из какого аниме этот персонаж?',
-    promptKind: 'avatar',
+    prompt,
+    promptKind,
     options,
     correctIndex: options.indexOf(character.series),
   };
@@ -72,12 +88,14 @@ function triviaQuestion(character: Character): Question {
 }
 
 export function generateQuiz(mode: QuizMode, questionCount = QUESTIONS_PER_QUIZ): Question[] {
-  const pool = shuffle(CHARACTERS).slice(0, Math.min(questionCount, CHARACTERS.length));
+  const basePool = mode === 'poster' ? uniqueSeriesPool() : CHARACTERS;
+  const pool = shuffle(basePool).slice(0, Math.min(questionCount, basePool.length));
 
   return pool.map((character) => {
     if (mode === 'photo') return nameQuestion(character, 'avatar', 'Кто это?');
     if (mode === 'eyes') return eyesQuestion(character);
-    if (mode === 'series') return seriesQuestion(character);
+    if (mode === 'series') return seriesGuessQuestion(character, 'avatar', 'Из какого аниме этот персонаж?');
+    if (mode === 'poster') return seriesGuessQuestion(character, 'poster', 'Какое это аниме?');
     if (mode === 'trivia') return triviaQuestion(character);
     return nameQuestion(character, 'text', character.description);
   });

@@ -16,7 +16,7 @@ const DEFAULT_AVATAR = {
 
 const EMPTY_MODE_STATS = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
 
-const ALL_MODES: QuizMode[] = ['photo', 'eyes', 'description', 'series', 'trivia'];
+const ALL_MODES: QuizMode[] = ['photo', 'eyes', 'description', 'series', 'poster', 'trivia'];
 
 function emptyStats(): Profile['stats'] {
   return {
@@ -24,6 +24,7 @@ function emptyStats(): Profile['stats'] {
     eyes: { ...EMPTY_MODE_STATS },
     description: { ...EMPTY_MODE_STATS },
     series: { ...EMPTY_MODE_STATS },
+    poster: { ...EMPTY_MODE_STATS },
     trivia: { ...EMPTY_MODE_STATS },
   };
 }

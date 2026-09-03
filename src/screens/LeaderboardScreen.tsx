@@ -20,6 +20,7 @@ const TABS: { key: Category; label: string }[] = [
   { key: 'eyes', label: 'По глазам' },
   { key: 'description', label: 'По описанию' },
   { key: 'series', label: 'Из аниме' },
+  { key: 'poster', label: 'По картинке' },
   { key: 'trivia', label: 'Вопросы' },
 ];
 
