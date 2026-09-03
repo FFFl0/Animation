@@ -1,6 +1,6 @@
 import { CHARACTERS, Character } from '../data/characters';
 
-export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes';
+export type QuizMode = 'photo' | 'description' | 'trivia' | 'eyes' | 'series';
 
 export const QUESTIONS_PER_QUIZ = 50;
 
@@ -45,6 +45,21 @@ function eyesQuestion(character: Character): Question {
   };
 }
 
+function seriesQuestion(character: Character): Question {
+  // Options must be distinct anime titles, not distinct characters — several
+  // characters share the same series, so dedupe before sampling distractors.
+  const otherSeries = Array.from(new Set(CHARACTERS.map((c) => c.series).filter((s) => s !== character.series)));
+  const distractors = shuffle(otherSeries).slice(0, 3);
+  const options = shuffle([character.series, ...distractors]);
+  return {
+    character,
+    prompt: 'Из какого аниме этот персонаж?',
+    promptKind: 'avatar',
+    options,
+    correctIndex: options.indexOf(character.series),
+  };
+}
+
 function triviaQuestion(character: Character): Question {
   const options = shuffle([character.answer, ...character.distractors]);
   return {
@@ -62,6 +77,7 @@ export function generateQuiz(mode: QuizMode, questionCount = QUESTIONS_PER_QUIZ)
   return pool.map((character) => {
     if (mode === 'photo') return nameQuestion(character, 'avatar', 'Кто это?');
     if (mode === 'eyes') return eyesQuestion(character);
+    if (mode === 'series') return seriesQuestion(character);
     if (mode === 'trivia') return triviaQuestion(character);
     return nameQuestion(character, 'text', character.description);
   });

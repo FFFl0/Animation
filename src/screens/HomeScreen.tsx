@@ -15,6 +15,7 @@ const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[
   { mode: 'photo', emoji: '🖼️', title: 'Угадай по фото', subtitle: 'По стилизованному портрету назови персонажа' },
   { mode: 'eyes', emoji: '👀', title: 'Угадай по глазам', subtitle: 'По одним лишь глазам назови персонажа' },
   { mode: 'description', emoji: '📝', title: 'Угадай по описанию', subtitle: 'По короткой подсказке назови персонажа' },
+  { mode: 'series', emoji: '🎬', title: 'Из какого аниме?', subtitle: 'По портрету персонажа назови сериал' },
   { mode: 'trivia', emoji: '❓', title: 'Вопросы про персонажа', subtitle: 'Факты и детали про конкретных героинь' },
 ];
 

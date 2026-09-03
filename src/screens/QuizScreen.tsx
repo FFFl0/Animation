@@ -15,6 +15,7 @@ const MODE_TITLE: Record<QuizMode, string> = {
   description: 'Угадай по описанию',
   trivia: 'Вопрос про персонажа',
   eyes: 'Угадай по глазам',
+  series: 'Из какого аниме?',
 };
 
 export default function QuizScreen({ mode, onFinish }: Props) {

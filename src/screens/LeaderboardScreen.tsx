@@ -18,6 +18,7 @@ const TABS: { key: Category; label: string }[] = [
   { key: 'photo', label: 'По фото' },
   { key: 'eyes', label: 'По глазам' },
   { key: 'description', label: 'По описанию' },
+  { key: 'series', label: 'Из аниме' },
   { key: 'trivia', label: 'Вопросы' },
 ];
 
@@ -83,7 +84,12 @@ export default function LeaderboardScreen({ onBack }: Props) {
         <View style={{ width: 56 }} />
       </View>
 
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.tabs}>
+      <ScrollView
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.tabsScroll}
+        contentContainerStyle={styles.tabs}
+      >
         {TABS.map((tab) => (
           <TouchableOpacity
             key={tab.key}
@@ -95,7 +101,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
         ))}
       </ScrollView>
 
-      <ScrollView contentContainerStyle={styles.list}>
+      <ScrollView style={styles.listScroll} contentContainerStyle={styles.list}>
         {rows.length === 0 && (
           <Text style={styles.empty}>
             Пока никто не сыграл в этом режиме. Сыграй первым — и займи первую строчку!
@@ -135,19 +141,21 @@ const styles = StyleSheet.create({
   },
   backText: { color: theme.primary, fontSize: 15, fontWeight: '700' },
   title: { fontSize: 18, fontWeight: '800', color: theme.text },
-  tabs: { paddingHorizontal: 24, gap: 8, paddingVertical: 8 },
+  tabsScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 44 },
+  tabs: { paddingHorizontal: 24, gap: 8 },
   tab: {
-    paddingHorizontal: 16,
+    paddingHorizontal: 14,
     paddingVertical: 8,
-    borderRadius: 20,
+    borderRadius: 18,
     backgroundColor: theme.card,
     borderWidth: 1.5,
     borderColor: theme.border,
   },
   tabActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-  tabText: { fontSize: 13, fontWeight: '700', color: theme.textMuted },
+  tabText: { fontSize: 12, fontWeight: '700', color: theme.textMuted },
   tabTextActive: { color: '#fff' },
-  list: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40, gap: 8 },
+  listScroll: { flex: 1 },
+  list: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40, gap: 8 },
   empty: {
     textAlign: 'center',
     color: theme.textMuted,

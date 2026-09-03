@@ -19,6 +19,7 @@ const MODE_LABEL: Record<QuizMode, string> = {
   photo: 'По фото',
   eyes: 'По глазам',
   description: 'По описанию',
+  series: 'Из аниме',
   trivia: 'Вопросы',
 };
 
