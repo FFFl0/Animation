@@ -8,6 +8,7 @@ import AnimeAvatar from '../components/AnimeAvatar';
 type Props = {
   onStart: (mode: QuizMode) => void;
   onOpenProfile: () => void;
+  onOpenLeaderboard: () => void;
 };
 
 const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[] = [
@@ -17,17 +18,22 @@ const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[
   { mode: 'trivia', emoji: '❓', title: 'Вопросы про персонажа', subtitle: 'Факты и детали про конкретных героинь' },
 ];
 
-export default function HomeScreen({ onStart, onOpenProfile }: Props) {
+export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }: Props) {
   const { profile } = useAuth();
 
   return (
     <SafeAreaView style={styles.safe}>
       {profile && (
-        <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
-          <AnimeAvatar avatar={profile.avatar} size={40} />
-          <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
-          <Text style={styles.profileLink}>Профиль ›</Text>
-        </TouchableOpacity>
+        <View style={styles.topBar}>
+          <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
+            <AnimeAvatar avatar={profile.avatar} size={40} />
+            <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
+            <Text style={styles.profileLink}>Профиль ›</Text>
+          </TouchableOpacity>
+          <TouchableOpacity style={styles.trophyButton} onPress={onOpenLeaderboard} activeOpacity={0.85}>
+            <Text style={styles.trophyEmoji}>🏆</Text>
+          </TouchableOpacity>
+        </View>
       )}
 
       <ScrollView contentContainerStyle={styles.container}>
@@ -70,12 +76,18 @@ const styles = StyleSheet.create({
     paddingTop: 76,
     paddingBottom: 32,
   },
-  profileBar: {
+  topBar: {
     position: 'absolute',
     top: 16,
     left: 20,
     right: 20,
     zIndex: 1,
+    flexDirection: 'row',
+    alignItems: 'center',
+    gap: 10,
+  },
+  profileBar: {
+    flex: 1,
     flexDirection: 'row',
     alignItems: 'center',
     backgroundColor: theme.card,
@@ -88,6 +100,17 @@ const styles = StyleSheet.create({
   },
   profileName: { flex: 1, fontSize: 14, fontWeight: '700', color: theme.text },
   profileLink: { fontSize: 13, fontWeight: '700', color: theme.primary },
+  trophyButton: {
+    width: 44,
+    height: 44,
+    borderRadius: 22,
+    backgroundColor: theme.card,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  trophyEmoji: { fontSize: 20 },
   emoji: { fontSize: 52, marginBottom: 8 },
   title: {
     fontSize: 32,

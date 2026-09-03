@@ -97,6 +97,11 @@ export async function getSessionProfile(): Promise<Profile | null> {
   return account?.profile ?? null;
 }
 
+export async function getAllProfiles(): Promise<Profile[]> {
+  const accounts = await readAccounts();
+  return accounts.map((a) => a.profile);
+}
+
 async function updateAccount(userId: string, updater: (profile: Profile) => Profile): Promise<Profile> {
   const accounts = await readAccounts();
   const index = accounts.findIndex((a) => a.id === userId);

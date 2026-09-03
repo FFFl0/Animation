@@ -7,10 +7,11 @@ import HomeScreen from './src/screens/HomeScreen';
 import QuizScreen from './src/screens/QuizScreen';
 import ResultScreen from './src/screens/ResultScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import { QuizMode } from './src/quiz/generateQuiz';
 import { theme } from './src/theme';
 
-type Screen = 'home' | 'quiz' | 'result' | 'profile';
+type Screen = 'home' | 'quiz' | 'result' | 'profile' | 'leaderboard';
 
 function AppShell() {
   const { profile, loading, recordQuizResult } = useAuth();
@@ -49,7 +50,13 @@ function AppShell() {
 
   return (
     <>
-      {screen === 'home' && <HomeScreen onStart={startQuiz} onOpenProfile={() => setScreen('profile')} />}
+      {screen === 'home' && (
+        <HomeScreen
+          onStart={startQuiz}
+          onOpenProfile={() => setScreen('profile')}
+          onOpenLeaderboard={() => setScreen('leaderboard')}
+        />
+      )}
       {screen === 'quiz' && <QuizScreen key={quizKey} mode={mode} onFinish={finishQuiz} />}
       {screen === 'result' && (
         <ResultScreen
@@ -60,6 +67,7 @@ function AppShell() {
         />
       )}
       {screen === 'profile' && <ProfileScreen onBack={() => setScreen('home')} />}
+      {screen === 'leaderboard' && <LeaderboardScreen onBack={() => setScreen('home')} />}
       <StatusBar style="auto" />
     </>
   );
