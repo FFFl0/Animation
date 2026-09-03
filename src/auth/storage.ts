@@ -16,6 +16,8 @@ const DEFAULT_AVATAR = {
 
 const EMPTY_MODE_STATS = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
 
+const ALL_MODES: QuizMode[] = ['photo', 'eyes', 'description', 'trivia'];
+
 function emptyStats(): Profile['stats'] {
   return {
     photo: { ...EMPTY_MODE_STATS },
@@ -25,9 +27,25 @@ function emptyStats(): Profile['stats'] {
   };
 }
 
+// Accounts created before a new quiz mode shipped won't have a stats entry
+// for it — backfill on read so every consumer can rely on all modes being
+// present, instead of every call site needing its own fallback.
+function normalizeProfile(profile: Profile): Profile {
+  const stats = { ...profile.stats };
+  let changed = false;
+  for (const mode of ALL_MODES) {
+    if (!stats[mode]) {
+      stats[mode] = { ...EMPTY_MODE_STATS };
+      changed = true;
+    }
+  }
+  return changed ? { ...profile, stats } : profile;
+}
+
 async function readAccounts(): Promise<StoredAccount[]> {
   const raw = await AsyncStorage.getItem(ACCOUNTS_KEY);
-  return raw ? (JSON.parse(raw) as StoredAccount[]) : [];
+  const accounts = raw ? (JSON.parse(raw) as StoredAccount[]) : [];
+  return accounts.map((a) => ({ ...a, profile: normalizeProfile(a.profile) }));
 }
 
 async function writeAccounts(accounts: StoredAccount[]): Promise<void> {

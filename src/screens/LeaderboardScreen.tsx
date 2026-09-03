@@ -107,7 +107,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
           return (
             <View key={row.profile.id} style={[styles.row, isMe && styles.rowMe]}>
               <Text style={styles.rank}>{MEDALS[i] ?? `#${i + 1}`}</Text>
-              <AnimeAvatar avatar={row.profile.avatar} size={40} />
+              <AnimeAvatar avatar={row.profile.avatar} size={32} />
               <View style={styles.rowText}>
                 <Text style={styles.rowName} numberOfLines={1}>
                   {row.profile.username}{isMe ? ' (ты)' : ''}
@@ -166,7 +166,7 @@ const styles = StyleSheet.create({
     gap: 12,
   },
   rowMe: { borderColor: theme.primary, backgroundColor: '#FFF0F6' },
-  rank: { width: 30, textAlign: 'center', fontSize: 16, fontWeight: '800', color: theme.textMuted },
+  rank: { width: 24, textAlign: 'center', fontSize: 13, fontWeight: '800', color: theme.textMuted },
   rowText: { flex: 1 },
   rowName: { fontSize: 15, fontWeight: '700', color: theme.text },
   rowSub: { fontSize: 12, color: theme.textMuted, marginTop: 1 },
