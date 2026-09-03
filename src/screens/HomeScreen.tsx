@@ -2,9 +2,12 @@ import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-na
 import { theme } from '../theme';
 import { CHARACTERS } from '../data/characters';
 import { QuizMode } from '../quiz/generateQuiz';
+import { useAuth } from '../auth/AuthContext';
+import AnimeAvatar from '../components/AnimeAvatar';
 
 type Props = {
   onStart: (mode: QuizMode) => void;
+  onOpenProfile: () => void;
 };
 
 const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[] = [
@@ -13,10 +16,20 @@ const MODES: { mode: QuizMode; emoji: string; title: string; subtitle: string }[
   { mode: 'trivia', emoji: '❓', title: 'Вопросы про персонажа', subtitle: 'Факты и детали про конкретных героинь' },
 ];
 
-export default function HomeScreen({ onStart }: Props) {
+export default function HomeScreen({ onStart, onOpenProfile }: Props) {
+  const { profile } = useAuth();
+
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
+        {profile && (
+          <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
+            <AnimeAvatar avatar={profile.avatar} size={40} />
+            <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
+            <Text style={styles.profileLink}>Профиль ›</Text>
+          </TouchableOpacity>
+        )}
+
         <Text style={styles.emoji}>🎀</Text>
         <Text style={styles.title}>Angel Quiz</Text>
         <Text style={styles.subtitle}>
@@ -54,6 +67,23 @@ const styles = StyleSheet.create({
     justifyContent: 'center',
     paddingHorizontal: 28,
   },
+  profileBar: {
+    position: 'absolute',
+    top: 16,
+    left: 20,
+    right: 20,
+    flexDirection: 'row',
+    alignItems: 'center',
+    backgroundColor: theme.card,
+    borderRadius: 24,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    paddingVertical: 6,
+    paddingHorizontal: 10,
+    gap: 10,
+  },
+  profileName: { flex: 1, fontSize: 14, fontWeight: '700', color: theme.text },
+  profileLink: { fontSize: 13, fontWeight: '700', color: theme.primary },
   emoji: { fontSize: 52, marginBottom: 8 },
   title: {
     fontSize: 32,

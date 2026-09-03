@@ -99,6 +99,7 @@ export default function QuizScreen({ mode, onFinish }: Props) {
                 onPress={() => handleSelect(i)}
                 disabled={showState}
                 activeOpacity={0.8}
+                accessibilityRole="button"
               >
                 <Text style={styles.optionText}>{option}</Text>
               </TouchableOpacity>
@@ -107,7 +108,7 @@ export default function QuizScreen({ mode, onFinish }: Props) {
         </View>
 
         {selected !== null && (
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.85}>
+          <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
             <Text style={styles.nextButtonText}>{isLast ? 'Результаты' : 'Дальше'}</Text>
           </TouchableOpacity>
         )}
