@@ -2,16 +2,13 @@ import { ReactNode, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
+import { fontFamily } from '../theme/fonts';
 import { useTheme, ThemeMode } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS, HairStyle } from '../data/characters';
 import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import AnimeAvatar from '../components/AnimeAvatar';
-
-type Props = {
-  onBack: () => void;
-};
 
 const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'wavy', 'odango', 'animalEars', 'horns', 'wild'];
 const COLOR_SWATCHES = ['#2B2B33', '#8B5E3C', '#D9B24C', '#E8632E', '#E85D9C', '#5FB8E0', '#7C5CB8', '#EDEDED'];
@@ -39,7 +36,7 @@ function cycle<T>(list: T[], current: T, dir: 1 | -1): T {
   return list[(i + dir + list.length) % list.length];
 }
 
-export default function ProfileScreen({ onBack }: Props) {
+export default function ProfileScreen() {
   const { profile, logout, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, toggleMusic, toggleSfx } = useSound();
@@ -53,9 +50,7 @@ export default function ProfileScreen({ onBack }: Props) {
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.container}>
-      <SoundTouchable onPress={onBack} style={styles.backButton}>
-        <Text style={styles.backText}>‹ Назад</Text>
-      </SoundTouchable>
+      <Text style={styles.pageTitle}>Профиль</Text>
 
       <View style={styles.avatarSection}>
         <AnimeAvatar avatar={avatar} size={120} />
@@ -215,21 +210,20 @@ function SwatchRow({ colors, selected, onSelect, styles }: { colors: string[]; s
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
-    container: { paddingHorizontal: 24, paddingTop: 16, paddingBottom: 40 },
-    backButton: { marginBottom: 8 },
-    backText: { color: theme.primary, fontSize: 15, fontWeight: '700' },
+    container: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
+    pageTitle: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.primary, marginBottom: 16 },
     avatarSection: { alignItems: 'center', marginBottom: 12 },
-    username: { fontSize: 22, fontWeight: '800', color: theme.text, marginTop: 12 },
-    joined: { fontSize: 13, color: theme.textMuted, marginTop: 2 },
+    username: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
+    joined: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2 },
     editToggle: {
       marginTop: 14,
       borderWidth: 1.5,
-      borderColor: theme.primary,
+      borderColor: theme.accent,
       borderRadius: 20,
       paddingHorizontal: 18,
       paddingVertical: 8,
     },
-    editToggleText: { color: theme.primary, fontWeight: '700', fontSize: 13 },
+    editToggleText: { color: theme.accent, fontFamily: fontFamily('700'), fontSize: 13 },
     editor: {
       backgroundColor: theme.card,
       borderRadius: 16,
@@ -240,10 +234,10 @@ function makeStyles(theme: Theme) {
       gap: 10,
     },
     editorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    editorLabel: { width: 78, fontSize: 13, fontWeight: '700', color: theme.textMuted },
+    editorLabel: { width: 78, fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
     editorControls: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-    editorValue: { fontSize: 14, fontWeight: '600', color: theme.text, minWidth: 80 },
-    arrow: { fontSize: 22, color: theme.primary, fontWeight: '800', paddingHorizontal: 6 },
+    editorValue: { fontSize: 14, fontFamily: fontFamily('600'), color: theme.text, minWidth: 80 },
+    arrow: { fontSize: 22, color: theme.primary, fontFamily: fontFamily('800'), paddingHorizontal: 6 },
     swatch: {
       width: 28,
       height: 28,
@@ -264,15 +258,15 @@ function makeStyles(theme: Theme) {
       borderWidth: 2,
       borderColor: 'transparent',
     },
-    badgeOptionSelected: { borderColor: theme.primary },
+    badgeOptionSelected: { borderColor: theme.accent },
     badgeOptionText: { fontSize: 16 },
-    sectionTitle: { fontSize: 15, fontWeight: '800', color: theme.text, marginTop: 24, marginBottom: 10 },
+    sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
     favRow: { gap: 14, paddingRight: 12 },
     favItem: { alignItems: 'center', width: 64 },
     favAvatarWrap: { borderRadius: 30, borderWidth: 2, borderColor: 'transparent' },
-    favAvatarSelected: { borderColor: theme.primary },
-    favName: { fontSize: 11, color: theme.textMuted, marginTop: 4, textAlign: 'center' },
-    favSummary: { fontSize: 13, color: theme.text, marginTop: 10 },
+    favAvatarSelected: { borderColor: theme.accent },
+    favName: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4, textAlign: 'center' },
+    favSummary: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, marginTop: 10 },
     statsGrid: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     statCard: {
       flexBasis: '47%',
@@ -284,9 +278,9 @@ function makeStyles(theme: Theme) {
       padding: 12,
       alignItems: 'center',
     },
-    statTitle: { fontSize: 11, fontWeight: '700', color: theme.textMuted, textAlign: 'center' },
-    statBig: { fontSize: 20, fontWeight: '800', color: theme.primary, marginVertical: 4 },
-    statLine: { fontSize: 11, color: theme.textMuted },
+    statTitle: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted, textAlign: 'center' },
+    statBig: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.primary, marginVertical: 4 },
+    statLine: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
     themeTabs: {
       flexDirection: 'row',
       backgroundColor: theme.card,
@@ -297,9 +291,9 @@ function makeStyles(theme: Theme) {
       gap: 4,
     },
     themeTab: { flex: 1, paddingVertical: 10, borderRadius: 10, alignItems: 'center' },
-    themeTabActive: { backgroundColor: theme.primary },
-    themeTabText: { fontSize: 13, fontWeight: '700', color: theme.textMuted },
-    themeTabTextActive: { color: '#fff' },
+    themeTabActive: { backgroundColor: theme.accent },
+    themeTabText: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
+    themeTabTextActive: { color: theme.onPrimary },
     logout: {
       marginTop: 30,
       alignItems: 'center',
@@ -308,6 +302,6 @@ function makeStyles(theme: Theme) {
       borderWidth: 1.5,
       borderColor: theme.border,
     },
-    logoutText: { color: theme.danger, fontWeight: '700', fontSize: 15 },
+    logoutText: { color: theme.danger, fontFamily: fontFamily('700'), fontSize: 15 },
   });
 }

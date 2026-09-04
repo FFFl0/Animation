@@ -4,6 +4,7 @@ export type Theme = {
   primary: string;
   primaryDark: string;
   primarySoft: string;
+  onPrimary: string;
   accent: string;
   text: string;
   textMuted: string;
@@ -14,34 +15,39 @@ export type Theme = {
   border: string;
 };
 
+// "primary" is the ink color used for headings, primary CTA buttons, and
+// plain emphasis numbers. "accent" is the dusty-rose color reserved for
+// active/selected states, progress, and in-flow progression buttons.
 export const lightTheme: Theme = {
-  background: '#F4F5F9',
+  background: '#F7F1E7',
   card: '#FFFFFF',
-  primary: '#4F5FCE',
-  primaryDark: '#3A47A8',
-  primarySoft: '#EAEBFA',
-  accent: '#0EA5A0',
-  text: '#20232E',
-  textMuted: '#6B7280',
-  success: '#22C55E',
-  successBg: '#E9F9EE',
-  danger: '#E5484D',
-  dangerBg: '#FCEBEC',
-  border: '#E2E4EC',
+  primary: '#211D18',
+  primaryDark: '#000000',
+  primarySoft: '#FBE7EB',
+  onPrimary: '#FFFFFF',
+  accent: '#DE8797',
+  text: '#2A241E',
+  textMuted: '#90867A',
+  success: '#3E9A5C',
+  successBg: '#E7F5EA',
+  danger: '#D9636E',
+  dangerBg: '#FBE9EB',
+  border: '#EBE1D2',
 };
 
 export const darkTheme: Theme = {
-  background: '#14161F',
-  card: '#1E2130',
-  primary: '#6C77E0',
-  primaryDark: '#4A54B8',
-  primarySoft: '#282C4A',
-  accent: '#14B8A6',
-  text: '#F1F2F6',
-  textMuted: '#9AA0B4',
-  success: '#4ADE80',
-  successBg: '#1B2E22',
-  danger: '#F87171',
-  dangerBg: '#3A2023',
-  border: '#2B2F42',
+  background: '#1B1712',
+  card: '#262019',
+  primary: '#F3ECE1',
+  primaryDark: '#D8CFC0',
+  primarySoft: '#3A262C',
+  onPrimary: '#211D18',
+  accent: '#E7909E',
+  text: '#F3ECE1',
+  textMuted: '#A99E8E',
+  success: '#5FC57F',
+  successBg: '#1E3324',
+  danger: '#E2828C',
+  dangerBg: '#3A2226',
+  border: '#3A332A',
 };

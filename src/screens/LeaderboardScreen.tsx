@@ -2,16 +2,13 @@ import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
+import { fontFamily } from '../theme/fonts';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { getAllProfiles } from '../auth/storage';
 import { Profile } from '../auth/types';
 import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import AnimeAvatar from '../components/AnimeAvatar';
-
-type Props = {
-  onBack: () => void;
-};
 
 type Category = QuizMode | 'overall';
 
@@ -67,7 +64,7 @@ function buildRows(profiles: Profile[], category: Category): Row[] {
 
 const MEDALS = ['🥇', '🥈', '🥉'];
 
-export default function LeaderboardScreen({ onBack }: Props) {
+export default function LeaderboardScreen() {
   const { profile: me } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -83,11 +80,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
   return (
     <View style={styles.safe}>
       <View style={styles.header}>
-        <SoundTouchable onPress={onBack}>
-          <Text style={styles.backText}>‹ Назад</Text>
-        </SoundTouchable>
         <Text style={styles.title}>🏆 Рейтинг</Text>
-        <View style={{ width: 56 }} />
       </View>
 
       <ScrollView
@@ -139,15 +132,11 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   header: {
-    flexDirection: 'row',
-    alignItems: 'center',
-    justifyContent: 'space-between',
     paddingHorizontal: 24,
-    paddingTop: 16,
+    paddingTop: 20,
     paddingBottom: 8,
   },
-  backText: { color: theme.primary, fontSize: 15, fontWeight: '700' },
-  title: { fontSize: 18, fontWeight: '800', color: theme.text },
+  title: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.primary },
   tabsScroll: { flexGrow: 0, flexShrink: 0, maxHeight: 44 },
   tabs: { paddingHorizontal: 24, gap: 8 },
   tab: {
@@ -158,14 +147,15 @@ function makeStyles(theme: Theme) {
     borderWidth: 1.5,
     borderColor: theme.border,
   },
-  tabActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-  tabText: { fontSize: 12, fontWeight: '700', color: theme.textMuted },
-  tabTextActive: { color: '#fff' },
+  tabActive: { backgroundColor: theme.accent, borderColor: theme.accent },
+  tabText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
+  tabTextActive: { color: theme.onPrimary },
   listScroll: { flex: 1 },
   list: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 40, gap: 8 },
   empty: {
     textAlign: 'center',
     color: theme.textMuted,
+    fontFamily: fontFamily('500'),
     fontSize: 14,
     marginTop: 40,
     lineHeight: 20,
@@ -181,11 +171,11 @@ function makeStyles(theme: Theme) {
     paddingHorizontal: 10,
     gap: 10,
   },
-  rowMe: { borderColor: theme.primary, backgroundColor: theme.primarySoft },
-  rank: { width: 22, textAlign: 'center', fontSize: 12, fontWeight: '800', color: theme.textMuted },
+  rowMe: { borderColor: theme.accent, backgroundColor: theme.primarySoft },
+  rank: { width: 22, textAlign: 'center', fontSize: 12, fontFamily: fontFamily('800'), color: theme.textMuted },
   rowText: { flex: 1 },
-  rowName: { fontSize: 14, fontWeight: '700', color: theme.text },
-  rowSub: { fontSize: 11, color: theme.textMuted },
-  rowScore: { fontSize: 14, fontWeight: '800', color: theme.primary },
+  rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+  rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
+  rowScore: { fontSize: 14, fontFamily: fontFamily('800'), color: theme.primary },
   });
 }

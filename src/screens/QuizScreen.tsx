@@ -2,6 +2,7 @@ import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
+import { fontFamily } from '../theme/fonts';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question, QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
@@ -14,6 +15,7 @@ import ClipPreview from '../components/ClipPreview';
 type Props = {
   mode: QuizMode;
   onFinish: (score: number, total: number) => void;
+  onClose: () => void;
 };
 
 const MODE_TITLE: Record<QuizMode, string> = {
@@ -34,7 +36,7 @@ function seedFromId(id: string): number {
   return hash;
 }
 
-export default function QuizScreen({ mode, onFinish }: Props) {
+export default function QuizScreen({ mode, onFinish, onClose }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { playCorrect, playWrong } = useSound();
@@ -69,11 +71,16 @@ export default function QuizScreen({ mode, onFinish }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <View style={styles.progressRow}>
-          <Text style={styles.progressText}>
-            Вопрос {index + 1} / {questions.length}
-          </Text>
-          <Text style={styles.scoreText}>Очки: {score}</Text>
+        <View style={styles.topRow}>
+          <SoundTouchable style={styles.closeButton} onPress={onClose} activeOpacity={0.8} accessibilityRole="button">
+            <Text style={styles.closeButtonText}>✕</Text>
+          </SoundTouchable>
+          <View style={styles.progressRow}>
+            <Text style={styles.progressText}>
+              Вопрос {index + 1} / {questions.length}
+            </Text>
+            <Text style={styles.scoreText}>Очки: {score}</Text>
+          </View>
         </View>
 
         <View style={styles.progressBarTrack}>
@@ -162,13 +169,25 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
   safe: { flex: 1, backgroundColor: theme.background },
   container: { flex: 1, paddingHorizontal: 24, paddingTop: 16 },
+  topRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginBottom: 8 },
+  closeButton: {
+    width: 36,
+    height: 36,
+    borderRadius: 18,
+    backgroundColor: theme.card,
+    borderWidth: 1.5,
+    borderColor: theme.border,
+    alignItems: 'center',
+    justifyContent: 'center',
+  },
+  closeButtonText: { fontSize: 15, color: theme.textMuted, fontFamily: fontFamily('700') },
   progressRow: {
+    flex: 1,
     flexDirection: 'row',
     justifyContent: 'space-between',
-    marginBottom: 8,
   },
-  progressText: { color: theme.textMuted, fontWeight: '600' },
-  scoreText: { color: theme.primary, fontWeight: '700' },
+  progressText: { color: theme.textMuted, fontFamily: fontFamily('600') },
+  scoreText: { color: theme.primary, fontFamily: fontFamily('700') },
   progressBarTrack: {
     height: 8,
     borderRadius: 4,
@@ -178,7 +197,7 @@ function makeStyles(theme: Theme) {
   },
   progressBarFill: {
     height: '100%',
-    backgroundColor: theme.primary,
+    backgroundColor: theme.accent,
     borderRadius: 4,
   },
   triviaHeader: {
@@ -193,12 +212,12 @@ function makeStyles(theme: Theme) {
     borderColor: theme.border,
   },
   triviaHeaderText: { flex: 1 },
-  triviaName: { fontSize: 16, fontWeight: '700', color: theme.text },
-  triviaSeries: { fontSize: 13, color: theme.textMuted },
+  triviaName: { fontSize: 16, fontFamily: fontFamily('700'), color: theme.text },
+  triviaSeries: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted },
   avatarWrap: { alignItems: 'center', marginBottom: 16 },
   modeLabel: {
     fontSize: 13,
-    fontWeight: '700',
+    fontFamily: fontFamily('700'),
     color: theme.accent,
     textTransform: 'uppercase',
     letterSpacing: 0.5,
@@ -207,6 +226,7 @@ function makeStyles(theme: Theme) {
   },
   hint: {
     fontSize: 17,
+    fontFamily: fontFamily('600'),
     color: theme.text,
     textAlign: 'center',
     lineHeight: 24,
@@ -230,7 +250,7 @@ function makeStyles(theme: Theme) {
     borderColor: theme.danger,
     backgroundColor: theme.dangerBg,
   },
-  optionText: { fontSize: 16, color: theme.text, fontWeight: '600' },
+  optionText: { fontSize: 16, color: theme.text, fontFamily: fontFamily('600') },
   nextButton: {
     marginTop: 24,
     backgroundColor: theme.accent,
@@ -238,6 +258,6 @@ function makeStyles(theme: Theme) {
     paddingVertical: 16,
     alignItems: 'center',
   },
-  nextButtonText: { color: '#fff', fontSize: 16, fontWeight: '700' },
+  nextButtonText: { color: theme.onPrimary, fontSize: 16, fontFamily: fontFamily('700') },
   });
 }
