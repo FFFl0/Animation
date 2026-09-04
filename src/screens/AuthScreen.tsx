@@ -6,12 +6,12 @@ import {
   StyleSheet,
   Text,
   TextInput,
-  TouchableOpacity,
   View,
 } from 'react-native';
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth, AuthError } from '../auth/AuthContext';
+import SoundTouchable from '../sound/SoundTouchable';
 
 export default function AuthScreen() {
   const { login, register } = useAuth();
@@ -59,18 +59,18 @@ export default function AuthScreen() {
           <Text style={styles.title}>Anime Quiz</Text>
 
           <View style={styles.tabs}>
-            <TouchableOpacity
+            <SoundTouchable
               style={[styles.tab, !isRegister && styles.tabActive]}
               onPress={() => setMode('login')}
             >
               <Text style={[styles.tabText, !isRegister && styles.tabTextActive]}>Вход</Text>
-            </TouchableOpacity>
-            <TouchableOpacity
+            </SoundTouchable>
+            <SoundTouchable
               style={[styles.tab, isRegister && styles.tabActive]}
               onPress={() => setMode('register')}
             >
               <Text style={[styles.tabText, isRegister && styles.tabTextActive]}>Регистрация</Text>
-            </TouchableOpacity>
+            </SoundTouchable>
           </View>
 
           <TextInput
@@ -103,14 +103,14 @@ export default function AuthScreen() {
 
           {error && <Text style={styles.error}>{error}</Text>}
 
-          <TouchableOpacity
+          <SoundTouchable
             style={[styles.submit, busy && styles.submitDisabled]}
             onPress={handleSubmit}
             disabled={busy}
             activeOpacity={0.85}
           >
             <Text style={styles.submitText}>{isRegister ? 'Создать аккаунт' : 'Войти'}</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
 
           <Text style={styles.footer}>
             Аккаунт хранится только на этом устройстве — пароль не передаётся никуда и не хранится в открытом виде.

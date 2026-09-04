@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
@@ -82,9 +83,9 @@ export default function LeaderboardScreen({ onBack }: Props) {
   return (
     <View style={styles.safe}>
       <View style={styles.header}>
-        <TouchableOpacity onPress={onBack}>
+        <SoundTouchable onPress={onBack}>
           <Text style={styles.backText}>‹ Назад</Text>
-        </TouchableOpacity>
+        </SoundTouchable>
         <Text style={styles.title}>🏆 Рейтинг</Text>
         <View style={{ width: 56 }} />
       </View>
@@ -96,13 +97,13 @@ export default function LeaderboardScreen({ onBack }: Props) {
         contentContainerStyle={styles.tabs}
       >
         {TABS.map((tab) => (
-          <TouchableOpacity
+          <SoundTouchable
             key={tab.key}
             style={[styles.tab, category === tab.key && styles.tabActive]}
             onPress={() => setCategory(tab.key)}
           >
             <Text style={[styles.tabText, category === tab.key && styles.tabTextActive]}>{tab.label}</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
         ))}
       </ScrollView>
 

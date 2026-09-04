@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { SafeAreaView, ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
 import { CHARACTERS } from '../data/characters';
@@ -32,14 +33,14 @@ export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }
     <SafeAreaView style={styles.safe}>
       {profile && (
         <View style={styles.topBar}>
-          <TouchableOpacity style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
+          <SoundTouchable style={styles.profileBar} onPress={onOpenProfile} activeOpacity={0.85}>
             <AnimeAvatar avatar={profile.avatar} size={40} />
             <Text style={styles.profileName} numberOfLines={1}>{profile.username}</Text>
             <Text style={styles.profileLink}>Профиль ›</Text>
-          </TouchableOpacity>
-          <TouchableOpacity style={styles.trophyButton} onPress={onOpenLeaderboard} activeOpacity={0.85}>
+          </SoundTouchable>
+          <SoundTouchable style={styles.trophyButton} onPress={onOpenLeaderboard} activeOpacity={0.85}>
             <Text style={styles.trophyEmoji}>🏆</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
         </View>
       )}
 
@@ -52,7 +53,7 @@ export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }
 
         <View style={styles.modes}>
           {MODES.map((m) => (
-            <TouchableOpacity
+            <SoundTouchable
               key={m.mode}
               style={styles.modeCard}
               onPress={() => onStart(m.mode)}
@@ -63,7 +64,7 @@ export default function HomeScreen({ onStart, onOpenProfile, onOpenLeaderboard }
                 <Text style={styles.modeTitle}>{m.title}</Text>
                 <Text style={styles.modeSubtitle}>{m.subtitle}</Text>
               </View>
-            </TouchableOpacity>
+            </SoundTouchable>
           ))}
         </View>
 

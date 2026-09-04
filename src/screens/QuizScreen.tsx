@@ -1,7 +1,9 @@
 import { useMemo, useState } from 'react';
 import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
+import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question, QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
 import { getPoster } from '../data/animePosters';
 import AnimeAvatar from '../components/AnimeAvatar';
@@ -35,6 +37,7 @@ function seedFromId(id: string): number {
 export default function QuizScreen({ mode, onFinish }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { playCorrect, playWrong } = useSound();
   const questions = useMemo<Question[]>(() => generateQuiz(mode, QUESTIONS_PER_QUIZ), [mode]);
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -48,6 +51,9 @@ export default function QuizScreen({ mode, onFinish }: Props) {
     setSelected(optionIndex);
     if (optionIndex === question.correctIndex) {
       setScore((s) => s + 1);
+      playCorrect();
+    } else {
+      playWrong();
     }
   };
 
@@ -143,9 +149,9 @@ export default function QuizScreen({ mode, onFinish }: Props) {
         </View>
 
         {selected !== null && (
-          <TouchableOpacity style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
+          <SoundTouchable style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
             <Text style={styles.nextButtonText}>{isLast ? 'Результаты' : 'Дальше'}</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
         )}
       </View>
     </SafeAreaView>

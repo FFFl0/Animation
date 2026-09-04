@@ -1,5 +1,6 @@
 import { useMemo } from 'react';
-import { SafeAreaView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { SafeAreaView, StyleSheet, Text, View } from 'react-native';
+import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { useTheme } from '../theme/ThemeContext';
 
@@ -32,13 +33,13 @@ export default function ResultScreen({ score, total, onRestart, onHome }: Props)
         </Text>
         <Text style={styles.message}>{getMessage(ratio)}</Text>
 
-        <TouchableOpacity style={styles.primaryButton} onPress={onRestart} activeOpacity={0.85}>
+        <SoundTouchable style={styles.primaryButton} onPress={onRestart} activeOpacity={0.85}>
           <Text style={styles.primaryButtonText}>Попробовать снова</Text>
-        </TouchableOpacity>
+        </SoundTouchable>
 
-        <TouchableOpacity style={styles.secondaryButton} onPress={onHome} activeOpacity={0.85}>
+        <SoundTouchable style={styles.secondaryButton} onPress={onHome} activeOpacity={0.85}>
           <Text style={styles.secondaryButtonText}>На главную</Text>
-        </TouchableOpacity>
+        </SoundTouchable>
       </View>
     </SafeAreaView>
   );

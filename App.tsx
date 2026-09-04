@@ -3,6 +3,7 @@ import { ActivityIndicator, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { SoundProvider, useSound } from './src/sound/SoundContext';
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import QuizScreen from './src/screens/QuizScreen';
@@ -16,6 +17,7 @@ type Screen = 'home' | 'quiz' | 'result' | 'profile' | 'leaderboard';
 function AppShell() {
   const { profile, loading, recordQuizResult } = useAuth();
   const { theme, resolvedScheme } = useTheme();
+  const { setMusicContext } = useSound();
   const [screen, setScreen] = useState<Screen>('home');
   const [mode, setMode] = useState<QuizMode>('photo');
   const [quizKey, setQuizKey] = useState(0);
@@ -24,6 +26,10 @@ function AppShell() {
   useEffect(() => {
     setScreen('home');
   }, [profile?.id]);
+
+  useEffect(() => {
+    setMusicContext(!profile ? 'menu' : screen === 'quiz' ? 'quiz' : 'menu');
+  }, [profile, screen, setMusicContext]);
 
   if (loading) {
     return (
@@ -82,9 +88,11 @@ function AppShell() {
 export default function App() {
   return (
     <ThemeProvider>
-      <AuthProvider>
-        <AppShell />
-      </AuthProvider>
+      <SoundProvider>
+        <AuthProvider>
+          <AppShell />
+        </AuthProvider>
+      </SoundProvider>
     </ThemeProvider>
   );
 }

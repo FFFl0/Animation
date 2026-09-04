@@ -1,7 +1,9 @@
 import { ReactNode, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TouchableOpacity, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { useTheme, ThemeMode } from '../theme/ThemeContext';
+import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS, HairStyle } from '../data/characters';
 import { QuizMode, QUESTIONS_PER_QUIZ } from '../quiz/generateQuiz';
@@ -40,6 +42,7 @@ function cycle<T>(list: T[], current: T, dir: 1 | -1): T {
 export default function ProfileScreen({ onBack }: Props) {
   const { profile, logout, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
+  const { musicEnabled, sfxEnabled, toggleMusic, toggleSfx } = useSound();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [editing, setEditing] = useState(false);
 
@@ -50,9 +53,9 @@ export default function ProfileScreen({ onBack }: Props) {
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.container}>
-      <TouchableOpacity onPress={onBack} style={styles.backButton}>
+      <SoundTouchable onPress={onBack} style={styles.backButton}>
         <Text style={styles.backText}>‹ Назад</Text>
-      </TouchableOpacity>
+      </SoundTouchable>
 
       <View style={styles.avatarSection}>
         <AnimeAvatar avatar={avatar} size={120} />
@@ -60,21 +63,21 @@ export default function ProfileScreen({ onBack }: Props) {
         <Text style={styles.joined}>
           С нами с {new Date(profile.createdAt).toLocaleDateString('ru-RU')}
         </Text>
-        <TouchableOpacity style={styles.editToggle} onPress={() => setEditing((v) => !v)}>
+        <SoundTouchable style={styles.editToggle} onPress={() => setEditing((v) => !v)}>
           <Text style={styles.editToggleText}>{editing ? 'Готово' : 'Настроить аватар'}</Text>
-        </TouchableOpacity>
+        </SoundTouchable>
       </View>
 
       {editing && (
         <View style={styles.editor}>
           <EditorRow styles={styles} label="Причёска">
-            <TouchableOpacity onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, -1) } })}>
+            <SoundTouchable onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, -1) } })}>
               <Text style={styles.arrow}>‹</Text>
-            </TouchableOpacity>
+            </SoundTouchable>
             <Text style={styles.editorValue}>{avatar.hairStyle}</Text>
-            <TouchableOpacity onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, 1) } })}>
+            <SoundTouchable onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, 1) } })}>
               <Text style={styles.arrow}>›</Text>
-            </TouchableOpacity>
+            </SoundTouchable>
           </EditorRow>
 
           <EditorRow styles={styles} label="Волосы">
@@ -92,13 +95,13 @@ export default function ProfileScreen({ onBack }: Props) {
           <EditorRow styles={styles} label="Значок">
             <ScrollView horizontal showsHorizontalScrollIndicator={false}>
               {BADGE_OPTIONS.map((b) => (
-                <TouchableOpacity
+                <SoundTouchable
                   key={b}
                   style={[styles.badgeOption, b === avatar.badge && styles.badgeOptionSelected]}
                   onPress={() => updateAvatar({ avatar: { ...avatar, badge: b } })}
                 >
                   <Text style={styles.badgeOptionText}>{b}</Text>
-                </TouchableOpacity>
+                </SoundTouchable>
               ))}
             </ScrollView>
           </EditorRow>
@@ -108,7 +111,7 @@ export default function ProfileScreen({ onBack }: Props) {
       <Text style={styles.sectionTitle}>Любимый персонаж</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
         {CHARACTERS.map((c) => (
-          <TouchableOpacity
+          <SoundTouchable
             key={c.id}
             style={styles.favItem}
             onPress={() => updateAvatar({ favoriteCharacterId: c.id === profile.favoriteCharacterId ? null : c.id })}
@@ -117,7 +120,7 @@ export default function ProfileScreen({ onBack }: Props) {
               <AnimeAvatar avatar={c.avatar} size={56} />
             </View>
             <Text style={styles.favName} numberOfLines={1}>{c.name.split(' ')[0]}</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
         ))}
       </ScrollView>
       {favoriteCharacter && (
@@ -143,19 +146,39 @@ export default function ProfileScreen({ onBack }: Props) {
       <Text style={styles.sectionTitle}>Тема оформления</Text>
       <View style={styles.themeTabs}>
         {THEME_TABS.map((tab) => (
-          <TouchableOpacity
+          <SoundTouchable
             key={tab.key}
             style={[styles.themeTab, mode === tab.key && styles.themeTabActive]}
             onPress={() => setMode(tab.key)}
           >
             <Text style={[styles.themeTabText, mode === tab.key && styles.themeTabTextActive]}>{tab.label}</Text>
-          </TouchableOpacity>
+          </SoundTouchable>
         ))}
       </View>
 
-      <TouchableOpacity style={styles.logout} onPress={logout} activeOpacity={0.85}>
+      <Text style={styles.sectionTitle}>Звук</Text>
+      <View style={styles.themeTabs}>
+        <SoundTouchable
+          style={[styles.themeTab, musicEnabled && styles.themeTabActive]}
+          onPress={toggleMusic}
+        >
+          <Text style={[styles.themeTabText, musicEnabled && styles.themeTabTextActive]}>
+            🎵 Музыка {musicEnabled ? 'вкл' : 'выкл'}
+          </Text>
+        </SoundTouchable>
+        <SoundTouchable
+          style={[styles.themeTab, sfxEnabled && styles.themeTabActive]}
+          onPress={toggleSfx}
+        >
+          <Text style={[styles.themeTabText, sfxEnabled && styles.themeTabTextActive]}>
+            🔊 Звуки {sfxEnabled ? 'вкл' : 'выкл'}
+          </Text>
+        </SoundTouchable>
+      </View>
+
+      <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
         <Text style={styles.logoutText}>Выйти из аккаунта</Text>
-      </TouchableOpacity>
+      </SoundTouchable>
     </ScrollView>
   );
 }
@@ -175,7 +198,7 @@ function SwatchRow({ colors, selected, onSelect, styles }: { colors: string[]; s
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
       {colors.map((c) => (
-        <TouchableOpacity
+        <SoundTouchable
           key={c}
           onPress={() => onSelect(c)}
           style={[
