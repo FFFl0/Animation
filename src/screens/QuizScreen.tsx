@@ -11,6 +11,7 @@ import { RoundConfig } from '../quiz/types';
 import AnimeAvatar from '../components/AnimeAvatar';
 import ProgressBar, { ProgressDots } from '../components/ProgressBar';
 import LivesIndicator from '../components/LivesIndicator';
+import Icon from '../components/Icon';
 
 type Props = {
   config: RoundConfig;
@@ -91,7 +92,7 @@ export default function QuizScreen({ config, onFinish, onClose }: Props) {
       <View style={styles.container}>
         <View style={styles.topRow}>
           <SoundTouchable style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
-            <Text style={styles.closeButtonText}>✕</Text>
+            <Icon name="close" size={15} color={theme.textMuted} />
           </SoundTouchable>
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>
@@ -115,50 +116,52 @@ export default function QuizScreen({ config, onFinish, onClose }: Props) {
           <Text style={[styles.timer, timeLeft <= 3 && { color: theme.danger }]}>⏱ {timeLeft}с</Text>
         )}
 
-        {question.promptKind !== 'text' && question.character && (
-          <View style={styles.avatarWrap}>
-            <AnimeAvatar
-              avatar={question.character.avatar}
-              size={140}
-              variant={question.promptKind === 'avatar' ? 'full' : question.promptKind}
-            />
+        <View style={styles.centerBlock}>
+          {question.promptKind !== 'text' && question.character && (
+            <View style={styles.avatarWrap}>
+              <AnimeAvatar
+                avatar={question.character.avatar}
+                size={140}
+                variant={question.promptKind === 'avatar' ? 'full' : question.promptKind}
+              />
+            </View>
+          )}
+
+          <Text style={styles.hint}>{question.promptText}</Text>
+
+          <View style={styles.options}>
+            {question.options.map((option, i) => {
+              const isCorrect = i === question.correctIndex;
+              const isSelected = i === selected;
+              const showState = selected !== null;
+
+              let style = styles.option;
+              if (showState && isCorrect) style = { ...styles.option, ...styles.optionCorrect };
+              else if (showState && isSelected && !isCorrect) style = { ...styles.option, ...styles.optionWrong };
+
+              return (
+                <TouchableOpacity
+                  key={option}
+                  style={style}
+                  onPress={() => handleSelect(i)}
+                  disabled={showState}
+                  activeOpacity={0.8}
+                  accessibilityRole="button"
+                >
+                  <Text style={styles.optionText}>{option}</Text>
+                </TouchableOpacity>
+              );
+            })}
           </View>
-        )}
 
-        <Text style={styles.hint}>{question.promptText}</Text>
-
-        <View style={styles.options}>
-          {question.options.map((option, i) => {
-            const isCorrect = i === question.correctIndex;
-            const isSelected = i === selected;
-            const showState = selected !== null;
-
-            let style = styles.option;
-            if (showState && isCorrect) style = { ...styles.option, ...styles.optionCorrect };
-            else if (showState && isSelected && !isCorrect) style = { ...styles.option, ...styles.optionWrong };
-
-            return (
-              <TouchableOpacity
-                key={option}
-                style={style}
-                onPress={() => handleSelect(i)}
-                disabled={showState}
-                activeOpacity={0.8}
-                accessibilityRole="button"
-              >
-                <Text style={styles.optionText}>{option}</Text>
-              </TouchableOpacity>
-            );
-          })}
+          {selected !== null && (
+            <SoundTouchable style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
+              <Text style={styles.nextButtonText}>
+                {isLast || (hasLives && lives <= 0) ? 'Результаты' : 'Дальше'}
+              </Text>
+            </SoundTouchable>
+          )}
         </View>
-
-        {selected !== null && (
-          <SoundTouchable style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
-            <Text style={styles.nextButtonText}>
-              {isLast || (hasLives && lives <= 0) ? 'Результаты' : 'Дальше'}
-            </Text>
-          </SoundTouchable>
-        )}
       </View>
     </SafeAreaView>
   );
@@ -179,12 +182,12 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    closeButtonText: { fontSize: 15, color: theme.textMuted, fontFamily: fontFamily('700') },
     progressRow: { flex: 1, flexDirection: 'row', justifyContent: 'space-between', alignItems: 'center' },
     progressText: { color: theme.textMuted, fontFamily: fontFamily('600') },
     dotsWrap: { marginBottom: 16 },
     barWrap: { marginBottom: 16 },
     timer: { textAlign: 'center', fontFamily: fontFamily('700'), color: theme.text, marginBottom: 8, fontSize: 14 },
+    centerBlock: { flex: 1, justifyContent: 'center', paddingBottom: 24 },
     avatarWrap: { alignItems: 'center', marginBottom: 16 },
     hint: {
       fontSize: 17,

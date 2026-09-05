@@ -4,23 +4,25 @@ import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { useTheme } from '../theme/ThemeContext';
 import { radius } from '../theme/tokens';
+import Icon, { IconName } from './Icon';
 
 type Props = {
-  icon: string;
+  icon: IconName;
+  iconColor: string;
   iconBg: string;
   title: string;
   subtitle: string;
   onPress: () => void;
 };
 
-export default function CategoryTile({ icon, iconBg, title, subtitle, onPress }: Props) {
+export default function CategoryTile({ icon, iconColor, iconBg, title, subtitle, onPress }: Props) {
   const { theme } = useTheme();
   const styles = makeStyles(theme);
 
   return (
     <SoundTouchable style={styles.card} onPress={onPress} activeOpacity={0.85}>
       <View style={[styles.iconWrap, { backgroundColor: iconBg }]}>
-        <Text style={styles.icon}>{icon}</Text>
+        <Icon name={icon} size={20} color={iconColor} />
       </View>
       <Text style={styles.title}>{title}</Text>
       <Text style={styles.subtitle}>{subtitle}</Text>
@@ -46,7 +48,6 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
       marginBottom: 10,
     },
-    icon: { fontSize: 22 },
     title: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text, marginBottom: 2 },
     subtitle: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted },
   });

@@ -1,10 +1,12 @@
+import { IconName } from '../components/Icon';
+
 export type TierId = 'novice' | 'fan' | 'otaku' | 'expert' | 'legend';
 
 export type Tier = {
   id: TierId;
   label: string;
   description: string;
-  icon: string;
+  icon: IconName;
   color: string;
   colorBg: string;
   questionsPerRound: number;
@@ -16,7 +18,7 @@ export const TIERS: Tier[] = [
     id: 'novice',
     label: 'Новичок',
     description: 'Главные герои популярных аниме',
-    icon: '🌿',
+    icon: 'leaf',
     color: '#22C55E',
     colorBg: '#E8F9EE',
     questionsPerRound: 20,
@@ -26,7 +28,7 @@ export const TIERS: Tier[] = [
     id: 'fan',
     label: 'Любитель',
     description: 'Второстепенные персонажи и детали',
-    icon: '🌊',
+    icon: 'wave',
     color: '#3B82F6',
     colorBg: '#E7F0FE',
     questionsPerRound: 20,
@@ -36,7 +38,7 @@ export const TIERS: Tier[] = [
     id: 'otaku',
     label: 'Отаку',
     description: 'Способности, организации и лор',
-    icon: '🌸',
+    icon: 'sakura',
     color: '#F06292',
     colorBg: '#FADDE1',
     questionsPerRound: 20,
@@ -46,7 +48,7 @@ export const TIERS: Tier[] = [
     id: 'expert',
     label: 'Эксперт',
     description: 'Детали сюжета и неочевидные факты',
-    icon: '🔥',
+    icon: 'flame',
     color: '#EF4444',
     colorBg: '#FDEAEA',
     questionsPerRound: 20,
@@ -56,7 +58,7 @@ export const TIERS: Tier[] = [
     id: 'legend',
     label: 'Легенда',
     description: 'Только для элиты — редкие детали',
-    icon: '👑',
+    icon: 'crown',
     color: '#D4A017',
     colorBg: '#FBF0C9',
     questionsPerRound: 20,

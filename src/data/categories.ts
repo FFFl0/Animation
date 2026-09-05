@@ -1,3 +1,5 @@
+import { IconName } from '../components/Icon';
+
 export type QuestionType =
   | 'guessSeries'
   | 'guessCharacterFull'
@@ -22,7 +24,7 @@ export type Category = {
   id: CategoryId;
   title: string;
   description: string;
-  icon: string;
+  icon: IconName;
   color: string;
   colorBg: string;
   questionTypes: QuestionType[];
@@ -34,7 +36,7 @@ export const CATEGORIES: Category[] = [
     id: 'anime',
     title: 'Аниме',
     description: 'Угадывай аниме по персонажу, сюжету и символам',
-    icon: '🎌',
+    icon: 'book',
     color: '#22C55E',
     colorBg: '#E8F9EE',
     questionTypes: ['guessSeries'],
@@ -43,7 +45,7 @@ export const CATEGORIES: Category[] = [
     id: 'characters',
     title: 'Персонажи',
     description: 'Имя героя, способности, команда и детали',
-    icon: '👤',
+    icon: 'character',
     color: '#3B82F6',
     colorBg: '#E7F0FE',
     questionTypes: ['guessCharacterFull', 'guessCharacterSilhouette', 'guessCharacterEyes'],
@@ -52,7 +54,7 @@ export const CATEGORIES: Category[] = [
     id: 'openings',
     title: 'Опенинги и эндинги',
     description: 'Угадай аниме по заставке и её деталям',
-    icon: '🎵',
+    icon: 'music',
     color: '#A855F7',
     colorBg: '#F1E7FB',
     questionTypes: ['openingTrivia'],
@@ -61,7 +63,7 @@ export const CATEGORIES: Category[] = [
     id: 'quotes',
     title: 'Цитаты',
     description: 'Кто сказал фразу и из какого аниме',
-    icon: '💬',
+    icon: 'quote',
     color: '#F06292',
     colorBg: '#FADDE1',
     questionTypes: ['guessQuote'],
@@ -70,7 +72,7 @@ export const CATEGORIES: Category[] = [
     id: 'battles',
     title: 'Бои и способности',
     description: 'Владелец способности, техники и оружие',
-    icon: '⚔️',
+    icon: 'swords',
     color: '#EF4444',
     colorBg: '#FDEAEA',
     questionTypes: ['guessAbility'],
@@ -79,7 +81,7 @@ export const CATEGORIES: Category[] = [
     id: 'world',
     title: 'Мир аниме',
     description: 'Кланы, организации, школы и фракции',
-    icon: '🌸',
+    icon: 'globe',
     color: '#EC4899',
     colorBg: '#FCE4F1',
     questionTypes: ['guessFaction'],
@@ -88,7 +90,7 @@ export const CATEGORIES: Category[] = [
     id: 'hard',
     title: 'Сложные',
     description: 'Для опытных фанатов — детали и мелочи',
-    icon: '🧠',
+    icon: 'star',
     color: '#D4A017',
     colorBg: '#FBF0C9',
     questionTypes: ['guessCharacterFull', 'guessQuote', 'guessAbility', 'guessFaction', 'guessSeries'],
@@ -98,7 +100,7 @@ export const CATEGORIES: Category[] = [
     id: 'mixed',
     title: 'Смешанный квиз',
     description: 'Вопросы из всех категорий вперемешку',
-    icon: '🔥',
+    icon: 'shuffle',
     color: '#F97316',
     colorBg: '#FDECDC',
     questionTypes: ['guessSeries', 'guessCharacterFull', 'guessQuote', 'guessAbility', 'guessFaction', 'openingTrivia'],

@@ -10,6 +10,7 @@ import { TIERS } from '../data/difficulty';
 import { GAME_MODES } from '../data/modes';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeStat } from '../auth/types';
+import Icon from '../components/Icon';
 
 function sumStats(stats: ModeStat[]): ModeStat {
   return stats.reduce(
@@ -49,7 +50,10 @@ export default function StatsScreen() {
             <Text style={styles.overviewLabel}>Точность</Text>
           </View>
           <View style={styles.overviewCard}>
-            <Text style={styles.overviewValue}>🔥 {profile.streak.count}</Text>
+            <View style={styles.overviewStreakRow}>
+              <Icon name="flame" size={16} color={theme.primary} />
+              <Text style={styles.overviewValue}>{profile.streak.count}</Text>
+            </View>
             <Text style={styles.overviewLabel}>Серия дней</Text>
           </View>
         </View>
@@ -65,7 +69,7 @@ export default function StatsScreen() {
           return (
             <View key={cat.id} style={styles.row}>
               <View style={[styles.rowIcon, { backgroundColor: cat.colorBg }]}>
-                <Text style={styles.rowIconText}>{cat.icon}</Text>
+                <Icon name={cat.icon} size={16} color={cat.color} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>{cat.title}</Text>
@@ -84,7 +88,7 @@ export default function StatsScreen() {
           return (
             <View key={mode.id} style={styles.row}>
               <View style={styles.rowIconPlain}>
-                <Text style={styles.rowIconText}>{mode.icon}</Text>
+                <Icon name={mode.icon} size={16} color={theme.primary} />
               </View>
               <View style={styles.rowText}>
                 <Text style={styles.rowTitle}>{mode.title}</Text>
@@ -114,6 +118,7 @@ function makeStyles(theme: Theme) {
       paddingVertical: 14,
       alignItems: 'center',
     },
+    overviewStreakRow: { flexDirection: 'row', alignItems: 'center', gap: 4 },
     overviewValue: { fontSize: 17, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 2 },
     overviewLabel: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted, textAlign: 'center' },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 8, marginBottom: 10 },
@@ -130,7 +135,6 @@ function makeStyles(theme: Theme) {
     },
     rowIcon: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center' },
     rowIconPlain: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', backgroundColor: theme.background },
-    rowIconText: { fontSize: 17 },
     rowText: { flex: 1 },
     rowTitle: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.text },
     rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },

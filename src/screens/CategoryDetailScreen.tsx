@@ -12,6 +12,7 @@ import { categoryStatsKey, getStat } from '../quiz/statsKey';
 import { ToriiIcon } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import ProgressBar from '../components/ProgressBar';
+import Icon from '../components/Icon';
 
 type Props = {
   categoryId: CategoryId;
@@ -63,7 +64,7 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
                   activeOpacity={unlocked ? 0.85 : 1}
                 >
                   <View style={[styles.tierIconWrap, { backgroundColor: tier.colorBg }]}>
-                    <Text style={styles.tierIcon}>{unlocked ? tier.icon : '🔒'}</Text>
+                    <Icon name={unlocked ? tier.icon : 'lock'} size={19} color={unlocked ? tier.color : theme.textMuted} />
                   </View>
                   <View style={styles.tierText}>
                     <Text style={styles.tierLabel}>{tier.label}</Text>
@@ -120,7 +121,6 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    tierIcon: { fontSize: 20 },
     tierText: { flex: 1 },
     tierLabel: { fontSize: 15, fontFamily: fontFamily('700'), color: theme.text },
     tierDesc: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1, marginBottom: 6 },

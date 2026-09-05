@@ -1,4 +1,6 @@
-import { Text, View } from 'react-native';
+import { View } from 'react-native';
+import Icon from './Icon';
+import { useTheme } from '../theme/ThemeContext';
 
 type Props = {
   lives: number;
@@ -6,14 +8,13 @@ type Props = {
   size?: number;
 };
 
-export default function LivesIndicator({ lives, max, size = 16 }: Props) {
+export default function LivesIndicator({ lives, max, size = 15 }: Props) {
+  const { theme } = useTheme();
   const hearts = Array.from({ length: max }, (_, i) => i < lives);
   return (
-    <View style={{ flexDirection: 'row', gap: 2 }}>
+    <View style={{ flexDirection: 'row', gap: 3 }}>
       {hearts.map((filled, i) => (
-        <Text key={i} style={{ fontSize: size, opacity: filled ? 1 : 0.28 }}>
-          {filled ? '❤️' : '🤍'}
-        </Text>
+        <Icon key={i} name={filled ? 'heart' : 'heartOutline'} size={size} color={filled ? theme.danger : theme.border} />
       ))}
     </View>
   );

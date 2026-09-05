@@ -6,6 +6,7 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { PetalScatter } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
+import Icon from '../components/Icon';
 
 type Props = {
   score: number;
@@ -34,7 +35,7 @@ export default function ResultScreen({ score, total, onRestart, onChooseCategory
         <View style={styles.trophyWrap}>
           <PetalScatter size={150} color={theme.primaryLight} count={6} />
           <View style={styles.trophyCircle}>
-            <Text style={styles.trophyEmoji}>🏆</Text>
+            <Icon name="trophy" size={42} color={theme.primary} strokeWidth={1.6} />
           </View>
         </View>
 
@@ -85,7 +86,6 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    trophyEmoji: { fontSize: 46 },
     title: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 4 },
     subtitle: { fontSize: 15, fontFamily: fontFamily('600'), color: theme.textMuted, marginBottom: 10 },
     message: {

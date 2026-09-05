@@ -12,6 +12,7 @@ import { ANIME_SERIES } from '../data/animeSeries';
 import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
+import Icon from '../components/Icon';
 
 type Props = {
   onOpenCategory: (id: CategoryId) => void;
@@ -56,12 +57,12 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             <Text style={styles.subGreeting}>Готов проверить свои знания об аниме?</Text>
           </View>
           <SoundTouchable style={styles.gearButton} onPress={onOpenSettings} activeOpacity={0.8}>
-            <Text style={styles.gearIcon}>⚙️</Text>
+            <Icon name="settings" size={18} color={theme.text} />
           </SoundTouchable>
         </View>
 
         <View style={styles.streakCard}>
-          <Text style={styles.streakIcon}>🔥</Text>
+          <Icon name="flame" size={26} color={theme.primary} />
           <View>
             <Text style={styles.streakLabel}>Серия ответов</Text>
             <Text style={styles.streakValue}>{profile.streak.count}</Text>
@@ -74,6 +75,7 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             <CategoryTile
               key={cat.id}
               icon={cat.icon}
+              iconColor={cat.color}
               iconBg={cat.colorBg}
               title={cat.title}
               subtitle={categoryCount(cat.id)}
@@ -86,7 +88,9 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modesRow}>
           {GAME_MODES.map((mode) => (
             <SoundTouchable key={mode.id} style={styles.modeCard} onPress={() => onStartMode(mode.id)} activeOpacity={0.85}>
-              <Text style={styles.modeIcon}>{mode.icon}</Text>
+              <View style={styles.modeIconWrap}>
+                <Icon name={mode.icon} size={18} color={theme.primary} />
+              </View>
               <Text style={styles.modeTitle}>{mode.title}</Text>
               <Text style={styles.modeSubtitle}>{mode.subtitle}</Text>
             </SoundTouchable>
@@ -114,7 +118,6 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    gearIcon: { fontSize: 17 },
     streakCard: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -124,7 +127,6 @@ function makeStyles(theme: Theme) {
       padding: 14,
       marginBottom: 22,
     },
-    streakIcon: { fontSize: 28 },
     streakLabel: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text, opacity: 0.7 },
     streakValue: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 12 },
@@ -144,7 +146,15 @@ function makeStyles(theme: Theme) {
       borderColor: theme.border,
       padding: 14,
     },
-    modeIcon: { fontSize: 22, marginBottom: 8 },
+    modeIconWrap: {
+      width: 34,
+      height: 34,
+      borderRadius: 11,
+      backgroundColor: theme.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+      marginBottom: 10,
+    },
     modeTitle: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text, marginBottom: 2 },
     modeSubtitle: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, lineHeight: 15 },
   });

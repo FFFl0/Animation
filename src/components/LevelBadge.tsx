@@ -2,11 +2,12 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Tier } from '../data/difficulty';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
+import Icon from './Icon';
 
 export default function LevelBadge({ tier }: { tier: Tier }) {
   return (
     <View style={[styles.badge, { backgroundColor: tier.colorBg }]}>
-      <Text style={styles.icon}>{tier.icon}</Text>
+      <Icon name={tier.icon} size={14} color={tier.color} />
       <Text style={[styles.label, { color: tier.color }]}>{tier.label}</Text>
     </View>
   );
@@ -22,6 +23,5 @@ const styles = StyleSheet.create({
     borderRadius: radius.pill,
     alignSelf: 'flex-start',
   },
-  icon: { fontSize: 13 },
   label: { fontSize: 12, fontFamily: fontFamily('700') },
 });

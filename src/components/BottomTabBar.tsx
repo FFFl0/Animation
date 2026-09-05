@@ -2,6 +2,7 @@ import { StyleSheet, Text, View } from 'react-native';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import SoundTouchable from '../sound/SoundTouchable';
+import Icon, { IconName } from './Icon';
 
 export type TabKey = 'home' | 'stats' | 'achievements' | 'profile';
 
@@ -11,11 +12,11 @@ type Props = {
   theme: Theme;
 };
 
-const TABS: { key: TabKey; label: string; icon: string }[] = [
-  { key: 'home', label: 'Главная', icon: '🏠' },
-  { key: 'stats', label: 'Статистика', icon: '📊' },
-  { key: 'achievements', label: 'Достижения', icon: '🏆' },
-  { key: 'profile', label: 'Профиль', icon: '👤' },
+const TABS: { key: TabKey; label: string; icon: IconName }[] = [
+  { key: 'home', label: 'Главная', icon: 'home' },
+  { key: 'stats', label: 'Статистика', icon: 'stats' },
+  { key: 'achievements', label: 'Достижения', icon: 'medal' },
+  { key: 'profile', label: 'Профиль', icon: 'user' },
 ];
 
 export default function BottomTabBar({ active, onChange, theme }: Props) {
@@ -26,7 +27,7 @@ export default function BottomTabBar({ active, onChange, theme }: Props) {
         const isActive = tab.key === active;
         return (
           <SoundTouchable key={tab.key} style={styles.tab} onPress={() => onChange(tab.key)} activeOpacity={0.7}>
-            <Text style={[styles.icon, isActive && styles.iconActive]}>{tab.icon}</Text>
+            <Icon name={tab.icon} size={20} color={isActive ? theme.primary : theme.textMuted} strokeWidth={isActive ? 2 : 1.7} />
             <Text style={[styles.label, isActive && styles.labelActive]}>{tab.label}</Text>
           </SoundTouchable>
         );
@@ -46,8 +47,6 @@ function makeStyles(theme: Theme) {
       paddingBottom: 22,
     },
     tab: { flex: 1, alignItems: 'center', gap: 3 },
-    icon: { fontSize: 19, opacity: 0.4 },
-    iconActive: { opacity: 1 },
     label: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted },
     labelActive: { color: theme.primary },
   });

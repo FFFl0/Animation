@@ -6,6 +6,7 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { ACHIEVEMENTS } from '../data/achievements';
+import Icon from '../components/Icon';
 
 export default function AchievementsScreen() {
   const { profile } = useAuth();
@@ -28,7 +29,7 @@ export default function AchievementsScreen() {
             return (
               <View key={a.id} style={[styles.card, !unlocked && styles.cardLocked]}>
                 <View style={[styles.iconWrap, unlocked && { backgroundColor: theme.primaryLight }]}>
-                  <Text style={styles.icon}>{unlocked ? a.icon : '🔒'}</Text>
+                  <Icon name={unlocked ? a.icon : 'lock'} size={18} color={unlocked ? theme.primary : theme.textMuted} />
                 </View>
                 <Text style={styles.title}>{a.title}</Text>
                 <Text style={styles.description}>{a.description}</Text>
@@ -66,7 +67,6 @@ function makeStyles(theme: Theme) {
       justifyContent: 'center',
       marginBottom: 10,
     },
-    icon: { fontSize: 19 },
     title: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.text, marginBottom: 3 },
     description: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, lineHeight: 15 },
   });

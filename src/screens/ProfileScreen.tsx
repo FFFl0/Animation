@@ -118,7 +118,7 @@ export default function ProfileScreen() {
           onPress={toggleMusic}
         >
           <Text style={[styles.themeTabText, musicEnabled && styles.themeTabTextActive]}>
-            🎵 Музыка {musicEnabled ? 'вкл' : 'выкл'}
+            Музыка {musicEnabled ? 'вкл' : 'выкл'}
           </Text>
         </SoundTouchable>
         <SoundTouchable
@@ -126,7 +126,7 @@ export default function ProfileScreen() {
           onPress={toggleSfx}
         >
           <Text style={[styles.themeTabText, sfxEnabled && styles.themeTabTextActive]}>
-            🔊 Звуки {sfxEnabled ? 'вкл' : 'выкл'}
+            Звуки {sfxEnabled ? 'вкл' : 'выкл'}
           </Text>
         </SoundTouchable>
       </View>
