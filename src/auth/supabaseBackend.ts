@@ -5,7 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { AuthError } from './authError';
-import { validateCredentials, usernameToEmail, isSyntheticEmail } from './validation';
+import { validateCredentials, usernameToEmail } from './validation';
 import { parseAuthTokensFromUrl } from './parseRecoveryUrl';
 import { Profile } from './types';
 import { makeAvatar } from '../data/avatar';
@@ -143,28 +143,33 @@ export async function register(username: string, password: string, recoveryEmail
   return profile;
 }
 
-async function resolveAuthEmail(username: string): Promise<string> {
+/**
+ * Calls the `auth-helper` Edge Function, which does the username→email
+ * resolution server-side (via the service role) — the account's email can
+ * be a real address the player supplied for password recovery, and must
+ * never be sent back to the client just to let it sign in or trigger a
+ * reset. See supabase/functions/auth-helper.
+ */
+async function callAuthHelper<T>(body: Record<string, unknown>): Promise<T> {
   const client = supabase!;
-  const { data, error } = await client.rpc('get_auth_email', { p_username: username.trim() });
-  if (error || !data) return usernameToEmail(username);
-  return data as string;
+  const { data, error } = await client.functions.invoke('auth-helper', { body });
+  if (error) throw new AuthError('Не удалось связаться с сервером, попробуйте ещё раз');
+  if (data?.error) throw mapAuthError(data.error);
+  return data as T;
 }
 
 export async function login(username: string, password: string): Promise<Profile> {
-  const trimmed = username.trim();
   const client = supabase!;
-  const email = await resolveAuthEmail(trimmed);
+  const { access_token, refresh_token } = await callAuthHelper<{ access_token: string; refresh_token: string }>({
+    action: 'login',
+    username: username.trim(),
+    password,
+  });
 
-  const { data, error } = await client.auth.signInWithPassword({ email, password });
-  if (error) throw mapAuthError(error.message);
-  if (!data.user) throw new AuthError('Не удалось войти, попробуйте ещё раз');
+  const { data, error } = await client.auth.setSession({ access_token, refresh_token });
+  if (error || !data.user) throw new AuthError('Не удалось войти, попробуйте ещё раз');
 
-  const { data: row, error: fetchError } = await client.from('profiles').select('*').eq('id', data.user.id).single();
-  if (fetchError) throw new AuthError(fetchError.message);
-
-  const profile = rowToProfile(row as ProfileRow);
-  await cacheProfile(profile);
-  return profile;
+  return resolveOrCreateProfile(client, data.user.id, data.user.email);
 }
 
 export async function logout(): Promise<void> {
@@ -251,22 +256,17 @@ export async function signInWithGoogle(): Promise<Profile | null> {
 }
 
 export async function requestPasswordReset(username: string): Promise<{ ok: boolean; reason?: string }> {
-  const client = supabase!;
-  const email = await resolveAuthEmail(username);
-
-  if (isSyntheticEmail(email)) {
-    return { ok: false, reason: 'Для этого аккаунта не указан email для восстановления пароля.' };
-  }
-
   // A bare root path (no trailing path segment) works both as a custom-scheme
   // deep link on native and as a reachable URL on a single-page web deploy
   // with no server-side routing — a named path like `/reset-password` would
   // 404 there. The recovery vs. OAuth callback is told apart by the tokens
   // in the URL fragment, not by the path.
   const redirectTo = Linking.createURL('');
-  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
-  if (error) return { ok: false, reason: error.message };
-  return { ok: true };
+  return callAuthHelper<{ ok: boolean; reason?: string }>({
+    action: 'reset',
+    username: username.trim(),
+    redirectTo,
+  });
 }
 
 export async function completeRecoverySession(accessToken: string, refreshToken: string): Promise<void> {

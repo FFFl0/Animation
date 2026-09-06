@@ -72,21 +72,13 @@ from public.profiles;
 
 grant select on public.leaderboard to authenticated;
 
--- Resolves a username to its Supabase Auth email (real, if the player set
--- one for password recovery, or the synthesized "username@animequiz.local"
--- otherwise) so the client can call signInWithPassword before it has a
--- session. Exposes only the email string tied to a username — the same
--- kind of oracle most apps expose for username-based login.
-create or replace function public.get_auth_email(p_username text)
-returns text
-language sql
-security definer
-set search_path = public, auth
-as $$
-  select u.email from auth.users u
-  join public.profiles p on p.id = u.id
-  where lower(p.username) = lower(p_username)
-  limit 1;
-$$;
-
-grant execute on function public.get_auth_email(text) to anon, authenticated;
+-- get_auth_email (added above in an earlier version of this file, since
+-- removed) let any anonymous caller resolve a username straight to its
+-- Supabase Auth email — including a real address a player supplied for
+-- password recovery, not just the synthesized "username@animequiz.local"
+-- one. That's a PII-disclosure oracle: username -> real email needs no
+-- session at all. Username<->email resolution now happens server-side in
+-- the auth-helper Edge Function (supabase/functions/auth-helper) instead,
+-- which never returns the email to the client. Run this once to remove the
+-- old function from any project that already has it:
+drop function if exists public.get_auth_email(text);

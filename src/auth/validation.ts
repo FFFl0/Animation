@@ -15,7 +15,3 @@ export function usernameToEmail(username: string): string {
   return `${local}${SYNTHETIC_EMAIL_DOMAIN}`;
 }
 
-/** True for our synthesized addresses — these can't receive real mail, so password reset can't work for them. */
-export function isSyntheticEmail(email: string): boolean {
-  return email.endsWith(SYNTHETIC_EMAIL_DOMAIN);
-}
