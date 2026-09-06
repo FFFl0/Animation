@@ -132,6 +132,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
             <View style={styles.avatarWrap}>
               <AnimeAvatar
                 avatar={question.character.avatar}
+                characterId={question.character.id}
                 size={140}
                 variant={question.promptKind === 'avatar' ? 'full' : question.promptKind}
               />

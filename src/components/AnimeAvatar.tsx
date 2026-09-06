@@ -1,11 +1,17 @@
-import { View } from 'react-native';
+import { Image, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { Avatar, HairStyle } from '../data/avatar';
+import { AVATAR_IMAGES } from '../data/avatarImages';
 
 type Props = {
   avatar: Avatar;
   size?: number;
   variant?: 'full' | 'silhouette' | 'eyes';
+  /** One of the 54 fixed roster characters — when set (and variant is
+   * 'full'), renders the pre-rendered PNG for that character instead of
+   * redrawing the SVG. Player-customized avatars have no fixed id and
+   * always fall back to the live SVG drawing below. */
+  characterId?: string;
 };
 
 function HairBack({ style, color }: { style: HairStyle; color: string }) {
@@ -44,8 +50,17 @@ function HairFront({ style, color }: { style: HairStyle; color: string }) {
   }
 }
 
-export default function AnimeAvatar({ avatar, size = 96, variant = 'full' }: Props) {
+export default function AnimeAvatar({ avatar, size = 96, variant = 'full', characterId }: Props) {
   const viewBox = variant === 'eyes' ? '52 108 96 46' : '0 0 200 200';
+
+  const image = variant === 'full' && characterId ? AVATAR_IMAGES[characterId] : undefined;
+  if (image) {
+    return (
+      <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
+        <Image source={image} style={{ width: size, height: size }} resizeMode="cover" />
+      </View>
+    );
+  }
 
   if (variant === 'silhouette') {
     return (

@@ -133,7 +133,7 @@ export default function ProfileScreen() {
               onPress={() => updateAvatar({ favoriteCharacterId: c.id === profile.favoriteCharacterId ? null : c.id })}
             >
               <View style={[styles.favAvatarWrap, c.id === profile.favoriteCharacterId && styles.favAvatarSelected]}>
-                <AnimeAvatar avatar={c.avatar} size={56} />
+                <AnimeAvatar avatar={c.avatar} characterId={c.id} size={56} />
               </View>
               <Text style={styles.favName} numberOfLines={1}>{c.name.split(' ')[0]}</Text>
             </SoundTouchable>
