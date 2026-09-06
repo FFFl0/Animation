@@ -14,6 +14,12 @@ export type Streak = {
   lastPlayedDate: string | null; // YYYY-MM-DD
 };
 
+export type DailyChallengeResult = {
+  date: string; // YYYY-MM-DD
+  score: number;
+  total: number;
+};
+
 export type Profile = {
   id: string;
   username: string;
@@ -23,6 +29,7 @@ export type Profile = {
   stats: Record<string, ModeStat>;
   streak: Streak;
   achievements: string[];
+  dailyChallenge: DailyChallengeResult | null;
 };
 
 export type Account = Profile & {

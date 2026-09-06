@@ -4,6 +4,7 @@ import { Account, ModeStat, Profile, Streak } from './types';
 import { makeAvatar } from '../data/avatar';
 import { AuthError } from './authError';
 import { validateCredentials } from './validation';
+import { todayDateStr } from '../quiz/today';
 
 export { AuthError };
 
@@ -28,6 +29,7 @@ function normalizeAccount(account: Account): Account {
     streak: account.streak ?? { count: 0, lastPlayedDate: null },
     achievements: account.achievements ?? [],
     favoriteCharacterId: account.favoriteCharacterId ?? null,
+    dailyChallenge: account.dailyChallenge ?? null,
   };
 }
 
@@ -46,7 +48,7 @@ async function hashPassword(password: string, salt: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${password}`);
 }
 
-export async function register(username: string, password: string): Promise<Profile> {
+export async function register(username: string, password: string, _recoveryEmail?: string): Promise<Profile> {
   const trimmed = validateCredentials(username, password);
 
   const accounts = await readAccounts();
@@ -65,6 +67,7 @@ export async function register(username: string, password: string): Promise<Prof
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    dailyChallenge: null,
     passwordHash,
     salt,
   };
@@ -113,13 +116,26 @@ export function subscribeProfile(_id: string, _onChange: (profile: Profile) => v
   return () => {};
 }
 
+/** Local accounts have no server to email — recovery is not possible by design. */
+export async function requestPasswordReset(_username: string): Promise<{ ok: boolean; reason?: string }> {
+  return { ok: false, reason: 'Локальный аккаунт не поддерживает восстановление пароля.' };
+}
+
+export async function completeRecoverySession(_accessToken: string, _refreshToken: string): Promise<void> {
+  throw new AuthError('Недоступно для локального аккаунта');
+}
+
+export async function updatePassword(_newPassword: string): Promise<void> {
+  throw new AuthError('Недоступно для локального аккаунта');
+}
+
 function toProfile(account: Account): Profile {
   const { passwordHash, salt, ...profile } = account;
   return profile;
 }
 
 export function bumpStreak(streak: Streak): Streak {
-  const today = new Date().toISOString().slice(0, 10);
+  const today = todayDateStr();
   if (streak.lastPlayedDate === today) return streak;
   const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
   const count = streak.lastPlayedDate === yesterday ? streak.count + 1 : 1;

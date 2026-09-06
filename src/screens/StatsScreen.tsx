@@ -11,6 +11,7 @@ import { GAME_MODES } from '../data/modes';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeStat } from '../auth/types';
 import Icon from '../components/Icon';
+import SoundTouchable from '../sound/SoundTouchable';
 
 function sumStats(stats: ModeStat[]): ModeStat {
   return stats.reduce(
@@ -24,7 +25,11 @@ function sumStats(stats: ModeStat[]): ModeStat {
   );
 }
 
-export default function StatsScreen() {
+type Props = {
+  onOpenLeaderboard: () => void;
+};
+
+export default function StatsScreen({ onOpenLeaderboard }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -39,6 +44,22 @@ export default function StatsScreen() {
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <Text style={styles.pageTitle}>Статистика</Text>
+
+        <SoundTouchable
+          style={styles.leaderboardLink}
+          onPress={onOpenLeaderboard}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+        >
+          <View style={styles.leaderboardIconWrap}>
+            <Icon name="trophy" size={18} color={theme.primary} />
+          </View>
+          <View style={styles.rowText}>
+            <Text style={styles.rowTitle}>Глобальный рейтинг</Text>
+            <Text style={styles.rowSub}>Сравни свой счёт с другими игроками</Text>
+          </View>
+          <Text style={styles.chevron}>›</Text>
+        </SoundTouchable>
 
         <View style={styles.overviewRow}>
           <View style={styles.overviewCard}>
@@ -108,6 +129,26 @@ function makeStyles(theme: Theme) {
     safe: { flex: 1, backgroundColor: theme.background },
     container: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
     pageTitle: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 16 },
+    leaderboardLink: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 12,
+      gap: 12,
+      marginBottom: 20,
+    },
+    leaderboardIconWrap: {
+      width: 38,
+      height: 38,
+      borderRadius: 12,
+      backgroundColor: theme.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    chevron: { fontSize: 20, color: theme.textMuted, fontFamily: fontFamily('700') },
     overviewRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
     overviewCard: {
       flex: 1,

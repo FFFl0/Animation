@@ -13,6 +13,7 @@ import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import Icon from '../components/Icon';
+import { todayDateStr } from '../quiz/today';
 
 type Props = {
   onOpenCategory: (id: CategoryId) => void;
@@ -48,6 +49,8 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
 
   if (!profile) return null;
 
+  const dailyDone = profile.dailyChallenge?.date === todayDateStr() ? profile.dailyChallenge : null;
+
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -56,7 +59,13 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             <Text style={styles.greeting}>Привет, {profile.username}!</Text>
             <Text style={styles.subGreeting}>Готов проверить свои знания об аниме?</Text>
           </View>
-          <SoundTouchable style={styles.gearButton} onPress={onOpenSettings} activeOpacity={0.8}>
+          <SoundTouchable
+            style={styles.gearButton}
+            onPress={onOpenSettings}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Настройки"
+          >
             <Icon name="settings" size={18} color={theme.text} />
           </SoundTouchable>
         </View>
@@ -86,15 +95,20 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
 
         <Text style={styles.sectionTitle}>Игровые режимы</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modesRow}>
-          {GAME_MODES.map((mode) => (
-            <SoundTouchable key={mode.id} style={styles.modeCard} onPress={() => onStartMode(mode.id)} activeOpacity={0.85}>
-              <View style={styles.modeIconWrap}>
-                <Icon name={mode.icon} size={18} color={theme.primary} />
-              </View>
-              <Text style={styles.modeTitle}>{mode.title}</Text>
-              <Text style={styles.modeSubtitle}>{mode.subtitle}</Text>
-            </SoundTouchable>
-          ))}
+          {GAME_MODES.map((mode) => {
+            const isDailyDone = mode.id === 'daily' && dailyDone;
+            return (
+              <SoundTouchable key={mode.id} style={styles.modeCard} onPress={() => onStartMode(mode.id)} activeOpacity={0.85}>
+                <View style={styles.modeIconWrap}>
+                  <Icon name={isDailyDone ? 'target' : mode.icon} size={18} color={theme.primary} />
+                </View>
+                <Text style={styles.modeTitle}>{mode.title}</Text>
+                <Text style={styles.modeSubtitle}>
+                  {isDailyDone ? `Пройдено: ${dailyDone!.score}/${dailyDone!.total}` : mode.subtitle}
+                </Text>
+              </SoundTouchable>
+            );
+          })}
         </ScrollView>
       </ScrollView>
     </SafeAreaView>

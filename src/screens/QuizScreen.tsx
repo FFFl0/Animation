@@ -91,7 +91,13 @@ export default function QuizScreen({ config, onFinish, onClose }: Props) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.topRow}>
-          <SoundTouchable style={styles.closeButton} onPress={onClose} activeOpacity={0.8}>
+          <SoundTouchable
+            style={styles.closeButton}
+            onPress={onClose}
+            activeOpacity={0.8}
+            accessibilityRole="button"
+            accessibilityLabel="Закрыть квиз"
+          >
             <Icon name="close" size={15} color={theme.textMuted} />
           </SoundTouchable>
           <View style={styles.progressRow}>

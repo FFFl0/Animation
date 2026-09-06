@@ -7,8 +7,15 @@ export function validateCredentials(username: string, password: string): string 
   return trimmed;
 }
 
+const SYNTHETIC_EMAIL_DOMAIN = '@animequiz.local';
+
 /** Supabase Auth needs an email; we synthesize one from the username. */
 export function usernameToEmail(username: string): string {
   const local = username.toLowerCase().replace(/[^a-z0-9_.-]/g, '_');
-  return `${local}@animequiz.local`;
+  return `${local}${SYNTHETIC_EMAIL_DOMAIN}`;
+}
+
+/** True for our synthesized addresses — these can't receive real mail, so password reset can't work for them. */
+export function isSyntheticEmail(email: string): boolean {
+  return email.endsWith(SYNTHETIC_EMAIL_DOMAIN);
 }

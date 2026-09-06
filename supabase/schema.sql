@@ -9,6 +9,7 @@ create table if not exists public.profiles (
   stats jsonb not null default '{}'::jsonb,
   streak jsonb not null default '{"count":0,"lastPlayedDate":null}'::jsonb,
   achievements text[] not null default '{}',
+  daily_challenge jsonb,
   created_at timestamptz not null default now()
 );
 
@@ -46,3 +47,46 @@ grant execute on function public.is_username_taken(text) to anon, authenticated;
 -- doesn't exist under this name on your project), enable it instead via
 -- Dashboard -> Database -> Replication -> supabase_realtime -> profiles.
 alter publication supabase_realtime add table public.profiles;
+
+-- ============================================================
+-- MIGRATIONS — if you already ran the block above on an earlier
+-- version of this file, only run the new snippets added below it,
+-- each one is safe to run once. Newest at the bottom.
+-- ============================================================
+
+-- Adds daily-challenge tracking to an existing profiles table.
+alter table public.profiles add column if not exists daily_challenge jsonb;
+
+-- Public leaderboard: exposes only username/avatar/aggregate score for every
+-- player, without loosening the profiles RLS policies above (this view is
+-- owned by the migration-running role, which bypasses RLS, by design — the
+-- standard Supabase pattern for a public leaderboard over a private table).
+create or replace view public.leaderboard as
+select
+  username,
+  avatar,
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;
+
+-- Resolves a username to its Supabase Auth email (real, if the player set
+-- one for password recovery, or the synthesized "username@animequiz.local"
+-- otherwise) so the client can call signInWithPassword before it has a
+-- session. Exposes only the email string tied to a username — the same
+-- kind of oracle most apps expose for username-based login.
+create or replace function public.get_auth_email(p_username text)
+returns text
+language sql
+security definer
+set search_path = public, auth
+as $$
+  select u.email from auth.users u
+  join public.profiles p on p.id = u.id
+  where lower(p.username) = lower(p_username)
+  limit 1;
+$$;
+
+grant execute on function public.get_auth_email(text) to anon, authenticated;

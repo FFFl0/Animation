@@ -12,6 +12,7 @@ function emptyProfile(): Profile {
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    dailyChallenge: null,
   };
 }
 

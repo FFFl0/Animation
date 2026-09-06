@@ -1,7 +1,8 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import * as Linking from 'expo-linking';
 import { supabase } from './supabaseClient';
 import { AuthError } from './authError';
-import { validateCredentials, usernameToEmail } from './validation';
+import { validateCredentials, usernameToEmail, isSyntheticEmail } from './validation';
 import { Profile } from './types';
 import { makeAvatar } from '../data/avatar';
 
@@ -15,6 +16,7 @@ type ProfileRow = {
   stats: Profile['stats'];
   streak: Profile['streak'];
   achievements: string[];
+  daily_challenge: Profile['dailyChallenge'];
   created_at: string;
 };
 
@@ -27,6 +29,7 @@ function rowToProfile(row: ProfileRow): Profile {
     stats: row.stats ?? {},
     streak: row.streak ?? { count: 0, lastPlayedDate: null },
     achievements: row.achievements ?? [],
+    dailyChallenge: row.daily_challenge ?? null,
     createdAt: row.created_at,
   };
 }
@@ -38,6 +41,7 @@ function patchToRow(patch: Partial<Profile>): Record<string, unknown> {
   if (patch.stats !== undefined) row.stats = patch.stats;
   if (patch.streak !== undefined) row.streak = patch.streak;
   if (patch.achievements !== undefined) row.achievements = patch.achievements;
+  if (patch.dailyChallenge !== undefined) row.daily_challenge = patch.dailyChallenge;
   return row;
 }
 
@@ -60,7 +64,7 @@ function mapAuthError(message: string): AuthError {
   return new AuthError(message);
 }
 
-export async function register(username: string, password: string): Promise<Profile> {
+export async function register(username: string, password: string, recoveryEmail?: string): Promise<Profile> {
   const trimmed = validateCredentials(username, password);
   const client = supabase!;
 
@@ -68,7 +72,8 @@ export async function register(username: string, password: string): Promise<Prof
   if (rpcError) throw new AuthError(rpcError.message);
   if (taken) throw new AuthError('Такое имя пользователя уже занято');
 
-  const { data, error } = await client.auth.signUp({ email: usernameToEmail(trimmed), password });
+  const email = recoveryEmail?.trim() || usernameToEmail(trimmed);
+  const { data, error } = await client.auth.signUp({ email, password });
   if (error) throw mapAuthError(error.message);
   if (!data.user) throw new AuthError('Не удалось создать аккаунт, попробуйте ещё раз');
 
@@ -80,6 +85,7 @@ export async function register(username: string, password: string): Promise<Prof
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    daily_challenge: null,
     created_at: new Date().toISOString(),
   };
 
@@ -91,11 +97,19 @@ export async function register(username: string, password: string): Promise<Prof
   return profile;
 }
 
+async function resolveAuthEmail(username: string): Promise<string> {
+  const client = supabase!;
+  const { data, error } = await client.rpc('get_auth_email', { p_username: username.trim() });
+  if (error || !data) return usernameToEmail(username);
+  return data as string;
+}
+
 export async function login(username: string, password: string): Promise<Profile> {
   const trimmed = username.trim();
   const client = supabase!;
+  const email = await resolveAuthEmail(trimmed);
 
-  const { data, error } = await client.auth.signInWithPassword({ email: usernameToEmail(trimmed), password });
+  const { data, error } = await client.auth.signInWithPassword({ email, password });
   if (error) throw mapAuthError(error.message);
   if (!data.user) throw new AuthError('Не удалось войти, попробуйте ещё раз');
 
@@ -150,6 +164,30 @@ export async function updateAccount(id: string, patch: Partial<Profile>): Promis
     });
 
   return optimistic;
+}
+
+export async function requestPasswordReset(username: string): Promise<{ ok: boolean; reason?: string }> {
+  const client = supabase!;
+  const email = await resolveAuthEmail(username);
+
+  if (isSyntheticEmail(email)) {
+    return { ok: false, reason: 'Для этого аккаунта не указан email для восстановления пароля.' };
+  }
+
+  const redirectTo = Linking.createURL('reset-password');
+  const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
+  if (error) return { ok: false, reason: error.message };
+  return { ok: true };
+}
+
+export async function completeRecoverySession(accessToken: string, refreshToken: string): Promise<void> {
+  const { error } = await supabase!.auth.setSession({ access_token: accessToken, refresh_token: refreshToken });
+  if (error) throw new AuthError(error.message);
+}
+
+export async function updatePassword(newPassword: string): Promise<void> {
+  const { error } = await supabase!.auth.updateUser({ password: newPassword });
+  if (error) throw new AuthError(error.message);
 }
 
 export function subscribeProfile(id: string, onChange: (profile: Profile) => void): () => void {

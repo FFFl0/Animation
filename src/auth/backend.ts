@@ -14,3 +14,6 @@ export const logout = impl.logout;
 export const getSessionProfile = impl.getSessionProfile;
 export const updateAccount = impl.updateAccount;
 export const subscribeProfile = isSupabaseConfigured ? Remote.subscribeProfile : Local.subscribeProfile;
+export const requestPasswordReset = impl.requestPasswordReset;
+export const completeRecoverySession = impl.completeRecoverySession;
+export const updatePassword = impl.updatePassword;

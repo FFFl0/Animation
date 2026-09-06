@@ -6,17 +6,20 @@ import { RoundConfig } from '../quiz/types';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
 import { ACHIEVEMENTS, Achievement } from '../data/achievements';
+import { todayDateStr } from '../quiz/today';
 
 export { AuthError } from './backend';
 
 type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
-  register: (username: string, password: string) => Promise<void>;
+  register: (username: string, password: string, recoveryEmail?: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateAvatar: (patch: { avatar?: Avatar; favoriteCharacterId?: string | null }) => Promise<void>;
   recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
+  resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
+  completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -39,8 +42,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return unsubscribe;
   }, [profile?.id]);
 
-  const register = async (username: string, password: string) => {
-    const p = await Storage.register(username, password);
+  const register = async (username: string, password: string, recoveryEmail?: string) => {
+    const p = await Storage.register(username, password, recoveryEmail);
+    setProfile(p);
+  };
+
+  const resetPassword = (username: string) => Storage.requestPasswordReset(username);
+
+  const completePasswordReset = async (accessToken: string, refreshToken: string, newPassword: string) => {
+    await Storage.completeRecoverySession(accessToken, refreshToken);
+    await Storage.updatePassword(newPassword);
+    const p = await Storage.getSessionProfile();
     setProfile(p);
   };
 
@@ -74,14 +86,20 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => a.check(profile)).map((a) => a.id));
 
-    const p = await Storage.updateAccount(profile.id, { stats: nextStats, streak: nextStreak });
+    const today = todayDateStr();
+    const nextDailyChallenge =
+      modeId === 'daily' && profile.dailyChallenge?.date !== today
+        ? { date: today, score, total }
+        : profile.dailyChallenge;
+
+    const p = await Storage.updateAccount(profile.id, { stats: nextStats, streak: nextStreak, dailyChallenge: nextDailyChallenge });
     setProfile(p);
 
     return ACHIEVEMENTS.filter((a) => !unlockedBefore.has(a.id) && a.check(p));
   };
 
   const value = useMemo(
-    () => ({ profile, loading, register, login, logout, updateAvatar, recordRoundResult }),
+    () => ({ profile, loading, register, login, logout, updateAvatar, recordRoundResult, resetPassword, completePasswordReset }),
     [profile, loading]
   );
 

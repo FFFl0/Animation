@@ -1,6 +1,7 @@
 import { useEffect, useRef, useState } from 'react';
 import { ActivityIndicator, Animated, Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
+import * as Linking from 'expo-linking';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
 import {
   Manrope_400Regular,
@@ -14,6 +15,7 @@ import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 import AchievementToastHost from './src/components/AchievementToast';
+import OnboardingTour from './src/components/OnboardingTour';
 import ResponsiveShell from './src/components/ResponsiveShell';
 import WelcomeScreen from './src/screens/WelcomeScreen';
 import AuthScreen from './src/screens/AuthScreen';
@@ -24,13 +26,18 @@ import ResultScreen from './src/screens/ResultScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
+import LeaderboardScreen from './src/screens/LeaderboardScreen';
+import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import { CategoryId } from './src/data/categories';
 import { TierId, getTier } from './src/data/difficulty';
 import { GAME_MODES, ModeId } from './src/data/modes';
 import { RoundConfig } from './src/quiz/types';
 import { Achievement } from './src/data/achievements';
+import { dateSeed } from './src/quiz/generateQuiz';
+import { todayDateStr } from './src/quiz/today';
+import { parseRecoveryUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
 
-type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile';
+type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile' | 'leaderboard';
 
 const TAB_SCREENS: Screen[] = ['home', 'stats', 'achievements', 'profile'];
 
@@ -110,7 +117,9 @@ function AppShell() {
 
   const startMode = (modeId: ModeId) => {
     const mode = GAME_MODES.find((m) => m.id === modeId)!;
-    setRoundConfig(mode.config);
+    const config: RoundConfig =
+      modeId === 'daily' ? { ...mode.config, dailySeed: dateSeed(todayDateStr()) } : mode.config;
+    setRoundConfig(config);
     setActiveModeId(modeId);
     setQuizKey((k) => k + 1);
     setScreen('quiz');
@@ -156,7 +165,8 @@ function AppShell() {
           {screen === 'result' && (
             <ResultScreen score={result.score} total={result.total} onRestart={restart} onChooseCategory={() => setScreen('home')} />
           )}
-          {screen === 'stats' && <StatsScreen />}
+          {screen === 'stats' && <StatsScreen onOpenLeaderboard={() => setScreen('leaderboard')} />}
+          {screen === 'leaderboard' && <LeaderboardScreen onBack={() => setScreen('stats')} />}
           {screen === 'achievements' && <AchievementsScreen />}
           {screen === 'profile' && <ProfileScreen />}
         </ScreenTransition>
@@ -165,6 +175,7 @@ function AppShell() {
         <BottomTabBar active={screen as TabKey} onChange={(tab: TabKey) => setScreen(tab)} theme={theme} />
       )}
       <AchievementToastHost queue={achievementQueue} onShown={() => setAchievementQueue((q) => q.slice(1))} />
+      <OnboardingTour profileId={profile.id} />
       <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
     </View>
   );
@@ -178,6 +189,18 @@ export default function App() {
     Manrope_700Bold,
     Manrope_800ExtraBold,
   });
+  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryTokens | null>(null);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      const tokens = parseRecoveryUrl(url);
+      if (tokens) setRecoveryTokens(tokens);
+    };
+    Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+  }, []);
 
   if (!fontsLoaded) {
     return (
@@ -192,7 +215,15 @@ export default function App() {
       <SoundProvider>
         <AuthProvider>
           <ResponsiveShell>
-            <AppShell />
+            {recoveryTokens ? (
+              <ResetPasswordScreen
+                accessToken={recoveryTokens.accessToken}
+                refreshToken={recoveryTokens.refreshToken}
+                onDone={() => setRecoveryTokens(null)}
+              />
+            ) : (
+              <AppShell />
+            )}
           </ResponsiveShell>
         </AuthProvider>
       </SoundProvider>

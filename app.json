@@ -6,6 +6,8 @@
     "orientation": "portrait",
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
+    "scheme": "animequiz",
+    "plugins": ["expo-notifications"],
     "ios": {
       "supportsTablet": true
     },

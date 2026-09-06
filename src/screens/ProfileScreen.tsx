@@ -1,4 +1,4 @@
-import { ReactNode, useMemo, useState } from 'react';
+import { ReactNode, useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -12,6 +12,7 @@ import { ANIME_SERIES } from '../data/animeSeries';
 import { HairStyle } from '../data/avatar';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
+import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
 
 const SERIES_TITLE_BY_ID: Record<string, string> = Object.fromEntries(ANIME_SERIES.map((s) => [s.id, s.title]));
 
@@ -37,6 +38,23 @@ export default function ProfileScreen() {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState('');
+  const [reminderOn, setReminderOn] = useState(false);
+  const [reminderError, setReminderError] = useState<string | null>(null);
+
+  useEffect(() => {
+    getReminderEnabled().then(setReminderOn);
+  }, []);
+
+  const handleToggleReminder = async () => {
+    setReminderError(null);
+    const next = !reminderOn;
+    const result = await setReminderEnabled(next);
+    if (result.ok) {
+      setReminderOn(next);
+    } else {
+      setReminderError(result.reason ?? 'Не удалось включить уведомления');
+    }
+  };
 
   if (!profile) return null;
   const { avatar } = profile;
@@ -159,6 +177,16 @@ export default function ProfileScreen() {
         </SoundTouchable>
       </View>
 
+      <Text style={styles.sectionTitle}>Напоминания</Text>
+      <View style={styles.themeTabs}>
+        <SoundTouchable style={[styles.themeTab, reminderOn && styles.themeTabActive]} onPress={handleToggleReminder}>
+          <Text style={[styles.themeTabText, reminderOn && styles.themeTabTextActive]}>
+            Серия дней {reminderOn ? 'вкл' : 'выкл'}
+          </Text>
+        </SoundTouchable>
+      </View>
+      {reminderError && <Text style={styles.reminderError}>{reminderError}</Text>}
+
       <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
         <Text style={styles.logoutText}>Выйти из аккаунта</Text>
       </SoundTouchable>
@@ -278,5 +306,6 @@ function makeStyles(theme: Theme) {
       borderColor: theme.border,
     },
     logoutText: { color: theme.danger, fontFamily: fontFamily('700'), fontSize: 15 },
+    reminderError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 8 },
   });
 }
