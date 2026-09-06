@@ -1,8 +1,12 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
+import { Platform } from 'react-native';
 import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
+import { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { AuthError } from './authError';
 import { validateCredentials, usernameToEmail, isSyntheticEmail } from './validation';
+import { parseAuthTokensFromUrl } from './parseRecoveryUrl';
 import { Profile } from './types';
 import { makeAvatar } from '../data/avatar';
 
@@ -62,6 +66,48 @@ function mapAuthError(message: string): AuthError {
     return new AuthError('Неверное имя пользователя или пароль');
   }
   return new AuthError(message);
+}
+
+async function uniqueUsernameFrom(client: SupabaseClient, seed: string): Promise<string> {
+  const base = seed.toLowerCase().replace(/[^a-z0-9_]/g, '').slice(0, 16) || 'player';
+  for (let attempt = 0; attempt < 5; attempt++) {
+    const candidate = attempt === 0 ? base : `${base}${Math.floor(Math.random() * 10000)}`;
+    const { data: taken } = await client.rpc('is_username_taken', { check_username: candidate });
+    if (!taken) return candidate;
+  }
+  return `${base}${Date.now()}`;
+}
+
+/** Fetches the profile row for an authenticated user, auto-provisioning one
+ * the first time (e.g. a first-ever Google sign-in, which has no row yet
+ * since it skips our own register() flow). */
+async function resolveOrCreateProfile(client: SupabaseClient, userId: string, emailHint?: string | null): Promise<Profile> {
+  const { data: row, error } = await client.from('profiles').select('*').eq('id', userId).maybeSingle();
+  if (error) throw new AuthError(error.message);
+  if (row) {
+    const profile = rowToProfile(row as ProfileRow);
+    await cacheProfile(profile);
+    return profile;
+  }
+
+  const username = await uniqueUsernameFrom(client, emailHint?.split('@')[0] ?? 'player');
+  const newRow: ProfileRow = {
+    id: userId,
+    username,
+    avatar: makeAvatar(username + Date.now()),
+    favorite_character_id: null,
+    stats: {},
+    streak: { count: 0, lastPlayedDate: null },
+    achievements: [],
+    daily_challenge: null,
+    created_at: new Date().toISOString(),
+  };
+  const { data: inserted, error: insertError } = await client.from('profiles').insert(newRow).select().single();
+  if (insertError) throw new AuthError(insertError.message);
+
+  const profile = rowToProfile(inserted as ProfileRow);
+  await cacheProfile(profile);
+  return profile;
 }
 
 export async function register(username: string, password: string, recoveryEmail?: string): Promise<Profile> {
@@ -134,11 +180,7 @@ export async function getSessionProfile(): Promise<Profile | null> {
   if (!session) return null;
 
   try {
-    const { data: row, error } = await client.from('profiles').select('*').eq('id', session.user.id).single();
-    if (error) throw error;
-    const profile = rowToProfile(row as ProfileRow);
-    await cacheProfile(profile);
-    return profile;
+    return await resolveOrCreateProfile(client, session.user.id, session.user.email);
   } catch {
     // Offline or unreachable — fall back to the last known profile so the
     // app stays usable without a connection.
@@ -166,6 +208,48 @@ export async function updateAccount(id: string, patch: Partial<Profile>): Promis
   return optimistic;
 }
 
+/**
+ * Returns the signed-in Profile on native (where we complete the OAuth
+ * round-trip ourselves via an in-app browser). On web, `signInWithOAuth`
+ * navigates the whole page away to Google; Supabase's client picks the
+ * session back up from the redirect URL on reload, so there's nothing to
+ * return here — `getSessionProfile()` on the next app start provisions the
+ * profile row if needed.
+ */
+export async function signInWithGoogle(): Promise<Profile | null> {
+  const client = supabase!;
+  const redirectTo = Linking.createURL('');
+
+  if (Platform.OS === 'web') {
+    const { error } = await client.auth.signInWithOAuth({ provider: 'google', options: { redirectTo } });
+    if (error) throw new AuthError(error.message);
+    return null;
+  }
+
+  const { data, error } = await client.auth.signInWithOAuth({
+    provider: 'google',
+    options: { redirectTo, skipBrowserRedirect: true },
+  });
+  if (error || !data.url) throw new AuthError(error?.message ?? 'Не удалось начать вход через Google');
+
+  const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
+  if (result.type !== 'success') throw new AuthError('Вход через Google отменён');
+
+  const tokens = parseAuthTokensFromUrl(result.url);
+  if (!tokens) throw new AuthError('Не удалось завершить вход через Google');
+
+  const { error: sessionError } = await client.auth.setSession({
+    access_token: tokens.accessToken,
+    refresh_token: tokens.refreshToken,
+  });
+  if (sessionError) throw new AuthError(sessionError.message);
+
+  const { data: userData, error: userError } = await client.auth.getUser();
+  if (userError || !userData.user) throw new AuthError(userError?.message ?? 'Не удалось получить данные пользователя');
+
+  return resolveOrCreateProfile(client, userData.user.id, userData.user.email);
+}
+
 export async function requestPasswordReset(username: string): Promise<{ ok: boolean; reason?: string }> {
   const client = supabase!;
   const email = await resolveAuthEmail(username);
@@ -174,7 +258,12 @@ export async function requestPasswordReset(username: string): Promise<{ ok: bool
     return { ok: false, reason: 'Для этого аккаунта не указан email для восстановления пароля.' };
   }
 
-  const redirectTo = Linking.createURL('reset-password');
+  // A bare root path (no trailing path segment) works both as a custom-scheme
+  // deep link on native and as a reachable URL on a single-page web deploy
+  // with no server-side routing — a named path like `/reset-password` would
+  // 404 there. The recovery vs. OAuth callback is told apart by the tokens
+  // in the URL fragment, not by the path.
+  const redirectTo = Linking.createURL('');
   const { error } = await client.auth.resetPasswordForEmail(email, { redirectTo });
   if (error) return { ok: false, reason: error.message };
   return { ok: true };

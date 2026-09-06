@@ -25,7 +25,7 @@ type Props = {
 type Mode = 'login' | 'register' | 'forgot';
 
 export default function AuthScreen({ onBack }: Props) {
-  const { login, register, resetPassword } = useAuth();
+  const { login, register, resetPassword, loginWithGoogle } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [mode, setMode] = useState<Mode>('login');
@@ -44,6 +44,19 @@ export default function AuthScreen({ onBack }: Props) {
     setMode(next);
     setError(null);
     setInfo(null);
+  };
+
+  const handleGoogleSignIn = async () => {
+    setError(null);
+    setInfo(null);
+    setBusy(true);
+    try {
+      await loginWithGoogle();
+    } catch (e) {
+      setError(e instanceof AuthError ? e.message : 'Не удалось войти через Google, попробуйте ещё раз');
+    } finally {
+      setBusy(false);
+    }
   };
 
   const handleSubmit = async () => {
@@ -148,6 +161,23 @@ export default function AuthScreen({ onBack }: Props) {
             style={{ marginTop: 8 }}
           />
 
+          {!isForgot && isSupabaseConfigured && (
+            <>
+              <View style={styles.divider}>
+                <View style={styles.dividerLine} />
+                <Text style={styles.dividerText}>или</Text>
+                <View style={styles.dividerLine} />
+              </View>
+              <PillButton
+                title="Войти через Google"
+                variant="outline"
+                onPress={handleGoogleSignIn}
+                disabled={busy}
+                fullWidth
+              />
+            </>
+          )}
+
           {!isRegister && !isForgot && isSupabaseConfigured && (
             <SoundTouchable onPress={() => switchMode('forgot')} style={{ marginTop: 14 }}>
               <Text style={styles.forgotLink}>Забыли пароль?</Text>
@@ -183,6 +213,9 @@ function makeStyles(theme: Theme) {
     error: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('500'), marginBottom: 8, textAlign: 'center' },
     info: { color: theme.success, fontSize: 13, fontFamily: fontFamily('500'), marginBottom: 8, textAlign: 'center', lineHeight: 18 },
     forgotLink: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.primary },
+    divider: { flexDirection: 'row', alignItems: 'center', width: '100%', marginVertical: 14, gap: 10 },
+    dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
+    dividerText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted },
     footer: { marginTop: 20, fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 17 },
   });
 }

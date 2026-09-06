@@ -129,6 +129,11 @@ export async function updatePassword(_newPassword: string): Promise<void> {
   throw new AuthError('Недоступно для локального аккаунта');
 }
 
+/** No OAuth without a backend — local accounts are username+password only. */
+export async function signInWithGoogle(): Promise<Profile | null> {
+  throw new AuthError('Вход через Google недоступен без облачного аккаунта');
+}
+
 function toProfile(account: Account): Profile {
   const { passwordHash, salt, ...profile } = account;
   return profile;

@@ -17,3 +17,4 @@ export const subscribeProfile = isSupabaseConfigured ? Remote.subscribeProfile :
 export const requestPasswordReset = impl.requestPasswordReset;
 export const completeRecoverySession = impl.completeRecoverySession;
 export const updatePassword = impl.updatePassword;
+export const signInWithGoogle = impl.signInWithGoogle;

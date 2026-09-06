@@ -20,6 +20,7 @@ type AuthContextValue = {
   recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
   completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
+  loginWithGoogle: () => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -54,6 +55,11 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     await Storage.updatePassword(newPassword);
     const p = await Storage.getSessionProfile();
     setProfile(p);
+  };
+
+  const loginWithGoogle = async () => {
+    const p = await Storage.signInWithGoogle();
+    if (p) setProfile(p);
   };
 
   const login = async (username: string, password: string) => {
@@ -99,7 +105,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ profile, loading, register, login, logout, updateAvatar, recordRoundResult, resetPassword, completePasswordReset }),
+    () => ({ profile, loading, register, login, logout, updateAvatar, recordRoundResult, resetPassword, completePasswordReset, loginWithGoogle }),
     [profile, loading]
   );
 
