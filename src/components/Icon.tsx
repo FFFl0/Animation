@@ -33,7 +33,10 @@ export type IconName =
   | 'lock'
   | 'close'
   | 'search'
-  | 'arrowPath';
+  | 'arrowPath'
+  | 'userPlus'
+  | 'users'
+  | 'check';
 
 type Props = {
   name: IconName;
@@ -298,5 +301,25 @@ function renderIcon(name: IconName, common: any, color: string) {
           <Path d="M6 21v-4.5h4.5" {...common} />
         </>
       );
+    case 'userPlus':
+      return (
+        <>
+          <Circle cx="9.5" cy="8" r="3.3" {...common} />
+          <Path d="M3 20c0-3.8 2.8-5.7 6.5-5.7s6.5 1.9 6.5 5.7" {...common} />
+          <Line x1="18.5" y1="7" x2="18.5" y2="13" {...common} />
+          <Line x1="15.5" y1="10" x2="21.5" y2="10" {...common} />
+        </>
+      );
+    case 'users':
+      return (
+        <>
+          <Circle cx="8.5" cy="8" r="3" {...common} />
+          <Path d="M2.5 19c0-3.3 2.5-5 6-5s6 1.7 6 5" {...common} />
+          <Path d="M15 6a2.6 2.6 0 0 1 0 5.1" {...common} />
+          <Path d="M16 14.3c2.3.4 3.5 1.7 3.5 4.2" {...common} />
+        </>
+      );
+    case 'check':
+      return <Path d="M4.5 12.5l5 5 10-11" {...common} />;
   }
 }

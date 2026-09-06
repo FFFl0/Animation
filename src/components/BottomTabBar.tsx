@@ -4,7 +4,7 @@ import { fontFamily } from '../theme/fonts';
 import SoundTouchable from '../sound/SoundTouchable';
 import Icon, { IconName } from './Icon';
 
-export type TabKey = 'home' | 'stats' | 'achievements' | 'profile';
+export type TabKey = 'home' | 'friends' | 'stats' | 'achievements' | 'profile';
 
 type Props = {
   active: TabKey;
@@ -14,6 +14,7 @@ type Props = {
 
 const TABS: { key: TabKey; label: string; icon: IconName }[] = [
   { key: 'home', label: 'Главная', icon: 'home' },
+  { key: 'friends', label: 'Друзья', icon: 'users' },
   { key: 'stats', label: 'Статистика', icon: 'stats' },
   { key: 'achievements', label: 'Достижения', icon: 'medal' },
   { key: 'profile', label: 'Профиль', icon: 'user' },

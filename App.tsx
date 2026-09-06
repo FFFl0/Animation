@@ -29,6 +29,10 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import FriendsScreen from './src/screens/FriendsScreen';
+import FriendProfileScreen from './src/screens/FriendProfileScreen';
+import CompareScreen from './src/screens/CompareScreen';
+import { Friendship, PlayerSummary } from './src/friends/friendsApi';
 import { CategoryId } from './src/data/categories';
 import { TierId, getTier } from './src/data/difficulty';
 import { GAME_MODES, ModeId } from './src/data/modes';
@@ -38,9 +42,21 @@ import { dateSeed } from './src/quiz/generateQuiz';
 import { todayDateStr } from './src/quiz/today';
 import { parseRecoveryUrl, parseAuthTokensFromUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
 
-type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile' | 'leaderboard' | 'battle';
+type Screen =
+  | 'home'
+  | 'categoryDetail'
+  | 'quiz'
+  | 'result'
+  | 'stats'
+  | 'achievements'
+  | 'profile'
+  | 'leaderboard'
+  | 'battle'
+  | 'friends'
+  | 'friendProfile'
+  | 'compare';
 
-const TAB_SCREENS: Screen[] = ['home', 'stats', 'achievements', 'profile'];
+const TAB_SCREENS: Screen[] = ['home', 'friends', 'stats', 'achievements', 'profile'];
 
 function ScreenTransition({ children, transitionKey }: { children: React.ReactNode; transitionKey: string }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -73,6 +89,9 @@ function AppShell() {
   const [quizKey, setQuizKey] = useState(0);
   const [result, setResult] = useState({ score: 0, total: 0 });
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
+  const [selectedFriend, setSelectedFriend] = useState<PlayerSummary | null>(null);
+  const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
+  const [challengeUsername, setChallengeUsername] = useState<string | null>(null);
 
   useEffect(() => {
     setScreen('home');
@@ -158,7 +177,47 @@ function AppShell() {
               onOpenBattle={() => setScreen('battle')}
             />
           )}
-          {screen === 'battle' && <BattleScreen onBack={() => setScreen('home')} />}
+          {screen === 'battle' && (
+            <BattleScreen
+              onBack={() => {
+                setChallengeUsername(null);
+                setScreen(challengeUsername ? 'friendProfile' : 'home');
+              }}
+              challengeFriendUsername={challengeUsername ?? undefined}
+            />
+          )}
+          {screen === 'friends' && (
+            <FriendsScreen
+              onBack={() => setScreen('home')}
+              onOpenFriend={(player, friendship) => {
+                setSelectedFriend(player);
+                setSelectedFriendship(friendship);
+                setScreen('friendProfile');
+              }}
+            />
+          )}
+          {screen === 'friendProfile' && selectedFriend && (
+            <FriendProfileScreen
+              player={selectedFriend}
+              friendship={selectedFriendship}
+              onBack={() => setScreen('friends')}
+              onCompare={() => setScreen('compare')}
+              onChallenge={() => {
+                setChallengeUsername(selectedFriend.username);
+                setScreen('battle');
+              }}
+            />
+          )}
+          {screen === 'compare' && selectedFriend && (
+            <CompareScreen
+              friend={selectedFriend}
+              onBack={() => setScreen('friendProfile')}
+              onChallenge={() => {
+                setChallengeUsername(selectedFriend.username);
+                setScreen('battle');
+              }}
+            />
+          )}
           {screen === 'categoryDetail' && selectedCategory && (
             <CategoryDetailScreen categoryId={selectedCategory} onBack={() => setScreen('home')} onStartTier={startTier} />
           )}

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, SafeAreaView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
@@ -23,18 +23,24 @@ import {
 
 type Props = {
   onBack: () => void;
+  /** Set when arriving here via a friend's "Бросить вызов" button — skips
+   * the menu and immediately creates a room, then opens the share sheet
+   * with the code once it's ready (no in-app delivery to a specific
+   * player — sharing the code out-of-band is the whole MVP here). */
+  challengeFriendUsername?: string;
 };
 
 type Phase = 'menu' | 'joinInput' | 'connecting' | 'waiting' | 'countdown' | 'playing' | 'result';
 
 const BATTLE_QUESTION_COUNT = 10;
 
-export default function BattleScreen({ onBack }: Props) {
+export default function BattleScreen({ onBack, challengeFriendUsername }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
 
   const [phase, setPhase] = useState<Phase>('menu');
+  const sharedForChallenge = useRef(false);
   const [roomCode, setRoomCode] = useState('');
   const [joinCodeInput, setJoinCodeInput] = useState('');
   const [isHost, setIsHost] = useState(false);
@@ -57,8 +63,10 @@ export default function BattleScreen({ onBack }: Props) {
     };
   }, []);
 
-  if (!profile) return null;
-  const me: BattlePeer = { userId: profile.id, username: profile.username };
+  // Falls back to an empty id only in the impossible case profile is still
+  // null here — the JSX that could actually invoke these callbacks is gated
+  // behind the `if (!profile) return null` below, so this is never exercised.
+  const me: BattlePeer = { userId: profile?.id ?? '', username: profile?.username ?? '' };
 
   const beginCountdown = (payload: BattleStartPayload) => {
     setBattleConfig(payload.config);
@@ -147,6 +155,22 @@ export default function BattleScreen({ onBack }: Props) {
     roomRef.current?.broadcastFinish({ userId: me.userId, score, total });
     setPhase('result');
   };
+
+  useEffect(() => {
+    if (challengeFriendUsername && profile) handleCreate();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  useEffect(() => {
+    if (phase === 'waiting' && isHost && challengeFriendUsername && !sharedForChallenge.current) {
+      sharedForChallenge.current = true;
+      Share.share({
+        message: `Присоединяйся к битве в AnimeQuiz! Код комнаты: ${roomCode}`,
+      }).catch(() => {});
+    }
+  }, [phase, isHost, roomCode, challengeFriendUsername]);
+
+  if (!profile) return null;
 
   if (!isSupabaseConfigured) {
     return (
@@ -239,9 +263,17 @@ export default function BattleScreen({ onBack }: Props) {
           <>
             <Text style={styles.subtitle}>{isHost ? 'Отправь этот код другу' : 'Ждём начала...'}</Text>
             {isHost && (
-              <View style={styles.codeBox}>
-                <Text style={styles.codeText}>{roomCode}</Text>
-              </View>
+              <>
+                <View style={styles.codeBox}>
+                  <Text style={styles.codeText}>{roomCode}</Text>
+                </View>
+                <PillButton
+                  title="Поделиться кодом"
+                  variant="outline"
+                  onPress={() => Share.share({ message: `Присоединяйся к битве в AnimeQuiz! Код комнаты: ${roomCode}` }).catch(() => {})}
+                  style={{ marginTop: 14 }}
+                />
+              </>
             )}
             <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />
             <Text style={styles.subtitle}>Ожидание соперника...</Text>

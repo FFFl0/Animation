@@ -82,3 +82,57 @@ grant select on public.leaderboard to authenticated;
 -- which never returns the email to the client. Run this once to remove the
 -- old function from any project that already has it:
 drop function if exists public.get_auth_email(text);
+
+-- Friends feature: who's friends with whom. A row starts "pending" (sent by
+-- requester_id) and becomes "accepted" once addressee_id approves it —
+-- declining or unfriending is just deleting the row, no separate state.
+create table if not exists public.friendships (
+  id uuid primary key default gen_random_uuid(),
+  requester_id uuid not null references auth.users(id) on delete cascade,
+  addressee_id uuid not null references auth.users(id) on delete cascade,
+  status text not null default 'pending' check (status in ('pending', 'accepted')),
+  created_at timestamptz not null default now(),
+  constraint friendships_no_self check (requester_id <> addressee_id),
+  constraint friendships_unique_pair unique (requester_id, addressee_id)
+);
+
+alter table public.friendships enable row level security;
+
+create policy "See own friendships"
+  on public.friendships for select
+  using (auth.uid() = requester_id or auth.uid() = addressee_id);
+
+create policy "Send friend requests as yourself"
+  on public.friendships for insert
+  with check (auth.uid() = requester_id);
+
+create policy "Only the addressee can accept a request"
+  on public.friendships for update
+  using (auth.uid() = addressee_id)
+  with check (auth.uid() = addressee_id);
+
+create policy "Either side can remove a friendship"
+  on public.friendships for delete
+  using (auth.uid() = requester_id or auth.uid() = addressee_id);
+
+-- The friends screen needs a friend's id (to add/compare), streak,
+-- achievements, and the raw per-category/mode stats breakdown (to show
+-- favorite categories the same way the Statistics screen derives them for
+-- your own profile) alongside what the leaderboard already showed —
+-- extending the same safe view rather than adding a near-duplicate one.
+-- Still no email or other sensitive column, still authenticated-only.
+create or replace view public.leaderboard as
+select
+  id,
+  username,
+  avatar,
+  streak,
+  achievements,
+  stats,
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats)), 0) as total_games
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;

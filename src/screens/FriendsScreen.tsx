@@ -1,0 +1,422 @@
+import { useEffect, useMemo, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Theme } from '../theme/palette';
+import { fontFamily } from '../theme/fonts';
+import { radius } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../auth/AuthContext';
+import {
+  Friendship,
+  PlayerSummary,
+  getFriendships,
+  getRecommendations,
+  isSupabaseConfigured,
+  removeFriend,
+  respondToRequest,
+  searchPlayers,
+  sendFriendRequest,
+} from '../friends/friendsApi';
+import { levelFromTotalCorrect } from '../data/level';
+import AnimeAvatar from '../components/AnimeAvatar';
+import SoundTouchable from '../sound/SoundTouchable';
+import Icon from '../components/Icon';
+
+type Props = {
+  onBack: () => void;
+  onOpenFriend: (player: PlayerSummary, friendship: Friendship | null) => void;
+};
+
+type Tab = 'friends' | 'requests' | 'recommendations';
+
+const MEDAL_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
+
+export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
+  const { profile } = useAuth();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const [tab, setTab] = useState<Tab>('friends');
+  const [friendships, setFriendships] = useState<Friendship[] | null>(null);
+  const [recommendations, setRecommendations] = useState<PlayerSummary[] | null>(null);
+  const [query, setQuery] = useState('');
+  const [searchResults, setSearchResults] = useState<PlayerSummary[]>([]);
+  const [busyId, setBusyId] = useState<string | null>(null);
+
+  const meId = profile?.id ?? '';
+
+  const reload = () => {
+    if (!profile) return;
+    getFriendships(profile.id).then(setFriendships);
+  };
+
+  useEffect(() => {
+    reload();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id]);
+
+  useEffect(() => {
+    if (!friendships || !profile) return;
+    const knownIds = friendships.map((f) => f.player.id);
+    getRecommendations(profile.id, knownIds).then(setRecommendations);
+  }, [friendships, profile]);
+
+  useEffect(() => {
+    const trimmed = query.trim();
+    if (trimmed.length < 2 || !profile) {
+      setSearchResults([]);
+      return;
+    }
+    const handle = setTimeout(() => {
+      searchPlayers(trimmed, profile.id).then(setSearchResults);
+    }, 300);
+    return () => clearTimeout(handle);
+  }, [query, profile]);
+
+  if (!profile) return null;
+
+  const friends = (friendships ?? [])
+    .filter((f) => f.status === 'accepted')
+    .sort((a, b) => levelFromTotalCorrect(b.player.totalCorrect).xp - levelFromTotalCorrect(a.player.totalCorrect).xp);
+  const incoming = (friendships ?? []).filter((f) => f.status === 'pending' && !f.isOutgoing);
+  const outgoing = (friendships ?? []).filter((f) => f.status === 'pending' && f.isOutgoing);
+  const friendshipByPlayerId = new Map((friendships ?? []).map((f) => [f.player.id, f]));
+
+  const handleAdd = async (targetId: string) => {
+    setBusyId(targetId);
+    await sendFriendRequest(meId, targetId);
+    reload();
+    setBusyId(null);
+  };
+
+  const handleRespond = async (friendshipId: string, accept: boolean) => {
+    setBusyId(friendshipId);
+    await respondToRequest(friendshipId, accept);
+    reload();
+    setBusyId(null);
+  };
+
+  const handleRemove = async (friendshipId: string) => {
+    setBusyId(friendshipId);
+    await removeFriend(friendshipId);
+    reload();
+    setBusyId(null);
+  };
+
+  const renderPlayerActionRow = (player: PlayerSummary) => {
+    const existing = friendshipByPlayerId.get(player.id);
+    if (existing?.status === 'accepted') {
+      return <Text style={styles.badgeDone}>Уже друзья</Text>;
+    }
+    if (existing?.status === 'pending' && existing.isOutgoing) {
+      return <Text style={styles.badgeMuted}>Запрос отправлен</Text>;
+    }
+    if (existing?.status === 'pending' && !existing.isOutgoing) {
+      return <Text style={styles.badgeMuted}>Ждёт вашего ответа</Text>;
+    }
+    return (
+      <SoundTouchable
+        style={styles.addButton}
+        onPress={() => handleAdd(player.id)}
+        disabled={busyId === player.id}
+        accessibilityRole="button"
+      >
+        <Icon name="userPlus" size={15} color={theme.onPrimary} />
+      </SoundTouchable>
+    );
+  };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Header title="Друзья" onBack={onBack} theme={theme} />
+        <View style={styles.emptyWrap}>
+          <Icon name="user" size={32} color={theme.textMuted} />
+          <Text style={styles.emptyTitle}>Нужен облачный аккаунт</Text>
+          <Text style={styles.emptyText}>
+            Друзья работают через синхронизацию в реальном времени — доступно только когда подключён Supabase.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Header title="Друзья" onBack={onBack} theme={theme} />
+
+      <View style={styles.searchWrap}>
+        <Icon name="search" size={15} color={theme.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Найти по имени пользователя"
+          placeholderTextColor={theme.textMuted}
+          value={query}
+          onChangeText={setQuery}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+
+      {query.trim().length >= 2 ? (
+        <ScrollView contentContainerStyle={styles.list}>
+          {searchResults.length === 0 ? (
+            <Text style={styles.emptyText}>Никого не нашлось</Text>
+          ) : (
+            searchResults.map((player) => (
+              <PlayerRow
+                key={player.id}
+                player={player}
+                theme={theme}
+                styles={styles}
+                onPress={() => onOpenFriend(player, friendshipByPlayerId.get(player.id) ?? null)}
+                right={renderPlayerActionRow(player)}
+              />
+            ))
+          )}
+        </ScrollView>
+      ) : (
+        <>
+          <View style={styles.tabs}>
+            <TabButton label="Все друзья" active={tab === 'friends'} onPress={() => setTab('friends')} styles={styles} />
+            <TabButton
+              label={`Запросы${incoming.length ? ` ${incoming.length}` : ''}`}
+              active={tab === 'requests'}
+              onPress={() => setTab('requests')}
+              styles={styles}
+            />
+            <TabButton label="Рекомендации" active={tab === 'recommendations'} onPress={() => setTab('recommendations')} styles={styles} />
+          </View>
+
+          {friendships === null ? (
+            <View style={styles.emptyWrap}>
+              <ActivityIndicator size="large" color={theme.primary} />
+            </View>
+          ) : (
+            <ScrollView contentContainerStyle={styles.list}>
+              {tab === 'friends' &&
+                (friends.length === 0 ? (
+                  <Text style={styles.emptyText}>Пока нет друзей — найдите их через поиск сверху.</Text>
+                ) : (
+                  friends.map((f, i) => (
+                    <PlayerRow
+                      key={f.friendshipId}
+                      player={f.player}
+                      theme={theme}
+                      styles={styles}
+                      rank={i < 3 ? i : undefined}
+                      onPress={() => onOpenFriend(f.player, f)}
+                      right={<Text style={styles.xpText}>{levelFromTotalCorrect(f.player.totalCorrect).xp} XP</Text>}
+                    />
+                  ))
+                ))}
+
+              {tab === 'requests' && (
+                <>
+                  {incoming.length === 0 && outgoing.length === 0 && (
+                    <Text style={styles.emptyText}>Нет активных запросов в друзья.</Text>
+                  )}
+                  {incoming.map((f) => (
+                    <PlayerRow
+                      key={f.friendshipId}
+                      player={f.player}
+                      theme={theme}
+                      styles={styles}
+                      onPress={() => onOpenFriend(f.player, f)}
+                      right={
+                        <View style={styles.requestActions}>
+                          <SoundTouchable
+                            style={styles.acceptButton}
+                            onPress={() => handleRespond(f.friendshipId, true)}
+                            disabled={busyId === f.friendshipId}
+                            accessibilityRole="button"
+                          >
+                            <Icon name="check" size={14} color={theme.onPrimary} />
+                          </SoundTouchable>
+                          <SoundTouchable
+                            style={styles.declineButton}
+                            onPress={() => handleRespond(f.friendshipId, false)}
+                            disabled={busyId === f.friendshipId}
+                            accessibilityRole="button"
+                          >
+                            <Icon name="close" size={14} color={theme.textMuted} />
+                          </SoundTouchable>
+                        </View>
+                      }
+                    />
+                  ))}
+                  {outgoing.map((f) => (
+                    <PlayerRow
+                      key={f.friendshipId}
+                      player={f.player}
+                      theme={theme}
+                      styles={styles}
+                      onPress={() => onOpenFriend(f.player, f)}
+                      right={
+                        <SoundTouchable onPress={() => handleRemove(f.friendshipId)} disabled={busyId === f.friendshipId}>
+                          <Text style={styles.badgeMuted}>Отменить</Text>
+                        </SoundTouchable>
+                      }
+                    />
+                  ))}
+                </>
+              )}
+
+              {tab === 'recommendations' &&
+                (recommendations === null ? (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                ) : recommendations.length === 0 ? (
+                  <Text style={styles.emptyText}>Пока некого порекомендовать.</Text>
+                ) : (
+                  recommendations.map((player) => (
+                    <PlayerRow
+                      key={player.id}
+                      player={player}
+                      theme={theme}
+                      styles={styles}
+                      onPress={() => onOpenFriend(player, null)}
+                      right={renderPlayerActionRow(player)}
+                    />
+                  ))
+                ))}
+            </ScrollView>
+          )}
+        </>
+      )}
+    </SafeAreaView>
+  );
+}
+
+function Header({ title, onBack, theme }: { title: string; onBack: () => void; theme: Theme }) {
+  return (
+    <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
+      <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel="Назад" style={{ marginBottom: 12 }}>
+        <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>‹ Назад</Text>
+      </SoundTouchable>
+      <Text style={{ fontSize: 26, fontFamily: fontFamily('800'), color: theme.text }}>{title}</Text>
+    </View>
+  );
+}
+
+type Styles = ReturnType<typeof makeStyles>;
+
+function TabButton({ label, active, onPress, styles }: { label: string; active: boolean; onPress: () => void; styles: Styles }) {
+  return (
+    <SoundTouchable style={[styles.tab, active && styles.tabActive]} onPress={onPress}>
+      <Text style={[styles.tabText, active && styles.tabTextActive]}>{label}</Text>
+    </SoundTouchable>
+  );
+}
+
+function PlayerRow({
+  player,
+  theme,
+  styles,
+  onPress,
+  right,
+  rank,
+}: {
+  player: PlayerSummary;
+  theme: Theme;
+  styles: Styles;
+  onPress: () => void;
+  right: React.ReactNode;
+  rank?: number;
+}) {
+  const { level, title } = levelFromTotalCorrect(player.totalCorrect);
+  return (
+    <SoundTouchable style={styles.row} onPress={onPress} activeOpacity={0.85}>
+      {rank !== undefined && <Text style={[styles.rank, { color: MEDAL_COLORS[rank] }]}>#{rank + 1}</Text>}
+      <AnimeAvatar avatar={player.avatar} size={40} />
+      <View style={styles.rowText}>
+        <Text style={styles.rowName} numberOfLines={1}>{player.username}</Text>
+        <Text style={styles.rowSub}>
+          Уровень {level} · {title} · 🔥{player.streakCount}
+        </Text>
+      </View>
+      {right}
+    </SoundTouchable>
+  );
+}
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    searchWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      marginHorizontal: 20,
+      marginBottom: 12,
+    },
+    searchInput: { flex: 1, fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
+    tabs: {
+      flexDirection: 'row',
+      backgroundColor: theme.card,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 4,
+      gap: 4,
+      marginHorizontal: 20,
+      marginBottom: 12,
+    },
+    tab: { flex: 1, paddingVertical: 9, borderRadius: radius.sm, alignItems: 'center' },
+    tabActive: { backgroundColor: theme.primary },
+    tabText: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted },
+    tabTextActive: { color: theme.onPrimary },
+    emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },
+    emptyTitle: { fontSize: 16, fontFamily: fontFamily('700'), color: theme.text, marginTop: 6 },
+    emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 19, paddingVertical: 8 },
+    list: { paddingHorizontal: 20, paddingBottom: 40, gap: 8 },
+    row: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      backgroundColor: theme.card,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 10,
+      gap: 10,
+    },
+    rank: { width: 22, textAlign: 'center', fontSize: 13, fontFamily: fontFamily('800') },
+    rowText: { flex: 1 },
+    rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
+    xpText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.primary },
+    addButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    badgeDone: { fontSize: 11, fontFamily: fontFamily('600'), color: theme.success },
+    badgeMuted: { fontSize: 11, fontFamily: fontFamily('600'), color: theme.textMuted },
+    requestActions: { flexDirection: 'row', gap: 8 },
+    acceptButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: theme.primary,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    declineButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      backgroundColor: theme.background,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+  });
+}
