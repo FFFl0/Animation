@@ -35,7 +35,7 @@ import { RoundConfig } from './src/quiz/types';
 import { Achievement } from './src/data/achievements';
 import { dateSeed } from './src/quiz/generateQuiz';
 import { todayDateStr } from './src/quiz/today';
-import { parseRecoveryUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
+import { parseRecoveryUrl, parseAuthTokensFromUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
 
 type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile' | 'leaderboard';
 
@@ -118,7 +118,7 @@ function AppShell() {
   const startMode = (modeId: ModeId) => {
     const mode = GAME_MODES.find((m) => m.id === modeId)!;
     const config: RoundConfig =
-      modeId === 'daily' ? { ...mode.config, dailySeed: dateSeed(todayDateStr()) } : mode.config;
+      modeId === 'daily' ? { ...mode.config, seed: dateSeed(todayDateStr()) } : mode.config;
     setRoundConfig(config);
     setActiveModeId(modeId);
     setQuizKey((k) => k + 1);
@@ -181,6 +181,47 @@ function AppShell() {
   );
 }
 
+/**
+ * Handles both deep-link flows that hand back tokens in the URL: the
+ * password-recovery link (routes to ResetPasswordScreen) and the web
+ * Google OAuth redirect (completes the session in place, since supabase-js
+ * has `detectSessionInUrl: false` — it never parses the hash on its own).
+ * Lives inside AuthProvider so it can reach useAuth().
+ */
+function DeepLinkGate({ children }: { children: React.ReactNode }) {
+  const { completeGoogleSession } = useAuth();
+  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryTokens | null>(null);
+
+  useEffect(() => {
+    const handleUrl = (url: string | null) => {
+      if (!url) return;
+      const recovery = parseRecoveryUrl(url);
+      if (recovery) {
+        setRecoveryTokens(recovery);
+        return;
+      }
+      const oauth = parseAuthTokensFromUrl(url);
+      if (oauth) completeGoogleSession(oauth.accessToken, oauth.refreshToken);
+    };
+    Linking.getInitialURL().then(handleUrl);
+    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
+    return () => subscription.remove();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
+
+  if (recoveryTokens) {
+    return (
+      <ResetPasswordScreen
+        accessToken={recoveryTokens.accessToken}
+        refreshToken={recoveryTokens.refreshToken}
+        onDone={() => setRecoveryTokens(null)}
+      />
+    );
+  }
+
+  return <>{children}</>;
+}
+
 export default function App() {
   const [fontsLoaded] = useFonts({
     Manrope_400Regular,
@@ -189,18 +230,6 @@ export default function App() {
     Manrope_700Bold,
     Manrope_800ExtraBold,
   });
-  const [recoveryTokens, setRecoveryTokens] = useState<RecoveryTokens | null>(null);
-
-  useEffect(() => {
-    const handleUrl = (url: string | null) => {
-      if (!url) return;
-      const tokens = parseRecoveryUrl(url);
-      if (tokens) setRecoveryTokens(tokens);
-    };
-    Linking.getInitialURL().then(handleUrl);
-    const subscription = Linking.addEventListener('url', ({ url }) => handleUrl(url));
-    return () => subscription.remove();
-  }, []);
 
   if (!fontsLoaded) {
     return (
@@ -215,15 +244,9 @@ export default function App() {
       <SoundProvider>
         <AuthProvider>
           <ResponsiveShell>
-            {recoveryTokens ? (
-              <ResetPasswordScreen
-                accessToken={recoveryTokens.accessToken}
-                refreshToken={recoveryTokens.refreshToken}
-                onDone={() => setRecoveryTokens(null)}
-              />
-            ) : (
+            <DeepLinkGate>
               <AppShell />
-            )}
+            </DeepLinkGate>
           </ResponsiveShell>
         </AuthProvider>
       </SoundProvider>

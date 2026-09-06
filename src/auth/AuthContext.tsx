@@ -21,6 +21,7 @@ type AuthContextValue = {
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
   completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
+  completeGoogleSession: (accessToken: string, refreshToken: string) => Promise<void>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -60,6 +61,15 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const loginWithGoogle = async () => {
     const p = await Storage.signInWithGoogle();
     if (p) setProfile(p);
+  };
+
+  // Completes the round-trip for the web OAuth flow: `signInWithGoogle`
+  // there just navigates the page away, so the tokens come back later as a
+  // URL fragment that App.tsx's deep-link listener hands to this instead.
+  const completeGoogleSession = async (accessToken: string, refreshToken: string) => {
+    await Storage.completeRecoverySession(accessToken, refreshToken);
+    const p = await Storage.getSessionProfile();
+    setProfile(p);
   };
 
   const login = async (username: string, password: string) => {
@@ -105,7 +115,19 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const value = useMemo(
-    () => ({ profile, loading, register, login, logout, updateAvatar, recordRoundResult, resetPassword, completePasswordReset, loginWithGoogle }),
+    () => ({
+      profile,
+      loading,
+      register,
+      login,
+      logout,
+      updateAvatar,
+      recordRoundResult,
+      resetPassword,
+      completePasswordReset,
+      loginWithGoogle,
+      completeGoogleSession,
+    }),
     [profile, loading]
   );
 

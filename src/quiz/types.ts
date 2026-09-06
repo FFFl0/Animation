@@ -8,5 +8,5 @@ export type RoundConfig = {
   lives?: number;
   timerSeconds?: number;
   forceType?: QuestionType;
-  dailySeed?: number;
+  seed?: number;
 };

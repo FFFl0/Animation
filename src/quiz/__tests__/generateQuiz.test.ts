@@ -51,17 +51,17 @@ describe('generateQuiz', () => {
     }
   });
 
-  it('produces an identical question set for the same dailySeed', () => {
+  it('produces an identical question set for the same seed', () => {
     const seed = dateSeed('2026-09-06');
-    const a = generateQuiz(baseConfig({ questionCount: 10, dailySeed: seed }));
-    const b = generateQuiz(baseConfig({ questionCount: 10, dailySeed: seed }));
+    const a = generateQuiz(baseConfig({ questionCount: 10, seed: seed }));
+    const b = generateQuiz(baseConfig({ questionCount: 10, seed: seed }));
     expect(a.map((q) => q.id)).toEqual(b.map((q) => q.id));
     expect(a.map((q) => q.options)).toEqual(b.map((q) => q.options));
   });
 
-  it('produces different question sets for different dailySeeds', () => {
-    const a = generateQuiz(baseConfig({ questionCount: 10, dailySeed: dateSeed('2026-09-06') }));
-    const b = generateQuiz(baseConfig({ questionCount: 10, dailySeed: dateSeed('2026-09-07') }));
+  it('produces different question sets for different seeds', () => {
+    const a = generateQuiz(baseConfig({ questionCount: 10, seed: dateSeed('2026-09-06') }));
+    const b = generateQuiz(baseConfig({ questionCount: 10, seed: dateSeed('2026-09-07') }));
     expect(a.map((q) => q.id)).not.toEqual(b.map((q) => q.id));
   });
 

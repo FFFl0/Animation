@@ -17,7 +17,7 @@ export type GameMode = {
   title: string;
   subtitle: string;
   icon: IconName;
-  config: Omit<RoundConfig, 'dailySeed'>;
+  config: Omit<RoundConfig, 'seed'>;
 };
 
 export const GAME_MODES: GameMode[] = [

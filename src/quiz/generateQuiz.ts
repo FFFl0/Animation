@@ -134,7 +134,7 @@ function questionFor(type: QuestionType, character: Character, idSuffix: number,
 }
 
 export function generateQuiz(config: RoundConfig): Question[] {
-  const rng: Rng = config.dailySeed !== undefined ? seededRng(config.dailySeed) : Math.random;
+  const rng: Rng = config.seed !== undefined ? seededRng(config.seed) : Math.random;
 
   let pool = config.tier ? CHARACTERS.filter((c) => c.tier === config.tier) : CHARACTERS;
   if (config.categoryId === 'hard' && !config.tier) {
