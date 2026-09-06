@@ -1,0 +1,397 @@
+import { useEffect, useMemo, useRef, useState } from 'react';
+import { ActivityIndicator, SafeAreaView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Theme } from '../theme/palette';
+import { fontFamily } from '../theme/fonts';
+import { radius } from '../theme/tokens';
+import { useTheme } from '../theme/ThemeContext';
+import { useAuth } from '../auth/AuthContext';
+import { isSupabaseConfigured } from '../auth/supabaseClient';
+import SoundTouchable from '../sound/SoundTouchable';
+import PillButton from '../components/PillButton';
+import Icon from '../components/Icon';
+import QuizScreen from './QuizScreen';
+import { RoundConfig } from '../quiz/types';
+import { dateSeed } from '../quiz/generateQuiz';
+import {
+  BattleFinishPayload,
+  BattlePeer,
+  BattleRoom,
+  BattleStartPayload,
+  generateRoomCode,
+  normalizeRoomCode,
+} from '../battle/battleRoom';
+
+type Props = {
+  onBack: () => void;
+};
+
+type Phase = 'menu' | 'joinInput' | 'connecting' | 'waiting' | 'countdown' | 'playing' | 'result';
+
+const BATTLE_QUESTION_COUNT = 10;
+
+export default function BattleScreen({ onBack }: Props) {
+  const { profile } = useAuth();
+  const { theme } = useTheme();
+  const styles = useMemo(() => makeStyles(theme), [theme]);
+
+  const [phase, setPhase] = useState<Phase>('menu');
+  const [roomCode, setRoomCode] = useState('');
+  const [joinCodeInput, setJoinCodeInput] = useState('');
+  const [isHost, setIsHost] = useState(false);
+  const [error, setError] = useState<string | null>(null);
+  const [opponent, setOpponent] = useState<BattlePeer | null>(null);
+  const [opponentLeft, setOpponentLeft] = useState(false);
+  const [opponentProgress, setOpponentProgress] = useState<{ answered: number; score: number } | null>(null);
+  const [opponentFinish, setOpponentFinish] = useState<BattleFinishPayload | null>(null);
+  const [battleConfig, setBattleConfig] = useState<RoundConfig | null>(null);
+  const [countdown, setCountdown] = useState(0);
+  const [localResult, setLocalResult] = useState<{ score: number; total: number } | null>(null);
+
+  const roomRef = useRef<BattleRoom | null>(null);
+  const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+
+  useEffect(() => {
+    return () => {
+      if (countdownTimer.current) clearInterval(countdownTimer.current);
+      roomRef.current?.leave();
+    };
+  }, []);
+
+  if (!profile) return null;
+  const me: BattlePeer = { userId: profile.id, username: profile.username };
+
+  const beginCountdown = (payload: BattleStartPayload) => {
+    setBattleConfig(payload.config);
+    setPhase('countdown');
+    const tick = () => {
+      const secondsLeft = Math.max(0, Math.ceil((payload.startAt - Date.now()) / 1000));
+      setCountdown(secondsLeft);
+      if (secondsLeft <= 0) {
+        if (countdownTimer.current) clearInterval(countdownTimer.current);
+        setPhase('playing');
+      }
+    };
+    tick();
+    countdownTimer.current = setInterval(tick, 200);
+  };
+
+  const connect = async (code: string, host: boolean) => {
+    setError(null);
+    setIsHost(host);
+    setRoomCode(code);
+    setPhase('connecting');
+
+    const room = new BattleRoom(code, me);
+    try {
+      await room.connect({
+        onPeerJoin: (peer) => {
+          setOpponent(peer);
+          setOpponentLeft(false);
+          if (host) {
+            const config: RoundConfig = { categoryId: 'mixed', questionCount: BATTLE_QUESTION_COUNT, seed: dateSeed(code + Date.now()) };
+            const startAt = Date.now() + 4000;
+            room.broadcastStart({ config, startAt });
+            beginCountdown({ config, startAt });
+          }
+        },
+        onPeerLeave: () => {
+          setOpponent(null);
+          setOpponentLeft(true);
+        },
+        onStart: (payload) => {
+          if (!host) beginCountdown(payload);
+        },
+        onProgress: (payload) => {
+          if (payload.userId !== me.userId) setOpponentProgress({ answered: payload.answered, score: payload.score });
+        },
+        onFinish: (payload) => {
+          if (payload.userId !== me.userId) setOpponentFinish(payload);
+        },
+      });
+      roomRef.current = room;
+      setPhase('waiting');
+    } catch {
+      setError('Не удалось подключиться к комнате. Проверьте связь и попробуйте ещё раз.');
+      setPhase('menu');
+    }
+  };
+
+  const resetToMenu = () => {
+    if (countdownTimer.current) clearInterval(countdownTimer.current);
+    roomRef.current?.leave();
+    roomRef.current = null;
+    setPhase('menu');
+    setRoomCode('');
+    setJoinCodeInput('');
+    setOpponent(null);
+    setOpponentLeft(false);
+    setOpponentProgress(null);
+    setOpponentFinish(null);
+    setBattleConfig(null);
+    setLocalResult(null);
+  };
+
+  const handleCreate = () => connect(generateRoomCode(), true);
+
+  const handleJoinSubmit = () => {
+    const code = normalizeRoomCode(joinCodeInput);
+    if (code.length !== 5) {
+      setError('Код состоит из 5 символов');
+      return;
+    }
+    connect(code, false);
+  };
+
+  const handleFinish = (score: number, total: number) => {
+    setLocalResult({ score, total });
+    roomRef.current?.broadcastFinish({ userId: me.userId, score, total });
+    setPhase('result');
+  };
+
+  if (!isSupabaseConfigured) {
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Header title="Битва фанатов" onBack={onBack} theme={theme} />
+        <View style={styles.centerFill}>
+          <Icon name="swords" size={40} color={theme.textMuted} />
+          <Text style={styles.emptyTitle}>Нужен облачный аккаунт</Text>
+          <Text style={styles.emptyText}>
+            Битва фанатов работает через синхронизацию в реальном времени — она доступна только когда
+            подключён Supabase.
+          </Text>
+        </View>
+      </SafeAreaView>
+    );
+  }
+
+  if (phase === 'playing' && battleConfig) {
+    return (
+      <View style={{ flex: 1 }}>
+        <QuizScreen
+          config={battleConfig}
+          onFinish={handleFinish}
+          onClose={resetToMenu}
+          onAnswer={(_correct, answered, score) => roomRef.current?.broadcastProgress({ userId: me.userId, answered, score })}
+        />
+        {opponent && (
+          <View style={styles.opponentBadge} pointerEvents="none">
+            <Icon name="swords" size={13} color={theme.primary} />
+            <Text style={styles.opponentBadgeText}>
+              {opponent.username}: {opponentProgress ? `${opponentProgress.answered}/${BATTLE_QUESTION_COUNT}` : '0/' + BATTLE_QUESTION_COUNT}
+            </Text>
+          </View>
+        )}
+        {opponentLeft && (
+          <View style={styles.opponentLeftBanner} pointerEvents="none">
+            <Text style={styles.opponentLeftText}>Соперник отключился — можно доиграть в одиночку</Text>
+          </View>
+        )}
+      </View>
+    );
+  }
+
+  return (
+    <SafeAreaView style={styles.safe}>
+      <Header title="Битва фанатов" onBack={phase === 'menu' ? onBack : resetToMenu} theme={theme} />
+      <View style={styles.container}>
+        {phase === 'menu' && (
+          <>
+            <Icon name="swords" size={40} color={theme.primary} />
+            <Text style={styles.title}>Сразись с другом</Text>
+            <Text style={styles.subtitle}>
+              Один создаёт комнату и делится кодом, второй вводит его — оба получают одинаковые вопросы
+              и играют одновременно.
+            </Text>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <PillButton title="Создать битву" variant="ink" onPress={handleCreate} style={{ marginTop: 8 }} />
+            <PillButton title="Присоединиться по коду" variant="outline" onPress={() => setPhase('joinInput')} style={{ marginTop: 12 }} />
+          </>
+        )}
+
+        {phase === 'joinInput' && (
+          <>
+            <Icon name="swords" size={40} color={theme.primary} />
+            <Text style={styles.title}>Код комнаты</Text>
+            <Text style={styles.subtitle}>Спроси код у соперника и введи его здесь</Text>
+            {error && <Text style={styles.error}>{error}</Text>}
+            <TextInput
+              style={styles.codeInput}
+              placeholder="ABCDE"
+              placeholderTextColor={theme.textMuted}
+              autoCapitalize="characters"
+              autoCorrect={false}
+              maxLength={5}
+              value={joinCodeInput}
+              onChangeText={setJoinCodeInput}
+            />
+            <PillButton title="Войти в комнату" variant="ink" onPress={handleJoinSubmit} style={{ marginTop: 8 }} />
+          </>
+        )}
+
+        {phase === 'connecting' && (
+          <>
+            <ActivityIndicator size="large" color={theme.primary} />
+            <Text style={styles.subtitle}>Подключаемся...</Text>
+          </>
+        )}
+
+        {phase === 'waiting' && (
+          <>
+            <Text style={styles.subtitle}>{isHost ? 'Отправь этот код другу' : 'Ждём начала...'}</Text>
+            {isHost && (
+              <View style={styles.codeBox}>
+                <Text style={styles.codeText}>{roomCode}</Text>
+              </View>
+            )}
+            <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />
+            <Text style={styles.subtitle}>Ожидание соперника...</Text>
+          </>
+        )}
+
+        {phase === 'countdown' && (
+          <>
+            <Text style={styles.subtitle}>Соперник найден!</Text>
+            <Text style={styles.countdownNumber}>{countdown > 0 ? countdown : 'Начали!'}</Text>
+          </>
+        )}
+
+        {phase === 'result' && localResult && (
+          <>
+            <Icon
+              name="trophy"
+              size={40}
+              color={
+                !opponentFinish
+                  ? theme.textMuted
+                  : localResult.score > opponentFinish.score
+                    ? theme.primary
+                    : localResult.score < opponentFinish.score
+                      ? theme.danger
+                      : theme.textMuted
+              }
+            />
+            <Text style={styles.title}>
+              {!opponentFinish
+                ? 'Ждём соперника...'
+                : localResult.score > opponentFinish.score
+                  ? 'Победа!'
+                  : localResult.score < opponentFinish.score
+                    ? 'Поражение'
+                    : 'Ничья'}
+            </Text>
+            <View style={styles.resultRow}>
+              <View style={styles.resultCard}>
+                <Text style={styles.resultName}>{profile.username}</Text>
+                <Text style={styles.resultScore}>{localResult.score}/{localResult.total}</Text>
+              </View>
+              <View style={styles.resultCard}>
+                <Text style={styles.resultName}>{opponent?.username ?? '—'}</Text>
+                {opponentFinish ? (
+                  <Text style={styles.resultScore}>{opponentFinish.score}/{opponentFinish.total}</Text>
+                ) : opponentLeft ? (
+                  <Text style={styles.resultScore}>—</Text>
+                ) : (
+                  <ActivityIndicator size="small" color={theme.primary} />
+                )}
+              </View>
+            </View>
+            {opponentLeft && !opponentFinish && (
+              <Text style={styles.subtitle}>Соперник отключился до конца раунда</Text>
+            )}
+            <PillButton title="Сыграть ещё" variant="ink" onPress={resetToMenu} style={{ marginTop: 20 }} />
+          </>
+        )}
+      </View>
+    </SafeAreaView>
+  );
+}
+
+function Header({ title, onBack, theme }: { title: string; onBack: () => void; theme: Theme }) {
+  return (
+    <SoundTouchable
+      onPress={onBack}
+      style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 4 }}
+      accessibilityRole="button"
+      accessibilityLabel="Назад"
+    >
+      <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>‹ {title}</Text>
+    </SoundTouchable>
+  );
+}
+
+function makeStyles(theme: Theme) {
+  return StyleSheet.create({
+    safe: { flex: 1, backgroundColor: theme.background },
+    container: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 4 },
+    centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 8 },
+    title: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 10, textAlign: 'center' },
+    subtitle: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4, marginBottom: 8, textAlign: 'center', lineHeight: 19 },
+    emptyTitle: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.text, marginTop: 6, textAlign: 'center' },
+    emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 19 },
+    error: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('500'), marginBottom: 4, textAlign: 'center' },
+    codeInput: {
+      width: '100%',
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 18,
+      paddingVertical: 14,
+      fontSize: 22,
+      letterSpacing: 6,
+      textAlign: 'center',
+      fontFamily: fontFamily('800'),
+      color: theme.text,
+      marginBottom: 4,
+    },
+    codeBox: {
+      backgroundColor: theme.primaryLight,
+      borderRadius: radius.lg,
+      paddingVertical: 18,
+      paddingHorizontal: 32,
+      marginTop: 12,
+    },
+    codeText: { fontSize: 34, fontFamily: fontFamily('800'), color: theme.text, letterSpacing: 8 },
+    countdownNumber: { fontSize: 56, fontFamily: fontFamily('800'), color: theme.primary, marginTop: 12 },
+    resultRow: { flexDirection: 'row', gap: 14, marginTop: 18, width: '100%' },
+    resultCard: {
+      flex: 1,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.lg,
+      paddingVertical: 16,
+      alignItems: 'center',
+      gap: 6,
+    },
+    resultName: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
+    resultScore: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text },
+    opponentBadge: {
+      position: 'absolute',
+      top: 14,
+      right: 20,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingVertical: 6,
+      paddingHorizontal: 12,
+    },
+    opponentBadgeText: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.text },
+    opponentLeftBanner: {
+      position: 'absolute',
+      top: 60,
+      left: 20,
+      right: 20,
+      backgroundColor: theme.dangerBg,
+      borderRadius: radius.lg,
+      paddingVertical: 8,
+      paddingHorizontal: 14,
+      alignItems: 'center',
+    },
+    opponentLeftText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.danger, textAlign: 'center' },
+  });
+}

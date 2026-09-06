@@ -28,6 +28,7 @@ import AchievementsScreen from './src/screens/AchievementsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
+import BattleScreen from './src/screens/BattleScreen';
 import { CategoryId } from './src/data/categories';
 import { TierId, getTier } from './src/data/difficulty';
 import { GAME_MODES, ModeId } from './src/data/modes';
@@ -37,7 +38,7 @@ import { dateSeed } from './src/quiz/generateQuiz';
 import { todayDateStr } from './src/quiz/today';
 import { parseRecoveryUrl, parseAuthTokensFromUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
 
-type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile' | 'leaderboard';
+type Screen = 'home' | 'categoryDetail' | 'quiz' | 'result' | 'stats' | 'achievements' | 'profile' | 'leaderboard' | 'battle';
 
 const TAB_SCREENS: Screen[] = ['home', 'stats', 'achievements', 'profile'];
 
@@ -154,8 +155,10 @@ function AppShell() {
               }}
               onStartMode={startMode}
               onOpenSettings={() => setScreen('profile')}
+              onOpenBattle={() => setScreen('battle')}
             />
           )}
+          {screen === 'battle' && <BattleScreen onBack={() => setScreen('home')} />}
           {screen === 'categoryDetail' && selectedCategory && (
             <CategoryDetailScreen categoryId={selectedCategory} onBack={() => setScreen('home')} onStartTier={startTier} />
           )}

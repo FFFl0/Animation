@@ -17,9 +17,11 @@ type Props = {
   config: RoundConfig;
   onFinish: (score: number, total: number) => void;
   onClose: () => void;
+  /** Fired right when an answer registers — lets a battle room broadcast live progress. */
+  onAnswer?: (correct: boolean, answeredCount: number, score: number) => void;
 };
 
-export default function QuizScreen({ config, onFinish, onClose }: Props) {
+export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { playCorrect, playWrong } = useSound();
@@ -68,13 +70,16 @@ export default function QuizScreen({ config, onFinish, onClose }: Props) {
   const handleSelect = (optionIndex: number) => {
     if (selected !== null) return;
     setSelected(optionIndex);
-    if (optionIndex === question.correctIndex) {
-      setScore((s) => s + 1);
+    const correct = optionIndex === question.correctIndex;
+    const nextScore = correct ? score + 1 : score;
+    if (correct) {
+      setScore(nextScore);
       playCorrect();
     } else {
       playWrong();
       if (hasLives) setLives((l) => Math.max(0, l - 1));
     }
+    onAnswer?.(correct, index + 1, nextScore);
   };
 
   const handleNext = () => {

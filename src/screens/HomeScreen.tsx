@@ -19,6 +19,7 @@ type Props = {
   onOpenCategory: (id: CategoryId) => void;
   onStartMode: (id: ModeId) => void;
   onOpenSettings: () => void;
+  onOpenBattle: () => void;
 };
 
 function categoryCount(id: CategoryId): string {
@@ -42,7 +43,7 @@ function categoryCount(id: CategoryId): string {
   }
 }
 
-export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings }: Props) {
+export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -92,6 +93,16 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             />
           ))}
         </View>
+
+        <SoundTouchable style={styles.battleCard} onPress={onOpenBattle} activeOpacity={0.88}>
+          <View style={styles.battleIconWrap}>
+            <Icon name="swords" size={22} color={theme.onInk} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.battleTitle}>Битва фанатов</Text>
+            <Text style={styles.battleSubtitle}>Сразись с другом онлайн, 1 на 1</Text>
+          </View>
+        </SoundTouchable>
 
         <Text style={styles.sectionTitle}>Игровые режимы</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modesRow}>
@@ -144,6 +155,25 @@ function makeStyles(theme: Theme) {
     streakLabel: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text, opacity: 0.7 },
     streakValue: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 12 },
+    battleCard: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 14,
+      backgroundColor: theme.ink,
+      borderRadius: radius.lg,
+      padding: 16,
+      marginBottom: 24,
+    },
+    battleIconWrap: {
+      width: 44,
+      height: 44,
+      borderRadius: 14,
+      backgroundColor: 'rgba(255,255,255,0.15)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    battleTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.onInk, marginBottom: 2 },
+    battleSubtitle: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.onInk, opacity: 0.75 },
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
