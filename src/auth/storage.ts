@@ -2,6 +2,10 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { Account, ModeStat, Profile, Streak } from './types';
 import { makeAvatar } from '../data/avatar';
+import { AuthError } from './authError';
+import { validateCredentials } from './validation';
+
+export { AuthError };
 
 const ACCOUNTS_KEY = 'animequiz.accounts';
 const SESSION_KEY = 'animequiz.session';
@@ -42,12 +46,8 @@ async function hashPassword(password: string, salt: string): Promise<string> {
   return Crypto.digestStringAsync(Crypto.CryptoDigestAlgorithm.SHA256, `${salt}:${password}`);
 }
 
-export class AuthError extends Error {}
-
 export async function register(username: string, password: string): Promise<Profile> {
-  const trimmed = username.trim();
-  if (trimmed.length < 3) throw new AuthError('Имя пользователя должно быть не короче 3 символов');
-  if (password.length < 4) throw new AuthError('Пароль должен быть не короче 4 символов');
+  const trimmed = validateCredentials(username, password);
 
   const accounts = await readAccounts();
   if (accounts.some((a) => a.username.toLowerCase() === trimmed.toLowerCase())) {
@@ -106,6 +106,11 @@ export async function updateAccount(id: string, patch: Partial<Profile>): Promis
   accounts[index] = updated;
   await writeAccounts(accounts);
   return toProfile(updated);
+}
+
+/** No realtime concept for the local-only backend; kept for interface parity with supabaseBackend. */
+export function subscribeProfile(_id: string, _onChange: (profile: Profile) => void): () => void {
+  return () => {};
 }
 
 function toProfile(account: Account): Profile {

@@ -1,5 +1,5 @@
 import { ReactNode, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -8,8 +8,12 @@ import { useTheme, ThemeMode } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS } from '../data/characters';
+import { ANIME_SERIES } from '../data/animeSeries';
 import { HairStyle } from '../data/avatar';
 import AnimeAvatar from '../components/AnimeAvatar';
+import Icon from '../components/Icon';
+
+const SERIES_TITLE_BY_ID: Record<string, string> = Object.fromEntries(ANIME_SERIES.map((s) => [s.id, s.title]));
 
 const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'short', 'spiky', 'ponytail'];
 const COLOR_SWATCHES = ['#2B2B33', '#8B5E3C', '#D9B24C', '#E8632E', '#E85D9C', '#5FB8E0', '#7C5CB8', '#3E3E3E'];
@@ -32,11 +36,19 @@ export default function ProfileScreen() {
   const { musicEnabled, sfxEnabled, toggleMusic, toggleSfx } = useSound();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [editing, setEditing] = useState(false);
+  const [search, setSearch] = useState('');
 
   if (!profile) return null;
   const { avatar } = profile;
 
   const favoriteCharacter = CHARACTERS.find((c) => c.id === profile.favoriteCharacterId) ?? null;
+
+  const query = search.trim().toLowerCase();
+  const visibleCharacters = query
+    ? CHARACTERS.filter(
+        (c) => c.name.toLowerCase().includes(query) || SERIES_TITLE_BY_ID[c.seriesId]?.toLowerCase().includes(query)
+      )
+    : CHARACTERS;
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.container}>
@@ -80,20 +92,36 @@ export default function ProfileScreen() {
       )}
 
       <Text style={styles.sectionTitle}>Любимый персонаж</Text>
-      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
-        {CHARACTERS.map((c) => (
-          <SoundTouchable
-            key={c.id}
-            style={styles.favItem}
-            onPress={() => updateAvatar({ favoriteCharacterId: c.id === profile.favoriteCharacterId ? null : c.id })}
-          >
-            <View style={[styles.favAvatarWrap, c.id === profile.favoriteCharacterId && styles.favAvatarSelected]}>
-              <AnimeAvatar avatar={c.avatar} size={56} />
-            </View>
-            <Text style={styles.favName} numberOfLines={1}>{c.name.split(' ')[0]}</Text>
-          </SoundTouchable>
-        ))}
-      </ScrollView>
+      <View style={styles.searchWrap}>
+        <Icon name="search" size={15} color={theme.textMuted} />
+        <TextInput
+          style={styles.searchInput}
+          placeholder="Найти персонажа или аниме"
+          placeholderTextColor={theme.textMuted}
+          value={search}
+          onChangeText={setSearch}
+          autoCapitalize="none"
+          autoCorrect={false}
+        />
+      </View>
+      {visibleCharacters.length === 0 ? (
+        <Text style={styles.searchEmpty}>Никого не нашлось</Text>
+      ) : (
+        <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
+          {visibleCharacters.map((c) => (
+            <SoundTouchable
+              key={c.id}
+              style={styles.favItem}
+              onPress={() => updateAvatar({ favoriteCharacterId: c.id === profile.favoriteCharacterId ? null : c.id })}
+            >
+              <View style={[styles.favAvatarWrap, c.id === profile.favoriteCharacterId && styles.favAvatarSelected]}>
+                <AnimeAvatar avatar={c.avatar} size={56} />
+              </View>
+              <Text style={styles.favName} numberOfLines={1}>{c.name.split(' ')[0]}</Text>
+            </SoundTouchable>
+          ))}
+        </ScrollView>
+      )}
       {favoriteCharacter && (
         <Text style={styles.favSummary}>Любимый персонаж: {favoriteCharacter.name}</Text>
       )}
@@ -208,6 +236,20 @@ function makeStyles(theme: Theme) {
     },
     swatchSelected: { borderColor: theme.text },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
+    searchWrap: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 9,
+      marginBottom: 12,
+    },
+    searchInput: { flex: 1, fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
+    searchEmpty: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, paddingVertical: 8 },
     favRow: { gap: 14, paddingRight: 12 },
     favItem: { alignItems: 'center', width: 64 },
     favAvatarWrap: { borderRadius: 30, borderWidth: 2, borderColor: 'transparent' },

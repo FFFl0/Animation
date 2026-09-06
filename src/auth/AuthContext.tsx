@@ -1,12 +1,13 @@
 import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
-import * as Storage from './storage';
+import * as Storage from './backend';
 import { Profile } from './types';
 import { Avatar } from '../data/avatar';
 import { RoundConfig } from '../quiz/types';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
+import { ACHIEVEMENTS, Achievement } from '../data/achievements';
 
-export { AuthError } from './storage';
+export { AuthError } from './backend';
 
 type AuthContextValue = {
   profile: Profile | null;
@@ -15,7 +16,7 @@ type AuthContextValue = {
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
   updateAvatar: (patch: { avatar?: Avatar; favoriteCharacterId?: string | null }) => Promise<void>;
-  recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<void>;
+  recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
 };
 
 const AuthContext = createContext<AuthContextValue | null>(null);
@@ -29,6 +30,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setProfile)
       .finally(() => setLoading(false));
   }, []);
+
+  // When a Supabase backend is configured, pick up changes made on other
+  // devices logged into the same account (no-op for the local-only backend).
+  useEffect(() => {
+    if (!profile) return;
+    const unsubscribe = Storage.subscribeProfile(profile.id, setProfile);
+    return unsubscribe;
+  }, [profile?.id]);
 
   const register = async (username: string, password: string) => {
     const p = await Storage.register(username, password);
@@ -52,7 +61,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const recordRoundResult = async (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => {
-    if (!profile) return;
+    if (!profile) return [];
     const keys = [categoryStatsKey(config.categoryId, config.tier)];
     if (modeId) keys.push(modeStatsKey(modeId));
 
@@ -63,8 +72,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const nextStreak = Storage.bumpStreak(profile.streak);
 
+    const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => a.check(profile)).map((a) => a.id));
+
     const p = await Storage.updateAccount(profile.id, { stats: nextStats, streak: nextStreak });
     setProfile(p);
+
+    return ACHIEVEMENTS.filter((a) => !unlockedBefore.has(a.id) && a.check(p));
   };
 
   const value = useMemo(

@@ -32,6 +32,7 @@ export type IconName =
   | 'crown'
   | 'lock'
   | 'close'
+  | 'search'
   | 'arrowPath';
 
 type Props = {
@@ -272,6 +273,13 @@ function renderIcon(name: IconName, common: any, color: string) {
         <>
           <Rect x="6" y="11" width="12" height="9" rx="2" {...common} />
           <Path d="M8 11V8a4 4 0 0 1 8 0v3" {...common} />
+        </>
+      );
+    case 'search':
+      return (
+        <>
+          <Circle cx="10.5" cy="10.5" r="6.5" {...common} />
+          <Line x1="15.3" y1="15.3" x2="20" y2="20" {...common} />
         </>
       );
     case 'close':
