@@ -1,0 +1,67 @@
+name: EAS Build (Android)
+
+on:
+  workflow_dispatch:
+    inputs:
+      profile:
+        description: 'EAS build profile'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+
+jobs:
+  build:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 20
+
+      - name: Install dependencies
+        run: npm ci
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Link EAS project (idempotent)
+        run: npx eas-cli init --non-interactive || true
+
+      - name: Build
+        run: npx eas-cli build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --json > build-output.json
+
+      - name: Publish download link to job summary
+        if: always()
+        run: |
+          echo "## Build result" >> "$GITHUB_STEP_SUMMARY"
+          if [ -s build-output.json ]; then
+            node -e "
+              const builds = JSON.parse(require('fs').readFileSync('build-output.json', 'utf8'));
+              const b = Array.isArray(builds) ? builds[0] : builds;
+              const fs = require('fs');
+              if (b && b.artifacts && b.artifacts.buildUrl) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n**APK ready:** [Download](' + b.artifacts.buildUrl + ')\n');
+              } else if (b) {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nBuild status: ' + b.status + '. Check the log above or your expo.dev dashboard for details.\n');
+              } else {
+                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nNo build info captured — check the log above.\n');
+              }
+            "
+          else
+            echo "Build output was empty — check the log above for the error." >> "$GITHUB_STEP_SUMMARY"
+          fi
+
+      - name: Upload build metadata
+        if: always()
+        uses: actions/upload-artifact@v4
+        with:
+          name: eas-build-output
+          path: build-output.json
+          if-no-files-found: ignore

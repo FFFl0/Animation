@@ -12,6 +12,7 @@
       "supportsTablet": true
     },
     "android": {
+      "package": "com.animequiz.app",
       "adaptiveIcon": {
         "backgroundColor": "#FDF9F6",
         "foregroundImage": "./assets/android-icon-foreground.png",
