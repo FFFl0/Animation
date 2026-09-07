@@ -4,6 +4,9 @@ type StringValue = string | ((...args: any[]) => string);
 type StringDict = { [key: string]: StringValue | StringDict };
 
 const ru: StringDict = {
+  common: {
+    pressBackAgainToExit: 'Нажмите «Назад» ещё раз, чтобы выйти',
+  },
   welcome: {
     start: 'Начать',
   },
@@ -308,6 +311,9 @@ const ru: StringDict = {
 };
 
 const en: StringDict = {
+  common: {
+    pressBackAgainToExit: 'Press back again to exit',
+  },
   welcome: {
     start: 'Start',
   },

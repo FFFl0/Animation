@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Platform, View } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Platform, ToastAndroid, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
@@ -45,6 +45,7 @@ import { Achievement } from './src/data/achievements';
 import { dateSeed } from './src/quiz/generateQuiz';
 import { todayDateStr } from './src/quiz/today';
 import { parseRecoveryUrl, parseAuthTokensFromUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
+import { useT } from './src/i18n/strings';
 
 type Screen =
   | 'home'
@@ -85,6 +86,7 @@ function AppShell() {
   const { profile, loading, recordRoundResult } = useAuth();
   const { theme, resolvedScheme } = useTheme();
   const { setMusicContext } = useSound();
+  const t = useT();
 
   const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
@@ -98,6 +100,7 @@ function AppShell() {
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
   const [challengeFriend, setChallengeFriend] = useState<PlayerSummary | null>(null);
   const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
+  const lastBackPressRef = useRef(0);
 
   useEffect(() => {
     setScreen('home');
@@ -107,6 +110,70 @@ function AppShell() {
   useEffect(() => {
     setMusicContext(screen === 'quiz' ? 'quiz' : 'menu');
   }, [screen, setMusicContext]);
+
+  // Android hardware/gesture back button: without this, RN's default
+  // behavior is to close the whole app from any screen. Route it through
+  // the same back destinations the on-screen back buttons already use, and
+  // require a second press on the true home screen before actually exiting.
+  useEffect(() => {
+    if (Platform.OS !== 'android') return;
+
+    const onBackPress = () => {
+      if (!profile) {
+        if (preAuthScreen === 'auth') {
+          setPreAuthScreen('welcome');
+          return true;
+        }
+        return false;
+      }
+
+      switch (screen) {
+        case 'battle': {
+          const cameFromFriendProfile = !!challengeFriend || !!autoJoinRoomCode;
+          setChallengeFriend(null);
+          setAutoJoinRoomCode(null);
+          setScreen(cameFromFriendProfile ? 'friendProfile' : 'home');
+          return true;
+        }
+        case 'friendProfile':
+          setScreen('friends');
+          return true;
+        case 'chat':
+        case 'compare':
+          setScreen('friendProfile');
+          return true;
+        case 'categoryDetail':
+        case 'quiz':
+        case 'result':
+          setScreen('home');
+          return true;
+        case 'leaderboard':
+          setScreen('stats');
+          return true;
+        case 'friends':
+        case 'stats':
+        case 'achievements':
+        case 'profile':
+          setScreen('home');
+          return true;
+        case 'home': {
+          const now = Date.now();
+          if (now - lastBackPressRef.current < 2000) {
+            BackHandler.exitApp();
+            return true;
+          }
+          lastBackPressRef.current = now;
+          ToastAndroid.show(t('common.pressBackAgainToExit'), ToastAndroid.SHORT);
+          return true;
+        }
+        default:
+          return false;
+      }
+    };
+
+    const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
+    return () => subscription.remove();
+  }, [profile, preAuthScreen, screen, challengeFriend, autoJoinRoomCode, t]);
 
   if (loading) {
     return (
