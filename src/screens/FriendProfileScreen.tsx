@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { Alert, SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { SafeAreaView, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
@@ -24,6 +24,7 @@ type Props = {
   friendship: Friendship | null;
   onBack: () => void;
   onCompare: () => void;
+  onOpenChat: () => void;
   onChallenge: () => void;
 };
 
@@ -33,7 +34,7 @@ function initialStatus(friendship: Friendship | null): 'none' | 'pending-out' | 
   return friendship.isOutgoing ? 'pending-out' : 'pending-in';
 }
 
-export default function FriendProfileScreen({ player, friendship, onBack, onCompare, onChallenge }: Props) {
+export default function FriendProfileScreen({ player, friendship, onBack, onCompare, onOpenChat, onChallenge }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -74,10 +75,6 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
     setBusy(false);
   };
 
-  const handleMessage = () => {
-    Alert.alert(t('friendProfile.messageStubTitle'), t('friendProfile.messageStubText'));
-  };
-
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
@@ -94,7 +91,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         <View style={styles.actionsRow}>
           {status === 'accepted' && (
             <>
-              <PillButton title={t('friendProfile.write')} variant="outline" onPress={handleMessage} fullWidth={false} style={styles.actionButton} />
+              <PillButton title={t('friendProfile.write')} variant="outline" onPress={onOpenChat} fullWidth={false} style={styles.actionButton} />
               <PillButton title={t('friendProfile.compare')} variant="outline" onPress={onCompare} fullWidth={false} style={styles.actionButton} />
             </>
           )}

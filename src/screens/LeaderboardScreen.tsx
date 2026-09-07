@@ -6,7 +6,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { fetchLeaderboard, isSupabaseConfigured, LeaderboardRow } from '../leaderboard/leaderboardApi';
+import { fetchLeaderboard, isSupabaseConfigured, LeaderboardPeriod, LeaderboardRow } from '../leaderboard/leaderboardApi';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { useT } from '../i18n/strings';
@@ -22,6 +22,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
+  const [period, setPeriod] = useState<LeaderboardPeriod>('all');
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
 
   useEffect(() => {
@@ -29,8 +30,15 @@ export default function LeaderboardScreen({ onBack }: Props) {
       setRows([]);
       return;
     }
-    fetchLeaderboard().then(setRows);
-  }, []);
+    setRows(null);
+    fetchLeaderboard(period).then(setRows);
+  }, [period]);
+
+  const PERIODS: { key: LeaderboardPeriod; label: string }[] = [
+    { key: 'all', label: t('leaderboardPeriod.allTime') },
+    { key: 'week', label: t('leaderboardPeriod.week') },
+    { key: 'season', label: t('leaderboardPeriod.season') },
+  ];
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -40,6 +48,20 @@ export default function LeaderboardScreen({ onBack }: Props) {
         </SoundTouchable>
         <Text style={styles.title}>{t('leaderboard.title')}</Text>
       </View>
+
+      {isSupabaseConfigured && (
+        <View style={styles.periodTabs}>
+          {PERIODS.map((p) => (
+            <SoundTouchable
+              key={p.key}
+              style={[styles.periodTab, period === p.key && styles.periodTabActive]}
+              onPress={() => setPeriod(p.key)}
+            >
+              <Text style={[styles.periodTabText, period === p.key && styles.periodTabTextActive]}>{p.label}</Text>
+            </SoundTouchable>
+          ))}
+        </View>
+      )}
 
       {!isSupabaseConfigured ? (
         <View style={styles.emptyWrap}>
@@ -73,7 +95,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
                   </Text>
                   <Text style={styles.rowSub}>{t('leaderboard.accuracyLine', accuracy)}</Text>
                 </View>
-                <Text style={styles.rowScore}>{row.totalScore}</Text>
+                <Text style={styles.rowScore}>{row.score}</Text>
               </View>
             );
           })}
@@ -90,6 +112,21 @@ function makeStyles(theme: Theme) {
     backButton: { marginBottom: 12 },
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     title: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text },
+    periodTabs: {
+      flexDirection: 'row',
+      backgroundColor: theme.card,
+      borderRadius: radius.md,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 4,
+      gap: 4,
+      marginHorizontal: 20,
+      marginBottom: 12,
+    },
+    periodTab: { flex: 1, paddingVertical: 9, borderRadius: radius.sm, alignItems: 'center' },
+    periodTabActive: { backgroundColor: theme.primary },
+    periodTabText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
+    periodTabTextActive: { color: theme.onPrimary },
     emptyWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 40, gap: 10 },
     emptyTitle: { fontSize: 16, fontFamily: fontFamily('700'), color: theme.text, marginTop: 6 },
     emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 19 },

@@ -21,21 +21,25 @@ import {
   normalizeRoomCode,
 } from '../battle/battleRoom';
 import { useT } from '../i18n/strings';
+import { sendBattleInvite } from '../notifications/notificationsApi';
 
 type Props = {
   onBack: () => void;
   /** Set when arriving here via a friend's "Бросить вызов" button — skips
-   * the menu and immediately creates a room, then opens the share sheet
-   * with the code once it's ready (no in-app delivery to a specific
-   * player — sharing the code out-of-band is the whole MVP here). */
-  challengeFriendUsername?: string;
+   * the menu, immediately creates a room, notifies the friend in-app (a
+   * `battle_invites` row, picked up by NotificationsContext), and opens the
+   * share sheet with the code too as a fallback delivery path. */
+  challengeFriend?: { id: string; username: string };
+  /** Set when arriving here by accepting an incoming battle invite — skips
+   * the menu and joins this room code directly instead of creating one. */
+  autoJoinRoomCode?: string;
 };
 
 type Phase = 'menu' | 'joinInput' | 'connecting' | 'waiting' | 'countdown' | 'playing' | 'result';
 
 const BATTLE_QUESTION_COUNT = 10;
 
-export default function BattleScreen({ onBack, challengeFriendUsername }: Props) {
+export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -159,18 +163,20 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
   };
 
   useEffect(() => {
-    if (challengeFriendUsername && profile) handleCreate();
+    if (autoJoinRoomCode && profile) connect(autoJoinRoomCode, false);
+    else if (challengeFriend && profile) handleCreate();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
   useEffect(() => {
-    if (phase === 'waiting' && isHost && challengeFriendUsername && !sharedForChallenge.current) {
+    if (phase === 'waiting' && isHost && challengeFriend && !sharedForChallenge.current) {
       sharedForChallenge.current = true;
+      sendBattleInvite(me.userId, challengeFriend.id, roomCode).catch(() => {});
       Share.share({
         message: t('battle.shareMessage', roomCode),
       }).catch(() => {});
     }
-  }, [phase, isHost, roomCode, challengeFriendUsername]);
+  }, [phase, isHost, roomCode, challengeFriend]);
 
   if (!profile) return null;
 

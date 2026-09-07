@@ -214,6 +214,8 @@ const ru: StringDict = {
     rowSub: (level: number, title: string, streak: number) => `Уровень ${level} · ${title} · 🔥${streak}`,
     xp: 'XP',
     back: 'Назад',
+    battleInvitesTitle: 'Вызовы на битву',
+    battleInviteSub: 'Хочет сразиться с тобой',
   },
   friendProfile: {
     levelLine: (level: number, title: string) => `Уровень ${level} · ${title}`,
@@ -230,8 +232,6 @@ const ru: StringDict = {
     noAchievements: 'Пока нет открытых достижений.',
     favoriteCategoriesTitle: 'Любимые категории',
     challenge: 'Бросить вызов',
-    messageStubTitle: 'Скоро',
-    messageStubText: 'Сообщения друзьям появятся в одном из следующих обновлений.',
     back: 'Назад',
   },
   compare: {
@@ -280,6 +280,30 @@ const ru: StringDict = {
     stats: 'Статистика',
     achievements: 'Достижения',
     profile: 'Профиль',
+  },
+  notifications: {
+    friendRequestTitle: 'Новая заявка в друзья',
+    friendRequestBody: 'Кто-то хочет добавить тебя в друзья — загляни во вкладку «Друзья».',
+    battleInviteTitle: 'Вызов на битву',
+    battleInviteBody: 'Друг вызывает тебя на битву фанатов!',
+  },
+  chat: {
+    placeholder: 'Написать сообщение...',
+    empty: 'Пока нет сообщений — напиши первым!',
+    back: 'Назад',
+  },
+  cosmetics: {
+    frameLabel: 'Рамка',
+    backgroundLabel: 'Узор фона',
+    none: 'Без рамки',
+    lockedAtLevel: (level: number) => `Открыть на уровне ${level}`,
+    frameNames: { bronze: 'Бронзовая', azure: 'Лазурная', sakura: 'Сакура', ember: 'Огненная', gold: 'Золотая' },
+    backgroundNames: { leaf: 'Листья', wave: 'Волны', petals: 'Лепестки', flame: 'Пламя', stars: 'Звёзды' },
+  },
+  leaderboardPeriod: {
+    allTime: 'Всё время',
+    week: 'Неделя',
+    season: 'Сезон',
   },
 };
 
@@ -494,6 +518,8 @@ const en: StringDict = {
     rowSub: (level: number, title: string, streak: number) => `Level ${level} · ${title} · 🔥${streak}`,
     xp: 'XP',
     back: 'Back',
+    battleInvitesTitle: 'Battle Invites',
+    battleInviteSub: 'Wants to battle you',
   },
   friendProfile: {
     levelLine: (level: number, title: string) => `Level ${level} · ${title}`,
@@ -510,8 +536,6 @@ const en: StringDict = {
     noAchievements: 'No achievements unlocked yet.',
     favoriteCategoriesTitle: 'Favorite Categories',
     challenge: 'Challenge',
-    messageStubTitle: 'Coming Soon',
-    messageStubText: 'Messaging friends is coming in a future update.',
     back: 'Back',
   },
   compare: {
@@ -560,6 +584,30 @@ const en: StringDict = {
     stats: 'Stats',
     achievements: 'Achievements',
     profile: 'Profile',
+  },
+  notifications: {
+    friendRequestTitle: 'New friend request',
+    friendRequestBody: "Someone wants to add you as a friend — check the Friends tab.",
+    battleInviteTitle: 'Battle Invite',
+    battleInviteBody: 'A friend is challenging you to a fan battle!',
+  },
+  chat: {
+    placeholder: 'Type a message...',
+    empty: 'No messages yet — say hi!',
+    back: 'Back',
+  },
+  cosmetics: {
+    frameLabel: 'Frame',
+    backgroundLabel: 'Background Pattern',
+    none: 'No frame',
+    lockedAtLevel: (level: number) => `Unlocks at level ${level}`,
+    frameNames: { bronze: 'Bronze', azure: 'Azure', sakura: 'Sakura', ember: 'Ember', gold: 'Gold' },
+    backgroundNames: { leaf: 'Leaves', wave: 'Waves', petals: 'Petals', flame: 'Flame', stars: 'Stars' },
+  },
+  leaderboardPeriod: {
+    allTime: 'All Time',
+    week: 'Week',
+    season: 'Season',
   },
 };
 

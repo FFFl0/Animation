@@ -2,6 +2,11 @@ import { Image, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { Avatar, HairStyle } from '../data/avatar';
 import { AVATAR_IMAGES } from '../data/avatarImages';
+import { FRAME_IMAGES, BACKGROUND_IMAGES } from '../data/cosmeticImages';
+
+/** How much wider than the avatar itself a frame ring renders — it's meant
+ * to bleed slightly past the circular edge, not clip against it. */
+const FRAME_OVERHANG = 1.16;
 
 type Props = {
   avatar: Avatar;
@@ -75,10 +80,20 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
     );
   }
 
-  return (
+  // Cosmetics only apply to a player's own customizable avatar rendered at
+  // full size — not to the fixed-roster character images above, and not to
+  // the cropped 'eyes' variant used for that quiz question type.
+  const isCustomizable = variant === 'full';
+  const backgroundImage = isCustomizable && avatar.backgroundId ? BACKGROUND_IMAGES[avatar.backgroundId] : undefined;
+  const frameImage = isCustomizable && avatar.frameId ? FRAME_IMAGES[avatar.frameId] : undefined;
+
+  const circle = (
     <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
+      {backgroundImage && (
+        <Image source={backgroundImage} style={{ position: 'absolute', width: size, height: size }} resizeMode="cover" />
+      )}
       <Svg width={size} height={size} viewBox={viewBox}>
-        <Circle cx="100" cy="100" r="100" fill={avatar.accent} />
+        {!backgroundImage && <Circle cx="100" cy="100" r="100" fill={avatar.accent} />}
         <HairBack style={avatar.hairStyle} color={avatar.hairColor} />
         <Ellipse cx="100" cy="118" rx="46" ry="50" fill={avatar.skinTone} />
         <Ellipse cx="78" cy="128" rx="7" ry="9" fill={avatar.eyeColor} />
@@ -86,6 +101,21 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
         <Path d="M82 152 Q100 162 118 152" stroke="#B9825F" strokeWidth={3} fill="none" strokeLinecap="round" />
         <HairFront style={avatar.hairStyle} color={avatar.hairColor} />
       </Svg>
+    </View>
+  );
+
+  if (!frameImage) return circle;
+
+  const frameSize = Math.round(size * FRAME_OVERHANG);
+  const offset = -(frameSize - size) / 2;
+  return (
+    <View style={{ width: size, height: size }}>
+      {circle}
+      <Image
+        source={frameImage}
+        style={{ position: 'absolute', top: offset, left: offset, width: frameSize, height: frameSize }}
+        resizeMode="contain"
+      />
     </View>
   );
 }

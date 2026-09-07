@@ -22,22 +22,26 @@ import SoundTouchable from '../sound/SoundTouchable';
 import Icon from '../components/Icon';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import { useNotifications } from '../notifications/NotificationsContext';
+import { getUnreadCountsByFriend } from '../chat/chatApi';
 
 type Props = {
   onBack: () => void;
   onOpenFriend: (player: PlayerSummary, friendship: Friendship | null) => void;
+  onAcceptBattleInvite: (roomCode: string) => void;
 };
 
 type Tab = 'friends' | 'requests' | 'recommendations';
 
 const MEDAL_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
 
-export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
+export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvite }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
   const t = useT();
+  const { battleInvites, refresh: refreshNotifications, respondToInvite } = useNotifications();
 
   const [tab, setTab] = useState<Tab>('friends');
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
@@ -45,12 +49,16 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
   const [query, setQuery] = useState('');
   const [searchResults, setSearchResults] = useState<PlayerSummary[]>([]);
   const [busyId, setBusyId] = useState<string | null>(null);
+  const [invitesBusyId, setInvitesBusyId] = useState<string | null>(null);
+  const [unreadByFriend, setUnreadByFriend] = useState<Map<string, number>>(new Map());
 
   const meId = profile?.id ?? '';
 
   const reload = () => {
     if (!profile) return;
     getFriendships(profile.id).then(setFriendships);
+    getUnreadCountsByFriend(profile.id).then(setUnreadByFriend);
+    refreshNotifications();
   };
 
   useEffect(() => {
@@ -104,6 +112,13 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
     await removeFriend(friendshipId);
     reload();
     setBusyId(null);
+  };
+
+  const handleBattleInvite = async (inviteId: string, accept: boolean) => {
+    setInvitesBusyId(inviteId);
+    const result = await respondToInvite(inviteId, accept);
+    setInvitesBusyId(null);
+    if (result) onAcceptBattleInvite(result.roomCode);
   };
 
   const renderPlayerActionRow = (player: PlayerSummary) => {
@@ -183,7 +198,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
           <View style={styles.tabs}>
             <TabButton label={t('friends.tabAllFriends')} active={tab === 'friends'} onPress={() => setTab('friends')} styles={styles} />
             <TabButton
-              label={`${t('friends.tabRequests')}${incoming.length ? ` ${incoming.length}` : ''}`}
+              label={`${t('friends.tabRequests')}${incoming.length + battleInvites.length ? ` ${incoming.length + battleInvites.length}` : ''}`}
               active={tab === 'requests'}
               onPress={() => setTab('requests')}
               styles={styles}
@@ -210,6 +225,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                       language={language}
                       t={t}
                       rank={i < 3 ? i : undefined}
+                      hasUnread={unreadByFriend.has(f.player.id)}
                       onPress={() => onOpenFriend(f.player, f)}
                       right={<Text style={styles.xpText}>{levelFromTotalCorrect(f.player.totalCorrect).xp} {t('friends.xp')}</Text>}
                     />
@@ -218,8 +234,46 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
 
               {tab === 'requests' && (
                 <>
-                  {incoming.length === 0 && outgoing.length === 0 && (
+                  {incoming.length === 0 && outgoing.length === 0 && battleInvites.length === 0 && (
                     <Text style={styles.emptyText}>{t('friends.noRequests')}</Text>
+                  )}
+                  {battleInvites.length > 0 && (
+                    <Text style={styles.sectionLabel}>{t('friends.battleInvitesTitle')}</Text>
+                  )}
+                  {battleInvites.map((invite) => (
+                    <PlayerRow
+                      key={invite.id}
+                      player={invite.fromPlayer}
+                      theme={theme}
+                      styles={styles}
+                      language={language}
+                      t={t}
+                      onPress={() => onOpenFriend(invite.fromPlayer, friendshipByPlayerId.get(invite.fromPlayer.id) ?? null)}
+                      subtitleOverride={t('friends.battleInviteSub')}
+                      right={
+                        <View style={styles.requestActions}>
+                          <SoundTouchable
+                            style={styles.acceptButton}
+                            onPress={() => handleBattleInvite(invite.id, true)}
+                            disabled={invitesBusyId === invite.id}
+                            accessibilityRole="button"
+                          >
+                            <Icon name="swords" size={14} color={theme.onPrimary} />
+                          </SoundTouchable>
+                          <SoundTouchable
+                            style={styles.declineButton}
+                            onPress={() => handleBattleInvite(invite.id, false)}
+                            disabled={invitesBusyId === invite.id}
+                            accessibilityRole="button"
+                          >
+                            <Icon name="close" size={14} color={theme.textMuted} />
+                          </SoundTouchable>
+                        </View>
+                      }
+                    />
+                  ))}
+                  {(incoming.length > 0 || outgoing.length > 0) && battleInvites.length > 0 && (
+                    <Text style={styles.sectionLabel}>{t('friends.tabRequests')}</Text>
                   )}
                   {incoming.map((f) => (
                     <PlayerRow
@@ -328,6 +382,8 @@ function PlayerRow({
   rank,
   language,
   t,
+  subtitleOverride,
+  hasUnread,
 }: {
   player: PlayerSummary;
   theme: Theme;
@@ -337,15 +393,20 @@ function PlayerRow({
   rank?: number;
   language: Language;
   t: ReturnType<typeof useT>;
+  subtitleOverride?: string;
+  hasUnread?: boolean;
 }) {
   const { level, title } = levelFromTotalCorrect(player.totalCorrect, language);
   return (
     <SoundTouchable style={styles.row} onPress={onPress} activeOpacity={0.85}>
       {rank !== undefined && <Text style={[styles.rank, { color: MEDAL_COLORS[rank] }]}>#{rank + 1}</Text>}
-      <AnimeAvatar avatar={player.avatar} size={40} />
+      <View>
+        <AnimeAvatar avatar={player.avatar} size={40} />
+        {hasUnread && <View style={[styles.unreadDot, { backgroundColor: theme.danger, borderColor: theme.card }]} />}
+      </View>
       <View style={styles.rowText}>
         <Text style={styles.rowName} numberOfLines={1}>{player.username}</Text>
-        <Text style={styles.rowSub}>{t('friends.rowSub', level, title, player.streakCount)}</Text>
+        <Text style={styles.rowSub}>{subtitleOverride ?? t('friends.rowSub', level, title, player.streakCount)}</Text>
       </View>
       {right}
     </SoundTouchable>
@@ -388,6 +449,7 @@ function makeStyles(theme: Theme) {
     emptyTitle: { fontSize: 16, fontFamily: fontFamily('700'), color: theme.text, marginTop: 6 },
     emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 19, paddingVertical: 8 },
     list: { paddingHorizontal: 20, paddingBottom: 40, gap: 8 },
+    sectionLabel: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted, textTransform: 'uppercase', letterSpacing: 0.5, marginTop: 4, marginBottom: 2 },
     row: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -399,6 +461,15 @@ function makeStyles(theme: Theme) {
       gap: 10,
     },
     rank: { width: 22, textAlign: 'center', fontSize: 13, fontFamily: fontFamily('800') },
+    unreadDot: {
+      position: 'absolute',
+      top: -2,
+      right: -2,
+      width: 12,
+      height: 12,
+      borderRadius: 6,
+      borderWidth: 2,
+    },
     rowText: { flex: 1 },
     rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },

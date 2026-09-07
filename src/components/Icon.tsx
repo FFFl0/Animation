@@ -36,7 +36,10 @@ export type IconName =
   | 'arrowPath'
   | 'userPlus'
   | 'users'
-  | 'check';
+  | 'check'
+  | 'bell'
+  | 'send'
+  | 'sparkles';
 
 type Props = {
   name: IconName;
@@ -321,5 +324,21 @@ function renderIcon(name: IconName, common: any, color: string) {
       );
     case 'check':
       return <Path d="M4.5 12.5l5 5 10-11" {...common} />;
+    case 'bell':
+      return (
+        <>
+          <Path d="M6 10a6 6 0 0 1 12 0c0 4 1.5 5.5 2 6H4c.5-.5 2-2 2-6z" {...common} />
+          <Path d="M10 19a2 2 0 0 0 4 0" {...common} />
+        </>
+      );
+    case 'send':
+      return <Path d="M4 12L20 4l-6 16-3-7-7-1z" {...common} />;
+    case 'sparkles':
+      return (
+        <>
+          <Path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" {...common} />
+          <Path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" {...common} />
+        </>
+      );
   }
 }

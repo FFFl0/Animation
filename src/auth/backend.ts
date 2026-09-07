@@ -18,3 +18,4 @@ export const requestPasswordReset = impl.requestPasswordReset;
 export const completeRecoverySession = impl.completeRecoverySession;
 export const updatePassword = impl.updatePassword;
 export const signInWithGoogle = impl.signInWithGoogle;
+export const logRoundResult = impl.logRoundResult;

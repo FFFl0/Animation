@@ -110,6 +110,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const p = await Storage.updateAccount(profile.id, { stats: nextStats, streak: nextStreak, dailyChallenge: nextDailyChallenge });
     setProfile(p);
+    Storage.logRoundResult(profile.id, score, total);
 
     return ACHIEVEMENTS.filter((a) => !unlockedBefore.has(a.id) && a.check(p));
   };

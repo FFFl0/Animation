@@ -147,6 +147,11 @@ export function bumpStreak(streak: Streak): Streak {
   return { count, lastPlayedDate: today };
 }
 
+/** No period-scoped leaderboard for the local-only backend — there's no
+ * shared table to log rounds into, and nobody else's device to compare
+ * against anyway. */
+export async function logRoundResult(_userId: string, _score: number, _total: number): Promise<void> {}
+
 export function mergeStat(prev: ModeStat | undefined, score: number, total: number): ModeStat {
   const base = prev ?? { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
   return {

@@ -1,5 +1,5 @@
 import { ReactNode, useEffect, useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { Image, ImageSourcePropType, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -10,6 +10,9 @@ import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS, characterName } from '../data/characters';
 import { seriesTitleById } from '../data/animeSeries';
 import { HairStyle } from '../data/avatar';
+import { BackgroundId, BACKGROUNDS, FrameId, FRAMES } from '../data/cosmetics';
+import { BACKGROUND_IMAGES, FRAME_IMAGES } from '../data/cosmeticImages';
+import { levelFromStats } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
@@ -65,6 +68,7 @@ export default function ProfileScreen() {
 
   if (!profile) return null;
   const { avatar } = profile;
+  const { level } = levelFromStats(profile.stats);
 
   const favoriteCharacter = CHARACTERS.find((c) => c.id === profile.favoriteCharacterId) ?? null;
 
@@ -114,6 +118,40 @@ export default function ProfileScreen() {
             <SwatchRow styles={styles} colors={ACCENT_SWATCHES} selected={avatar.accent} onSelect={(c) => updateAvatar({ avatar: { ...avatar, accent: c } })} />
           </EditorRow>
         </View>
+      )}
+
+      {editing && (
+        <>
+          <Text style={styles.sectionTitle}>{t('cosmetics.frameLabel')}</Text>
+          <CosmeticRow
+            styles={styles}
+            theme={theme}
+            t={t}
+            items={FRAMES}
+            images={FRAME_IMAGES}
+            selectedId={avatar.frameId}
+            level={level}
+            noneLabel={t('cosmetics.none')}
+            nameNamespace="frameNames"
+            thumbMode="contain"
+            onSelect={(id) => updateAvatar({ avatar: { ...avatar, frameId: id as FrameId | undefined } })}
+          />
+
+          <Text style={styles.sectionTitle}>{t('cosmetics.backgroundLabel')}</Text>
+          <CosmeticRow
+            styles={styles}
+            theme={theme}
+            t={t}
+            items={BACKGROUNDS}
+            images={BACKGROUND_IMAGES}
+            selectedId={avatar.backgroundId}
+            level={level}
+            noneLabel={t('cosmetics.none')}
+            nameNamespace="backgroundNames"
+            thumbMode="cover"
+            onSelect={(id) => updateAvatar({ avatar: { ...avatar, backgroundId: id as BackgroundId | undefined } })}
+          />
+        </>
       )}
 
       <Text style={styles.sectionTitle}>{t('profile.favoriteCharacterTitle')}</Text>
@@ -225,6 +263,67 @@ function EditorRow({ label, children, styles }: { label: string; children: React
   );
 }
 
+function CosmeticRow<TId extends string>({
+  items,
+  images,
+  selectedId,
+  level,
+  noneLabel,
+  nameNamespace,
+  thumbMode,
+  onSelect,
+  styles,
+  theme,
+  t,
+}: {
+  items: { id: TId; unlockLevel: number }[];
+  images: Record<TId, ImageSourcePropType>;
+  selectedId: TId | undefined;
+  level: number;
+  noneLabel: string;
+  nameNamespace: 'frameNames' | 'backgroundNames';
+  thumbMode: 'contain' | 'cover';
+  onSelect: (id: TId | undefined) => void;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+}) {
+  return (
+    <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
+      <SoundTouchable style={styles.favItem} onPress={() => onSelect(undefined)}>
+        <View style={[styles.cosmeticThumbWrap, !selectedId && styles.favAvatarSelected]}>
+          <Icon name="close" size={16} color={theme.textMuted} />
+        </View>
+        <Text style={styles.favName} numberOfLines={1}>{noneLabel}</Text>
+      </SoundTouchable>
+
+      {items.map((item) => {
+        const unlocked = level >= item.unlockLevel;
+        return (
+          <SoundTouchable
+            key={item.id}
+            style={styles.favItem}
+            disabled={!unlocked}
+            onPress={() => onSelect(item.id)}
+          >
+            <View style={[styles.cosmeticThumbWrap, selectedId === item.id && styles.favAvatarSelected]}>
+              <Image source={images[item.id]} style={styles.cosmeticThumb} resizeMode={thumbMode} />
+              {!unlocked && (
+                <View style={styles.cosmeticLockOverlay}>
+                  <Icon name="lock" size={16} color="#FFFFFF" />
+                </View>
+              )}
+            </View>
+            <Text style={styles.favName} numberOfLines={1}>
+              {unlocked ? t(`cosmetics.${nameNamespace}.${item.id}`) : t('cosmetics.lockedAtLevel', item.unlockLevel)}
+            </Text>
+          </SoundTouchable>
+        );
+      })}
+    </ScrollView>
+  );
+}
+
 function SwatchRow({ colors, selected, onSelect, styles }: { colors: string[]; selected: string; onSelect: (c: string) => void; styles: Styles }) {
   return (
     <ScrollView horizontal showsHorizontalScrollIndicator={false}>
@@ -302,6 +401,24 @@ function makeStyles(theme: Theme) {
     favItem: { alignItems: 'center', width: 64 },
     favAvatarWrap: { borderRadius: 30, borderWidth: 2, borderColor: 'transparent' },
     favAvatarSelected: { borderColor: theme.primary },
+    cosmeticThumbWrap: {
+      width: 56,
+      height: 56,
+      borderRadius: 28,
+      backgroundColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      overflow: 'hidden',
+      borderWidth: 2,
+      borderColor: 'transparent',
+    },
+    cosmeticThumb: { width: '100%', height: '100%' },
+    cosmeticLockOverlay: {
+      ...StyleSheet.absoluteFill,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     favName: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4, textAlign: 'center' },
     favSummary: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, marginTop: 10 },
     themeTabs: {

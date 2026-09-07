@@ -279,6 +279,13 @@ export async function updatePassword(newPassword: string): Promise<void> {
   if (error) throw new AuthError(error.message);
 }
 
+/** Fire-and-forget: the weekly/seasonal leaderboards are a nice-to-have
+ * derived view, not something the round result itself should ever fail on. */
+export async function logRoundResult(userId: string, score: number, total: number): Promise<void> {
+  const { error } = await supabase!.from('round_results').insert({ user_id: userId, score, total });
+  if (error) console.warn('Failed to log round result for period leaderboards:', error.message);
+}
+
 export function subscribeProfile(id: string, onChange: (profile: Profile) => void): () => void {
   const client = supabase!;
   const channel = client

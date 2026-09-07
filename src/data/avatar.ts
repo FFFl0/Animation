@@ -1,3 +1,5 @@
+import { FrameId, BackgroundId } from './cosmetics';
+
 export type HairStyle = 'long' | 'twin' | 'bob' | 'short' | 'spiky' | 'ponytail';
 
 export type Avatar = {
@@ -6,6 +8,10 @@ export type Avatar = {
   eyeColor: string;
   skinTone: string;
   accent: string;
+  /** Cosmetics unlocked by player level — absent means "none equipped",
+   * which renders exactly as before (no frame, solid `accent` circle). */
+  frameId?: FrameId;
+  backgroundId?: BackgroundId;
 };
 
 const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'short', 'spiky', 'ponytail'];

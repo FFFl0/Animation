@@ -11,6 +11,7 @@ import {
   Manrope_800ExtraBold,
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
+import { NotificationsProvider } from './src/notifications/NotificationsContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { LanguageProvider } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
@@ -33,6 +34,7 @@ import BattleScreen from './src/screens/BattleScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
+import ChatScreen from './src/screens/ChatScreen';
 import { Friendship, PlayerSummary } from './src/friends/friendsApi';
 import { CategoryId } from './src/data/categories';
 import { TierId, getTier } from './src/data/difficulty';
@@ -55,7 +57,8 @@ type Screen =
   | 'battle'
   | 'friends'
   | 'friendProfile'
-  | 'compare';
+  | 'compare'
+  | 'chat';
 
 const TAB_SCREENS: Screen[] = ['home', 'friends', 'stats', 'achievements', 'profile'];
 
@@ -92,7 +95,8 @@ function AppShell() {
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<PlayerSummary | null>(null);
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
-  const [challengeUsername, setChallengeUsername] = useState<string | null>(null);
+  const [challengeFriend, setChallengeFriend] = useState<PlayerSummary | null>(null);
+  const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
 
   useEffect(() => {
     setScreen('home');
@@ -181,10 +185,13 @@ function AppShell() {
           {screen === 'battle' && (
             <BattleScreen
               onBack={() => {
-                setChallengeUsername(null);
-                setScreen(challengeUsername ? 'friendProfile' : 'home');
+                const cameFromFriendProfile = !!challengeFriend || !!autoJoinRoomCode;
+                setChallengeFriend(null);
+                setAutoJoinRoomCode(null);
+                setScreen(cameFromFriendProfile ? 'friendProfile' : 'home');
               }}
-              challengeFriendUsername={challengeUsername ?? undefined}
+              challengeFriend={challengeFriend ?? undefined}
+              autoJoinRoomCode={autoJoinRoomCode ?? undefined}
             />
           )}
           {screen === 'friends' && (
@@ -195,6 +202,10 @@ function AppShell() {
                 setSelectedFriendship(friendship);
                 setScreen('friendProfile');
               }}
+              onAcceptBattleInvite={(roomCode) => {
+                setAutoJoinRoomCode(roomCode);
+                setScreen('battle');
+              }}
             />
           )}
           {screen === 'friendProfile' && selectedFriend && (
@@ -203,18 +214,22 @@ function AppShell() {
               friendship={selectedFriendship}
               onBack={() => setScreen('friends')}
               onCompare={() => setScreen('compare')}
+              onOpenChat={() => setScreen('chat')}
               onChallenge={() => {
-                setChallengeUsername(selectedFriend.username);
+                setChallengeFriend(selectedFriend);
                 setScreen('battle');
               }}
             />
+          )}
+          {screen === 'chat' && selectedFriend && (
+            <ChatScreen friend={selectedFriend} onBack={() => setScreen('friendProfile')} />
           )}
           {screen === 'compare' && selectedFriend && (
             <CompareScreen
               friend={selectedFriend}
               onBack={() => setScreen('friendProfile')}
               onChallenge={() => {
-                setChallengeUsername(selectedFriend.username);
+                setChallengeFriend(selectedFriend);
                 setScreen('battle');
               }}
             />
@@ -307,11 +322,13 @@ export default function App() {
       <LanguageProvider>
         <SoundProvider>
           <AuthProvider>
-            <ResponsiveShell>
-              <DeepLinkGate>
-                <AppShell />
-              </DeepLinkGate>
-            </ResponsiveShell>
+            <NotificationsProvider>
+              <ResponsiveShell>
+                <DeepLinkGate>
+                  <AppShell />
+                </DeepLinkGate>
+              </ResponsiveShell>
+            </NotificationsProvider>
           </AuthProvider>
         </SoundProvider>
       </LanguageProvider>

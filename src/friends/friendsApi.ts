@@ -62,7 +62,7 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
   };
 }
 
-async function fetchPlayers(ids: string[]): Promise<Map<string, PlayerSummary>> {
+export async function fetchPlayers(ids: string[]): Promise<Map<string, PlayerSummary>> {
   const map = new Map<string, PlayerSummary>();
   if (!supabase || ids.length === 0) return map;
   const { data } = await supabase.from('leaderboard').select('*').in('id', ids);
