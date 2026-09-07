@@ -1,6 +1,6 @@
 import { Profile } from '../auth/types';
 import { categoryStatsKey, getStat, modeStatsKey } from '../quiz/statsKey';
-import { TIERS } from './difficulty';
+import { TIERS, getTier } from './difficulty';
 import { CATEGORIES } from './categories';
 import { IconName } from '../components/Icon';
 import { Language } from '../i18n/LanguageContext';
@@ -52,7 +52,10 @@ export const ACHIEVEMENTS: Achievement[] = [
     title: 'Легенда',
     description: 'Пройди уровень «Легенда» в любой категории',
     icon: 'crown',
-    check: (p) => CATEGORIES.some((c) => getStat(p, categoryStatsKey(c.id, 'legend')).bestScore >= 12),
+    check: (p) => {
+      const threshold = Math.ceil(getTier('legend').questionsPerRound * 0.6);
+      return CATEGORIES.some((c) => getStat(p, categoryStatsKey(c.id, 'legend')).bestScore >= threshold);
+    },
   },
   {
     id: 'perfect-ten',

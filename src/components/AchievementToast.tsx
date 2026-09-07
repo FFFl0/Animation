@@ -1,5 +1,6 @@
 import { useEffect, useRef } from 'react';
 import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Achievement } from '../data/achievements';
 import { useTheme } from '../theme/ThemeContext';
 import { fontFamily } from '../theme/fonts';
@@ -18,6 +19,7 @@ const VISIBLE_MS = 2600;
 
 export default function AchievementToastHost({ queue, onShown }: Props) {
   const { theme } = useTheme();
+  const insets = useSafeAreaInsets();
   const { language } = useLanguage();
   const t = useT();
   const translateY = useRef(new Animated.Value(-120)).current;
@@ -50,7 +52,7 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
   if (!current) return null;
 
   return (
-    <View style={styles.overlay} pointerEvents="none">
+    <View style={[styles.overlay, { paddingTop: Math.max(insets.top, 24) + 30 }]} pointerEvents="none">
       <Animated.View
         style={[
           styles.toast,
@@ -81,7 +83,6 @@ const styles = StyleSheet.create({
     left: 0,
     right: 0,
     alignItems: 'center',
-    paddingTop: 54,
     paddingHorizontal: 20,
     zIndex: 50,
   },

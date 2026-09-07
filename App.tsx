@@ -3,6 +3,7 @@ import { ActivityIndicator, Animated, Platform, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
+import { SafeAreaProvider } from 'react-native-safe-area-context';
 import {
   Manrope_400Regular,
   Manrope_500Medium,
@@ -318,20 +319,22 @@ export default function App() {
   }
 
   return (
-    <ThemeProvider>
-      <LanguageProvider>
-        <SoundProvider>
-          <AuthProvider>
-            <NotificationsProvider>
-              <ResponsiveShell>
-                <DeepLinkGate>
-                  <AppShell />
-                </DeepLinkGate>
-              </ResponsiveShell>
-            </NotificationsProvider>
-          </AuthProvider>
-        </SoundProvider>
-      </LanguageProvider>
-    </ThemeProvider>
+    <SafeAreaProvider>
+      <ThemeProvider>
+        <LanguageProvider>
+          <SoundProvider>
+            <AuthProvider>
+              <NotificationsProvider>
+                <ResponsiveShell>
+                  <DeepLinkGate>
+                    <AppShell />
+                  </DeepLinkGate>
+                </ResponsiveShell>
+              </NotificationsProvider>
+            </AuthProvider>
+          </SoundProvider>
+        </LanguageProvider>
+      </ThemeProvider>
+    </SafeAreaProvider>
   );
 }

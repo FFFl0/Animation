@@ -1,4 +1,5 @@
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import SoundTouchable from '../sound/SoundTouchable';
@@ -15,7 +16,8 @@ type Props = {
 };
 
 export default function BottomTabBar({ active, onChange, theme }: Props) {
-  const styles = makeStyles(theme);
+  const insets = useSafeAreaInsets();
+  const styles = makeStyles(theme, insets.bottom);
   const t = useT();
   const { badgeCount } = useNotifications();
 
@@ -49,7 +51,7 @@ export default function BottomTabBar({ active, onChange, theme }: Props) {
   );
 }
 
-function makeStyles(theme: Theme) {
+function makeStyles(theme: Theme, bottomInset: number) {
   return StyleSheet.create({
     bar: {
       flexDirection: 'row',
@@ -57,7 +59,10 @@ function makeStyles(theme: Theme) {
       borderTopWidth: 1,
       borderTopColor: theme.border,
       paddingTop: 8,
-      paddingBottom: 22,
+      // Falls back to a fixed value on devices/platforms that report no
+      // inset (e.g. an iPhone with a home button, or web) — the previous
+      // hardcoded 22 was tuned for that case and is kept as the floor.
+      paddingBottom: Math.max(bottomInset, 8) + 14,
     },
     tab: { flex: 1, alignItems: 'center', gap: 3 },
     label: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted },

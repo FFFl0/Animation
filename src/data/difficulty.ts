@@ -23,7 +23,7 @@ export const TIERS: Tier[] = [
     icon: 'leaf',
     color: '#22C55E',
     colorBg: '#E8F9EE',
-    questionsPerRound: 20,
+    questionsPerRound: 11,
     unlockAfter: null,
   },
   {
@@ -33,7 +33,7 @@ export const TIERS: Tier[] = [
     icon: 'wave',
     color: '#3B82F6',
     colorBg: '#E7F0FE',
-    questionsPerRound: 20,
+    questionsPerRound: 11,
     unlockAfter: null,
   },
   {
@@ -43,7 +43,7 @@ export const TIERS: Tier[] = [
     icon: 'sakura',
     color: '#F06292',
     colorBg: '#FADDE1',
-    questionsPerRound: 20,
+    questionsPerRound: 11,
     unlockAfter: null,
   },
   {
@@ -53,7 +53,7 @@ export const TIERS: Tier[] = [
     icon: 'flame',
     color: '#EF4444',
     colorBg: '#FDEAEA',
-    questionsPerRound: 20,
+    questionsPerRound: 11,
     unlockAfter: 'otaku',
   },
   {
@@ -63,7 +63,7 @@ export const TIERS: Tier[] = [
     icon: 'crown',
     color: '#D4A017',
     colorBg: '#FBF0C9',
-    questionsPerRound: 20,
+    questionsPerRound: 10,
     unlockAfter: 'expert',
   },
 ];

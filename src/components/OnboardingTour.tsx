@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
+import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -18,7 +19,8 @@ type Props = {
 
 export default function OnboardingTour({ profileId }: Props) {
   const { theme } = useTheme();
-  const styles = useMemo(() => makeStyles(theme), [theme]);
+  const insets = useSafeAreaInsets();
+  const styles = useMemo(() => makeStyles(theme, insets), [theme, insets]);
   const t = useT();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
@@ -82,7 +84,7 @@ export default function OnboardingTour({ profileId }: Props) {
   );
 }
 
-function makeStyles(theme: Theme) {
+function makeStyles(theme: Theme, insets: { top: number; bottom: number }) {
   return StyleSheet.create({
     overlay: {
       position: 'absolute',
@@ -93,8 +95,8 @@ function makeStyles(theme: Theme) {
       backgroundColor: theme.background,
       zIndex: 100,
       paddingHorizontal: 32,
-      paddingTop: 60,
-      paddingBottom: 40,
+      paddingTop: Math.max(insets.top, 24) + 36,
+      paddingBottom: Math.max(insets.bottom, 8) + 32,
       justifyContent: 'space-between',
     },
     skip: { alignSelf: 'flex-end' },
