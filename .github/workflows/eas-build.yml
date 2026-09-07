@@ -32,7 +32,7 @@ jobs:
           token: ${{ secrets.EXPO_TOKEN }}
 
       - name: Link EAS project (idempotent)
-        run: npx eas-cli init --non-interactive
+        run: npx eas-cli init --non-interactive --force
 
       - name: Build
         run: npx eas-cli build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --json > build-output.json
