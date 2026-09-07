@@ -3,6 +3,8 @@ import { categoryStatsKey, getStat, modeStatsKey } from '../quiz/statsKey';
 import { TIERS } from './difficulty';
 import { CATEGORIES } from './categories';
 import { IconName } from '../components/Icon';
+import { Language } from '../i18n/LanguageContext';
+import { pick } from './localize';
 
 export type Achievement = {
   id: string;
@@ -91,4 +93,25 @@ export const ACHIEVEMENTS: Achievement[] = [
 
 function sumCorrect(profile: Profile, categoryId: Parameters<typeof categoryStatsKey>[0]): number {
   return TIERS.reduce((sum, t) => sum + getStat(profile, categoryStatsKey(categoryId, t.id)).totalCorrect, 0);
+}
+
+const ACHIEVEMENT_EN: Record<string, { title: string; description: string }> = {
+  'first-steps': { title: 'First Steps', description: 'Play your first quiz' },
+  'character-expert': { title: 'Character Expert', description: 'Score 50 correct answers in the Characters category' },
+  'quote-master': { title: 'Quote Master', description: 'Score 20 correct answers in the Quotes category' },
+  'anime-scholar': { title: 'Anime Scholar', description: 'Score 20 correct answers in the Anime category' },
+  'legend-tier': { title: 'Legend', description: 'Clear the Legend tier in any category' },
+  'perfect-ten': { title: 'Flawless', description: "Score 10 out of 10 in the '10 of 10' mode" },
+  survivor: { title: 'Tenacious', description: 'Score 15+ correct answers in Survivor mode' },
+  'week-streak': { title: 'Week of Fire', description: 'Play 7 days in a row' },
+  'month-streak': { title: 'Otaku Month', description: 'Play 30 days in a row' },
+  speedrunner: { title: 'Speedrunner', description: 'Score 8+ correct answers in Quick Quiz' },
+};
+
+export function achievementTitle(a: Achievement, lang: Language): string {
+  return pick(a.title, ACHIEVEMENT_EN[a.id]?.title, lang);
+}
+
+export function achievementDescription(a: Achievement, lang: Language): string {
+  return pick(a.description, ACHIEVEMENT_EN[a.id]?.description, lang);
 }

@@ -5,6 +5,7 @@ import { fontFamily } from '../theme/fonts';
 import { useTheme } from '../theme/ThemeContext';
 import { ToriiHero } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
+import { useT } from '../i18n/strings';
 
 type Props = {
   onStart: () => void;
@@ -13,6 +14,7 @@ type Props = {
 export default function WelcomeScreen({ onStart }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -30,7 +32,7 @@ export default function WelcomeScreen({ onStart }: Props) {
 
         <View style={styles.spacer} />
 
-        <PillButton title="Начать" icon="→" variant="ink" onPress={onStart} />
+        <PillButton title={t('welcome.start')} icon="→" variant="ink" onPress={onStart} />
       </View>
     </SafeAreaView>
   );

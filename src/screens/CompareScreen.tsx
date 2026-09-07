@@ -11,6 +11,8 @@ import AnimeAvatar from '../components/AnimeAvatar';
 import ProgressBar from '../components/ProgressBar';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 type Props = {
   friend: PlayerSummary;
@@ -22,6 +24,8 @@ export default function CompareScreen({ friend, onBack, onChallenge }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
 
   if (!profile) return null;
 
@@ -32,36 +36,36 @@ export default function CompareScreen({ friend, onBack, onChallenge }: Props) {
   const myXp = levelFromStats(profile.stats).xp;
 
   const theirAccuracy = friend.totalQuestions > 0 ? Math.round((friend.totalCorrect / friend.totalQuestions) * 100) : 0;
-  const theirXp = levelFromTotalCorrect(friend.totalCorrect).xp;
+  const theirXp = levelFromTotalCorrect(friend.totalCorrect, language).xp;
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel="Назад" style={{ marginBottom: 12 }}>
-          <Text style={styles.backText}>‹ Назад</Text>
+        <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('compare.back')} style={{ marginBottom: 12 }}>
+          <Text style={styles.backText}>{`‹ ${t('compare.back')}`}</Text>
         </SoundTouchable>
 
-        <Text style={styles.title}>Сравнение</Text>
-        <Text style={styles.subtitle}>Ты и {friend.username}</Text>
+        <Text style={styles.title}>{t('compare.title')}</Text>
+        <Text style={styles.subtitle}>{t('compare.subtitle', friend.username)}</Text>
 
         <View style={styles.vsRow}>
           <View style={styles.vsSide}>
             <AnimeAvatar avatar={profile.avatar} size={72} />
-            <Text style={styles.vsName}>Ты</Text>
+            <Text style={styles.vsName}>{t('compare.you')}</Text>
           </View>
-          <Text style={styles.vsLabel}>VS</Text>
+          <Text style={styles.vsLabel}>{t('compare.vs')}</Text>
           <View style={styles.vsSide}>
             <AnimeAvatar avatar={friend.avatar} size={72} />
             <Text style={styles.vsName}>{friend.username}</Text>
           </View>
         </View>
 
-        <CompareRow label="XP" mine={myXp} theirs={theirXp} theme={theme} styles={styles} />
-        <CompareRow label="Точность" mine={myAccuracy} theirs={theirAccuracy} theme={theme} styles={styles} suffix="%" />
-        <CompareRow label="Пройдено квизов" mine={myGames} theirs={friend.totalGames} theme={theme} styles={styles} />
-        <CompareRow label="Серия дней" mine={profile.streak.count} theirs={friend.streakCount} theme={theme} styles={styles} />
+        <CompareRow label={t('compare.xp')} mine={myXp} theirs={theirXp} theme={theme} styles={styles} />
+        <CompareRow label={t('compare.accuracy')} mine={myAccuracy} theirs={theirAccuracy} theme={theme} styles={styles} suffix="%" />
+        <CompareRow label={t('compare.quizzesCompleted')} mine={myGames} theirs={friend.totalGames} theme={theme} styles={styles} />
+        <CompareRow label={t('compare.dayStreak')} mine={profile.streak.count} theirs={friend.streakCount} theme={theme} styles={styles} />
 
-        <PillButton title="Бросить вызов" variant="primary" icon="⚔" onPress={onChallenge} style={{ marginTop: 20 }} />
+        <PillButton title={t('compare.challenge')} variant="primary" icon="⚔" onPress={onChallenge} style={{ marginTop: 20 }} />
       </ScrollView>
     </SafeAreaView>
   );

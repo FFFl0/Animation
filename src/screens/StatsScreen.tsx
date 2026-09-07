@@ -5,13 +5,15 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { CATEGORIES } from '../data/categories';
+import { CATEGORIES, categoryTitle } from '../data/categories';
 import { TIERS } from '../data/difficulty';
-import { GAME_MODES } from '../data/modes';
+import { GAME_MODES, modeTitle } from '../data/modes';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeStat } from '../auth/types';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 function sumStats(stats: ModeStat[]): ModeStat {
   return stats.reduce(
@@ -33,6 +35,8 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
 
   if (!profile) return null;
 
@@ -43,7 +47,7 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.pageTitle}>Статистика</Text>
+        <Text style={styles.pageTitle}>{t('stats.pageTitle')}</Text>
 
         <SoundTouchable
           style={styles.leaderboardLink}
@@ -55,8 +59,8 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
             <Icon name="trophy" size={18} color={theme.primary} />
           </View>
           <View style={styles.rowText}>
-            <Text style={styles.rowTitle}>Глобальный рейтинг</Text>
-            <Text style={styles.rowSub}>Сравни свой счёт с другими игроками</Text>
+            <Text style={styles.rowTitle}>{t('stats.leaderboardTitle')}</Text>
+            <Text style={styles.rowSub}>{t('stats.leaderboardSub')}</Text>
           </View>
           <Text style={styles.chevron}>›</Text>
         </SoundTouchable>
@@ -64,26 +68,26 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
         <View style={styles.overviewRow}>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewValue}>{overall.gamesPlayed}</Text>
-            <Text style={styles.overviewLabel}>Игр сыграно</Text>
+            <Text style={styles.overviewLabel}>{t('stats.gamesPlayed')}</Text>
           </View>
           <View style={styles.overviewCard}>
             <Text style={styles.overviewValue}>{overallAccuracy}%</Text>
-            <Text style={styles.overviewLabel}>Точность</Text>
+            <Text style={styles.overviewLabel}>{t('stats.accuracy')}</Text>
           </View>
           <View style={styles.overviewCard}>
             <View style={styles.overviewStreakRow}>
               <Icon name="flame" size={16} color={theme.primary} />
               <Text style={styles.overviewValue}>{profile.streak.count}</Text>
             </View>
-            <Text style={styles.overviewLabel}>Серия дней</Text>
+            <Text style={styles.overviewLabel}>{t('stats.streakDays')}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>По категориям</Text>
+        <Text style={styles.sectionTitle}>{t('stats.byCategory')}</Text>
         {CATEGORIES.map((cat) => {
           const keys = cat.hardOnly || cat.id === 'mixed'
             ? [categoryStatsKey(cat.id)]
-            : TIERS.map((t) => categoryStatsKey(cat.id, t.id));
+            : TIERS.map((tier) => categoryStatsKey(cat.id, tier.id));
           const stat = sumStats(keys.map((k) => profile.stats[k] ?? { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 }));
           const accuracy = stat.totalQuestions > 0 ? Math.round((stat.totalCorrect / stat.totalQuestions) * 100) : 0;
 
@@ -93,15 +97,15 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
                 <Icon name={cat.icon} size={16} color={cat.color} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{cat.title}</Text>
-                <Text style={styles.rowSub}>{stat.gamesPlayed} игр · точность {accuracy}%</Text>
+                <Text style={styles.rowTitle}>{categoryTitle(cat, language)}</Text>
+                <Text style={styles.rowSub}>{t('stats.gamesAccuracy', stat.gamesPlayed, accuracy)}</Text>
               </View>
               <Text style={styles.rowBest}>{stat.bestScore}</Text>
             </View>
           );
         })}
 
-        <Text style={styles.sectionTitle}>По режимам</Text>
+        <Text style={styles.sectionTitle}>{t('stats.byMode')}</Text>
         {GAME_MODES.map((mode) => {
           const stat = profile.stats[modeStatsKey(mode.id)] ?? { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
           const accuracy = stat.totalQuestions > 0 ? Math.round((stat.totalCorrect / stat.totalQuestions) * 100) : 0;
@@ -112,8 +116,8 @@ export default function StatsScreen({ onOpenLeaderboard }: Props) {
                 <Icon name={mode.icon} size={16} color={theme.primary} />
               </View>
               <View style={styles.rowText}>
-                <Text style={styles.rowTitle}>{mode.title}</Text>
-                <Text style={styles.rowSub}>{stat.gamesPlayed} игр · точность {accuracy}%</Text>
+                <Text style={styles.rowTitle}>{modeTitle(mode, language)}</Text>
+                <Text style={styles.rowSub}>{t('stats.gamesAccuracy', stat.gamesPlayed, accuracy)}</Text>
               </View>
               <Text style={styles.rowBest}>{stat.bestScore}</Text>
             </View>

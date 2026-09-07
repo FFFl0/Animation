@@ -14,6 +14,10 @@ import AnimeAvatar from '../components/AnimeAvatar';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
 import Icon from '../components/Icon';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
+import { achievementTitle } from '../data/achievements';
+import { categoryTitle } from '../data/categories';
 
 type Props = {
   player: PlayerSummary;
@@ -33,13 +37,15 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
   const [status, setStatus] = useState(initialStatus(friendship));
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState(friendship?.friendshipId ?? null);
 
   if (!profile) return null;
 
-  const { level, title } = levelFromTotalCorrect(player.totalCorrect);
+  const { level, title } = levelFromTotalCorrect(player.totalCorrect, language);
   const accuracy = player.totalQuestions > 0 ? Math.round((player.totalCorrect / player.totalQuestions) * 100) : 0;
   const unlockedAchievements = ACHIEVEMENTS.filter((a) => player.achievements.includes(a.id));
   const favoriteCategories = topCategories(player.stats);
@@ -69,37 +75,37 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
   };
 
   const handleMessage = () => {
-    Alert.alert('Скоро', 'Сообщения друзьям появятся в одном из следующих обновлений.');
+    Alert.alert(t('friendProfile.messageStubTitle'), t('friendProfile.messageStubText'));
   };
 
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel="Назад" style={{ marginBottom: 12 }}>
-          <Text style={styles.backText}>‹ Назад</Text>
+        <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('friendProfile.back')} style={{ marginBottom: 12 }}>
+          <Text style={styles.backText}>{`‹ ${t('friendProfile.back')}`}</Text>
         </SoundTouchable>
 
         <View style={styles.header}>
           <AnimeAvatar avatar={player.avatar} size={110} />
           <Text style={styles.name}>{player.username}</Text>
-          <Text style={styles.levelLine}>Уровень {level} · {title}</Text>
+          <Text style={styles.levelLine}>{t('friendProfile.levelLine', level, title)}</Text>
         </View>
 
         <View style={styles.actionsRow}>
           {status === 'accepted' && (
             <>
-              <PillButton title="Написать" variant="outline" onPress={handleMessage} fullWidth={false} style={styles.actionButton} />
-              <PillButton title="Сравнить" variant="outline" onPress={onCompare} fullWidth={false} style={styles.actionButton} />
+              <PillButton title={t('friendProfile.write')} variant="outline" onPress={handleMessage} fullWidth={false} style={styles.actionButton} />
+              <PillButton title={t('friendProfile.compare')} variant="outline" onPress={onCompare} fullWidth={false} style={styles.actionButton} />
             </>
           )}
           {status === 'none' && (
-            <PillButton title="Добавить в друзья" variant="ink" icon="＋" onPress={handleAdd} disabled={busy} />
+            <PillButton title={t('friendProfile.addFriend')} variant="ink" icon="＋" onPress={handleAdd} disabled={busy} />
           )}
-          {status === 'pending-out' && <PillButton title="Запрос отправлен" variant="outline" disabled onPress={() => {}} />}
+          {status === 'pending-out' && <PillButton title={t('friendProfile.requestSentButton')} variant="outline" disabled onPress={() => {}} />}
           {status === 'pending-in' && (
             <>
-              <PillButton title="Принять" variant="ink" onPress={handleAccept} disabled={busy} fullWidth={false} style={styles.actionButton} />
-              <PillButton title="Отклонить" variant="outline" onPress={handleRemove} disabled={busy} fullWidth={false} style={styles.actionButton} />
+              <PillButton title={t('friendProfile.accept')} variant="ink" onPress={handleAccept} disabled={busy} fullWidth={false} style={styles.actionButton} />
+              <PillButton title={t('friendProfile.decline')} variant="outline" onPress={handleRemove} disabled={busy} fullWidth={false} style={styles.actionButton} />
             </>
           )}
         </View>
@@ -107,24 +113,24 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{levelFromTotalCorrect(player.totalCorrect).xp}</Text>
-            <Text style={styles.statLabel}>XP</Text>
+            <Text style={styles.statLabel}>{t('friendProfile.xp')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={styles.statValue}>{accuracy}%</Text>
-            <Text style={styles.statLabel}>Точность</Text>
+            <Text style={styles.statLabel}>{t('friendProfile.accuracy')}</Text>
           </View>
           <View style={styles.statCard}>
             <View style={{ flexDirection: 'row', alignItems: 'center', gap: 4 }}>
               <Icon name="flame" size={14} color={theme.primary} />
               <Text style={styles.statValue}>{player.streakCount}</Text>
             </View>
-            <Text style={styles.statLabel}>Серия</Text>
+            <Text style={styles.statLabel}>{t('friendProfile.streak')}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Достижения</Text>
+        <Text style={styles.sectionTitle}>{t('friendProfile.achievementsTitle')}</Text>
         {unlockedAchievements.length === 0 ? (
-          <Text style={styles.emptyText}>Пока нет открытых достижений.</Text>
+          <Text style={styles.emptyText}>{t('friendProfile.noAchievements')}</Text>
         ) : (
           <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
             {unlockedAchievements.map((a) => (
@@ -132,7 +138,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
                 <View style={styles.achievementIconWrap}>
                   <Icon name={a.icon} size={18} color={theme.primary} />
                 </View>
-                <Text style={styles.achievementLabel} numberOfLines={2}>{a.title}</Text>
+                <Text style={styles.achievementLabel} numberOfLines={2}>{achievementTitle(a, language)}</Text>
               </View>
             ))}
           </ScrollView>
@@ -140,7 +146,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
 
         {favoriteCategories.length > 0 && (
           <>
-            <Text style={styles.sectionTitle}>Любимые категории</Text>
+            <Text style={styles.sectionTitle}>{t('friendProfile.favoriteCategoriesTitle')}</Text>
             <View style={styles.categoryRow}>
               {favoriteCategories.map((id) => {
                 const cat = getCategory(id);
@@ -149,7 +155,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
                     <View style={[styles.categoryIconWrap, { backgroundColor: cat.colorBg }]}>
                       <Icon name={cat.icon} size={16} color={cat.color} />
                     </View>
-                    <Text style={styles.categoryLabel} numberOfLines={1}>{cat.title}</Text>
+                    <Text style={styles.categoryLabel} numberOfLines={1}>{categoryTitle(cat, language)}</Text>
                   </View>
                 );
               })}
@@ -158,7 +164,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         )}
 
         {status === 'accepted' && (
-          <PillButton title="Бросить вызов" variant="primary" icon="⚔" onPress={onChallenge} style={{ marginTop: 24 }} />
+          <PillButton title={t('friendProfile.challenge')} variant="primary" icon="⚔" onPress={onChallenge} style={{ marginTop: 24 }} />
         )}
       </ScrollView>
     </SafeAreaView>

@@ -1,5 +1,7 @@
 import { Avatar, makeAvatar } from './avatar';
 import { TierId } from './difficulty';
+import { Language } from '../i18n/LanguageContext';
+import { pick } from './localize';
 
 export type Gender = 'male' | 'female' | 'other';
 
@@ -127,4 +129,96 @@ export const CHARACTERS: Character[] = [
 
 export function getCharacter(id: string): Character | undefined {
   return CHARACTERS.find((ch) => ch.id === id);
+}
+
+type CharacterEn = { name: string; quote: string; ability: string; faction: string };
+
+const CHARACTER_EN: Record<string, CharacterEn> = {
+  'naruto-1': { name: 'Naruto Uzumaki', quote: "I never give up — that's my ninja way!", ability: 'Rasengan', faction: 'Hidden Leaf Village' },
+  'naruto-2': { name: 'Sasuke Uchiha', quote: 'Revenge is all I have left.', ability: 'Sharingan and Susanoo', faction: 'Uchiha Clan' },
+  'naruto-3': { name: 'Kakashi Hatake', quote: 'Those who break the rules are scum.', ability: 'Chidori', faction: 'Hidden Leaf Village' },
+
+  'aot-1': { name: 'Eren Yeager', quote: "I'll keep fighting until every enemy is wiped out.", ability: 'Attack Titan', faction: 'Survey Corps' },
+  'aot-2': { name: 'Mikasa Ackerman', quote: 'This world is cruel, but also beautiful.', ability: 'Ackerman blade mastery', faction: 'Survey Corps' },
+  'aot-3': { name: 'Levi Ackerman', quote: "Choose for yourself what you'll regret later.", ability: 'Lightning-fast blade combos', faction: 'Survey Corps' },
+
+  'op-1': { name: 'Monkey D. Luffy', quote: "I'm gonna be King of the Pirates!", ability: 'Gum-Gum Fruit', faction: 'Straw Hat Pirates' },
+  'op-2': { name: 'Roronoa Zoro', quote: 'Getting lost is part of the journey too.', ability: 'Three-Sword Style', faction: 'Straw Hat Pirates' },
+  'op-3': { name: 'Nami', quote: "Money and maps — that's what matters.", ability: 'Clima-Tact weather staff', faction: 'Straw Hat Pirates' },
+
+  'dn-1': { name: 'Light Yagami', quote: 'In this new world, I will become a god.', ability: 'Death Note', faction: 'Kira' },
+  'dn-2': { name: 'L', quote: "The probability that I'm wrong is extremely low.", ability: 'Deduction and strategy', faction: 'International task force' },
+  'dn-3': { name: 'Ryuk', quote: 'I was just bored in the Shinigami world.', ability: 'Shinigami eyes', faction: 'Shinigami realm' },
+
+  'mha-1': { name: 'Izuku Midoriya', quote: 'I can become a hero too!', ability: 'One For All', faction: 'U.A. Academy' },
+  'mha-2': { name: 'Katsuki Bakugo', quote: "I'll become the number one hero, nothing less.", ability: 'Explosive sweat', faction: 'U.A. Academy' },
+  'mha-3': { name: 'Ochako Uraraka', quote: 'I want to be a hero who makes people smile.', ability: 'Zero Gravity', faction: 'U.A. Academy' },
+
+  'ds-1': { name: 'Tanjiro Kamado', quote: "I won't let anyone suffer any longer.", ability: 'Water Breathing', faction: 'Demon Slayer Corps' },
+  'ds-2': { name: 'Nezuko Kamado', quote: 'She protects her brother without saying a word.', ability: 'Blood Demon Art: flame', faction: 'Kamado Family' },
+  'ds-3': { name: 'Zenitsu Agatsuma', quote: "I'm scared of everything, but I still move forward.", ability: 'Thunder Breathing', faction: 'Demon Slayer Corps' },
+
+  'jjk-1': { name: 'Yuji Itadori', quote: 'I just want people to die a proper death.', ability: "Cursed energy and Sukuna's power", faction: 'Tokyo Jujutsu High' },
+  'jjk-2': { name: 'Satoru Gojo', quote: "Don't worry, I'm the strongest.", ability: 'Limitless and Six Eyes', faction: 'Tokyo Jujutsu High' },
+  'jjk-3': { name: 'Megumi Fushiguro', quote: 'I use what I have to protect others.', ability: 'Ten Shadows Technique', faction: 'Tokyo Jujutsu High' },
+
+  'fma-1': { name: 'Edward Elric', quote: "Humanity can't gain anything without sacrificing something first.", ability: 'Alchemy without a transmutation circle', faction: 'State Alchemists' },
+  'fma-2': { name: 'Alphonse Elric', quote: "We'll get our bodies back no matter what.", ability: 'Transmutation alchemy', faction: 'Elric Brothers' },
+  'fma-3': { name: 'Roy Mustang', quote: "One day, I'll stand at the top of this country.", ability: 'Flame Alchemy', faction: 'State Alchemists' },
+
+  'bleach-1': { name: 'Ichigo Kurosaki', quote: 'I protect everyone I care about with this blade.', ability: 'Getsuga Tensho', faction: 'Substitute Soul Reaper' },
+  'bleach-2': { name: 'Rukia Kuchiki', quote: 'Power without compassion is nothing.', ability: 'Dancing white blade', faction: 'Gotei 13' },
+  'bleach-3': { name: 'Toshiro Hitsugaya', quote: "Don't mistake my rank for my age.", ability: 'Ice Bankai', faction: 'Gotei 13' },
+
+  'hxh-1': { name: 'Gon Freecss', quote: "I'll find my father and become a Hunter like him.", ability: 'Jajanken', faction: 'Licensed Hunters' },
+  'hxh-2': { name: 'Killua Zoldyck', quote: 'Friendship matters more than what I was trained for.', ability: 'Lightning-fast electric strikes', faction: 'Zoldyck Assassin Family' },
+  'hxh-3': { name: 'Hisoka Morow', quote: "I'm just curious how strong you really are.", ability: 'Bungee Gum', faction: 'Phantom Troupe' },
+
+  'opm-1': { name: 'Saitama', quote: "I'm just a hero for fun.", ability: 'One Punch', faction: 'Hero Association' },
+  'opm-2': { name: 'Genos', quote: "I'll become strong enough for my revenge.", ability: 'Cyborg cannon', faction: 'Hero Association' },
+
+  'csm-1': { name: 'Denji', quote: 'I just want a normal life with toast in the morning.', ability: 'Chainsaw Devil transformation', faction: 'Tokyo Public Safety' },
+  'csm-2': { name: 'Power', quote: 'Blood is my element, fear me.', ability: 'Blood control', faction: 'Tokyo Public Safety' },
+
+  'sf-1': { name: 'Loid Forger', quote: 'A strong family is where the world begins.', ability: 'Master of disguise and combat', faction: 'Westalis Intelligence' },
+  'sf-2': { name: 'Anya Forger', quote: 'Anya thinks she gets it!', ability: 'Telepathy', faction: 'Forger Family' },
+  'sf-3': { name: 'Yor Forger', quote: 'A good wife always protects her family.', ability: 'Hidden assassin skills', faction: 'Forger Family' },
+
+  'sao-1': { name: 'Kirito', quote: "As long as I'm alive, I'll protect the ones I love.", ability: 'Dual Blades style', faction: 'SAO Players' },
+  'sao-2': { name: 'Asuna', quote: "I won't just wait around, I fight too.", ability: 'Rapier and lightning-fast strikes', faction: 'Knights of the Blood Oath' },
+
+  'cg-1': { name: 'Lelouch Lamperouge', quote: 'I, Lelouch, command you!', ability: 'Geass — absolute obedience', faction: 'Order of the Black Knights' },
+  'cg-2': { name: 'C.C.', quote: 'Pizza is the only thing that matters.', ability: 'Immortality and the Geass code', faction: 'Order of the Black Knights' },
+
+  'fr-1': { name: 'Frieren', quote: "Human life is so short, and I'm only beginning to understand it.", ability: 'Ancient elven magic', faction: 'Traveling mages' },
+  'fr-2': { name: 'Fern', quote: "I'll study magic so I can walk beside her.", ability: 'Combat magic', faction: 'Traveling mages' },
+
+  'rz-1': { name: 'Subaru Natsuki', quote: "I'll come back again and again until everyone is saved.", ability: '"Return by Death"', faction: 'Roswaal Mansion' },
+  'rz-2': { name: 'Rem', quote: 'For me, only you matter, Subaru.', ability: 'Ice magic and morning star', faction: 'Roswaal Mansion' },
+  'rz-3': { name: 'Emilia', quote: 'I want to become a kind ruler for everyone.', ability: 'Half-elf ice magic', faction: 'Royal candidates' },
+
+  'ks-1': { name: 'Kazuma Sato', quote: 'In another world, I just want a quiet life.', ability: 'Steal and Escape', faction: "Kazuma's Party" },
+  'ks-2': { name: 'Aqua', quote: "I'm a goddess, you should worship me!", ability: 'Water purification and creation', faction: 'Guide Goddess' },
+  'ks-3': { name: 'Megumin', quote: 'Explosion is the only magic worthy of me!', ability: 'Explosion', faction: 'Crimson Demon Clan' },
+
+  'eva-1': { name: 'Shinji Ikari', quote: "I mustn't run away, I mustn't run away...", ability: 'Evangelion Unit-01 pilot', faction: 'NERV' },
+  'eva-2': { name: 'Rei Ayanami', quote: "I don't understand what it means to be afraid.", ability: 'Evangelion Unit-00 pilot', faction: 'NERV' },
+  'eva-3': { name: 'Asuka Langley Soryu', quote: "I'm the best pilot, don't you forget it.", ability: 'Evangelion Unit-02 pilot', faction: 'NERV' },
+
+  'tg-1': { name: 'Ken Kaneki', quote: 'I used to be human.', ability: 'Ghoul regeneration and kagune', faction: 'Anteiku Café' },
+  'tg-2': { name: 'Touka Kirishima', quote: 'Even a ghoul can want to live like a human.', ability: 'Wing kagune', faction: 'Anteiku Café' },
+};
+
+export function localizeCharacter(c: Character, lang: Language): CharacterEn {
+  const en = CHARACTER_EN[c.id];
+  return {
+    name: pick(c.name, en?.name, lang),
+    quote: pick(c.quote, en?.quote, lang),
+    ability: pick(c.ability, en?.ability, lang),
+    faction: pick(c.faction, en?.faction, lang),
+  };
+}
+
+export function characterName(c: Character, lang: Language): string {
+  return pick(c.name, CHARACTER_EN[c.id]?.name, lang);
 }

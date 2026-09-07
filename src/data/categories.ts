@@ -1,4 +1,6 @@
 import { IconName } from '../components/Icon';
+import { Language } from '../i18n/LanguageContext';
+import { pick } from './localize';
 
 export type QuestionType =
   | 'guessSeries'
@@ -109,4 +111,23 @@ export const CATEGORIES: Category[] = [
 
 export function getCategory(id: CategoryId): Category {
   return CATEGORIES.find((cat) => cat.id === id)!;
+}
+
+const CATEGORY_EN: Record<CategoryId, { title: string; description: string }> = {
+  anime: { title: 'Anime', description: 'Guess the anime by character, plot and symbols' },
+  characters: { title: 'Characters', description: 'Hero names, abilities, teams and details' },
+  openings: { title: 'Openings & Endings', description: 'Guess the anime by its theme song and details' },
+  quotes: { title: 'Quotes', description: 'Who said it and from which anime' },
+  battles: { title: 'Battles & Abilities', description: 'Who owns the ability, technique or weapon' },
+  world: { title: 'Anime World', description: 'Clans, organizations, schools and factions' },
+  hard: { title: 'Hard Mode', description: 'For seasoned fans — details and trivia' },
+  mixed: { title: 'Mixed Quiz', description: 'Questions from every category, shuffled' },
+};
+
+export function categoryTitle(cat: Category, lang: Language): string {
+  return pick(cat.title, CATEGORY_EN[cat.id]?.title, lang);
+}
+
+export function categoryDescription(cat: Category, lang: Language): string {
+  return pick(cat.description, CATEGORY_EN[cat.id]?.description, lang);
 }

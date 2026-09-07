@@ -5,6 +5,9 @@ import { useTheme } from '../theme/ThemeContext';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import Icon from './Icon';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
+import { achievementTitle } from '../data/achievements';
 
 type Props = {
   queue: Achievement[];
@@ -15,6 +18,8 @@ const VISIBLE_MS = 2600;
 
 export default function AchievementToastHost({ queue, onShown }: Props) {
   const { theme } = useTheme();
+  const { language } = useLanguage();
+  const t = useT();
   const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
   const current = queue[0] ?? null;
@@ -61,8 +66,8 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
           <Icon name={current.icon} size={18} color={theme.primary} />
         </View>
         <View style={styles.textWrap}>
-          <Text style={[styles.label, { color: theme.primary }]}>Достижение открыто</Text>
-          <Text style={[styles.title, { color: theme.text }]}>{current.title}</Text>
+          <Text style={[styles.label, { color: theme.primary }]}>{t('achievementToast.label')}</Text>
+          <Text style={[styles.title, { color: theme.text }]}>{achievementTitle(current, language)}</Text>
         </View>
       </Animated.View>
     </View>

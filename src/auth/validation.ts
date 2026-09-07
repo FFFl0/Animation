@@ -2,8 +2,8 @@ import { AuthError } from './authError';
 
 export function validateCredentials(username: string, password: string): string {
   const trimmed = username.trim();
-  if (trimmed.length < 3) throw new AuthError('Имя пользователя должно быть не короче 3 символов');
-  if (password.length < 4) throw new AuthError('Пароль должен быть не короче 4 символов');
+  if (trimmed.length < 3) throw new AuthError('Имя пользователя должно быть не короче 3 символов', 'usernameTooShort');
+  if (password.length < 4) throw new AuthError('Пароль должен быть не короче 4 символов', 'passwordTooShort');
   return trimmed;
 }
 

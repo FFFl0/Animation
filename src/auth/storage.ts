@@ -53,7 +53,7 @@ export async function register(username: string, password: string, _recoveryEmai
 
   const accounts = await readAccounts();
   if (accounts.some((a) => a.username.toLowerCase() === trimmed.toLowerCase())) {
-    throw new AuthError('Такое имя пользователя уже занято');
+    throw new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
   }
 
   const salt = randomSalt();
@@ -80,10 +80,10 @@ export async function register(username: string, password: string, _recoveryEmai
 export async function login(username: string, password: string): Promise<Profile> {
   const accounts = await readAccounts();
   const account = accounts.find((a) => a.username.toLowerCase() === username.trim().toLowerCase());
-  if (!account) throw new AuthError('Пользователь не найден');
+  if (!account) throw new AuthError('Пользователь не найден', 'userNotFound');
 
   const hash = await hashPassword(password, account.salt);
-  if (hash !== account.passwordHash) throw new AuthError('Неверный пароль');
+  if (hash !== account.passwordHash) throw new AuthError('Неверный пароль', 'wrongPassword');
 
   await AsyncStorage.setItem(SESSION_KEY, account.id);
   return toProfile(account);
@@ -104,7 +104,7 @@ export async function getSessionProfile(): Promise<Profile | null> {
 export async function updateAccount(id: string, patch: Partial<Profile>): Promise<Profile> {
   const accounts = await readAccounts();
   const index = accounts.findIndex((a) => a.id === id);
-  if (index === -1) throw new AuthError('Профиль не найден');
+  if (index === -1) throw new AuthError('Профиль не найден', 'profileNotFound');
   const updated: Account = { ...accounts[index], ...patch };
   accounts[index] = updated;
   await writeAccounts(accounts);
@@ -118,20 +118,20 @@ export function subscribeProfile(_id: string, _onChange: (profile: Profile) => v
 
 /** Local accounts have no server to email — recovery is not possible by design. */
 export async function requestPasswordReset(_username: string): Promise<{ ok: boolean; reason?: string }> {
-  return { ok: false, reason: 'Локальный аккаунт не поддерживает восстановление пароля.' };
+  return { ok: false, reason: 'localAccountNoRecovery' };
 }
 
 export async function completeRecoverySession(_accessToken: string, _refreshToken: string): Promise<void> {
-  throw new AuthError('Недоступно для локального аккаунта');
+  throw new AuthError('Недоступно для локального аккаунта', 'localAccountUnavailable');
 }
 
 export async function updatePassword(_newPassword: string): Promise<void> {
-  throw new AuthError('Недоступно для локального аккаунта');
+  throw new AuthError('Недоступно для локального аккаунта', 'localAccountUnavailable');
 }
 
 /** No OAuth without a backend — local accounts are username+password only. */
 export async function signInWithGoogle(): Promise<Profile | null> {
-  throw new AuthError('Вход через Google недоступен без облачного аккаунта');
+  throw new AuthError('Вход через Google недоступен без облачного аккаунта', 'googleUnavailableLocal');
 }
 
 function toProfile(account: Account): Profile {

@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth, AuthError } from '../auth/AuthContext';
 import PillButton from '../components/PillButton';
 import { ToriiIcon } from '../components/SakuraDecor';
+import { useT, translateAuthError } from '../i18n/strings';
 
 type Props = {
   accessToken: string;
@@ -18,6 +19,7 @@ export default function ResetPasswordScreen({ accessToken, refreshToken, onDone 
   const { completePasswordReset } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
   const [password, setPassword] = useState('');
   const [confirmPassword, setConfirmPassword] = useState('');
   const [error, setError] = useState<string | null>(null);
@@ -27,11 +29,11 @@ export default function ResetPasswordScreen({ accessToken, refreshToken, onDone 
   const handleSubmit = async () => {
     setError(null);
     if (password.length < 4) {
-      setError('Пароль должен быть не короче 4 символов');
+      setError(t('resetPassword.passwordTooShort'));
       return;
     }
     if (password !== confirmPassword) {
-      setError('Пароли не совпадают');
+      setError(t('resetPassword.passwordsMismatch'));
       return;
     }
     setBusy(true);
@@ -39,7 +41,7 @@ export default function ResetPasswordScreen({ accessToken, refreshToken, onDone 
       await completePasswordReset(accessToken, refreshToken, password);
       setDone(true);
     } catch (e) {
-      setError(e instanceof AuthError ? e.message : 'Ссылка недействительна или устарела, запросите новую');
+      setError(e instanceof AuthError ? translateAuthError(e, t) : t('resetPassword.errorFallback'));
     } finally {
       setBusy(false);
     }
@@ -50,22 +52,22 @@ export default function ResetPasswordScreen({ accessToken, refreshToken, onDone 
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <View style={styles.container}>
           <ToriiIcon size={34} color={theme.ink} />
-          <Text style={styles.title}>Новый пароль</Text>
+          <Text style={styles.title}>{t('resetPassword.title')}</Text>
 
           {done ? (
             <>
-              <Text style={styles.subtitle}>Пароль обновлён — можно продолжать пользоваться аккаунтом.</Text>
-              <PillButton title="Готово" variant="ink" onPress={onDone} style={{ marginTop: 8 }} />
+              <Text style={styles.subtitle}>{t('resetPassword.doneSubtitle')}</Text>
+              <PillButton title={t('resetPassword.done')} variant="ink" onPress={onDone} style={{ marginTop: 8 }} />
             </>
           ) : (
             <>
-              <Text style={styles.subtitle}>Придумайте новый пароль для входа</Text>
-              <TextInput style={styles.input} placeholder="Новый пароль" placeholderTextColor={theme.textMuted}
+              <Text style={styles.subtitle}>{t('resetPassword.subtitle')}</Text>
+              <TextInput style={styles.input} placeholder={t('resetPassword.newPasswordPlaceholder')} placeholderTextColor={theme.textMuted}
                 secureTextEntry value={password} onChangeText={setPassword} />
-              <TextInput style={styles.input} placeholder="Повторите пароль" placeholderTextColor={theme.textMuted}
+              <TextInput style={styles.input} placeholder={t('resetPassword.confirmPasswordPlaceholder')} placeholderTextColor={theme.textMuted}
                 secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
               {error && <Text style={styles.error}>{error}</Text>}
-              <PillButton title="Сохранить пароль" variant="ink" onPress={handleSubmit} disabled={busy} style={{ marginTop: 8 }} />
+              <PillButton title={t('resetPassword.saveButton')} variant="ink" onPress={handleSubmit} disabled={busy} style={{ marginTop: 8 }} />
             </>
           )}
         </View>

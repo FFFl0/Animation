@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import { fetchLeaderboard, isSupabaseConfigured, LeaderboardRow } from '../leaderboard/leaderboardApi';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
+import { useT } from '../i18n/strings';
 
 type Props = {
   onBack: () => void;
@@ -20,6 +21,7 @@ export default function LeaderboardScreen({ onBack }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
 
   useEffect(() => {
@@ -33,20 +35,17 @@ export default function LeaderboardScreen({ onBack }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.header}>
-        <SoundTouchable onPress={onBack} style={styles.backButton} accessibilityRole="button" accessibilityLabel="Назад">
-          <Text style={styles.backText}>‹ Назад</Text>
+        <SoundTouchable onPress={onBack} style={styles.backButton} accessibilityRole="button" accessibilityLabel={t('leaderboard.backLabel')}>
+          <Text style={styles.backText}>{t('leaderboard.back')}</Text>
         </SoundTouchable>
-        <Text style={styles.title}>Рейтинг</Text>
+        <Text style={styles.title}>{t('leaderboard.title')}</Text>
       </View>
 
       {!isSupabaseConfigured ? (
         <View style={styles.emptyWrap}>
           <Icon name="globe" size={32} color={theme.textMuted} />
-          <Text style={styles.emptyTitle}>Рейтинг недоступен</Text>
-          <Text style={styles.emptyText}>
-            Глобальный рейтинг работает только с включённой синхронизацией аккаунта. Подключите её в профиле, чтобы
-            сравнивать результаты с другими игроками.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('leaderboard.unavailableTitle')}</Text>
+          <Text style={styles.emptyText}>{t('leaderboard.unavailableText')}</Text>
         </View>
       ) : rows === null ? (
         <View style={styles.emptyWrap}>
@@ -55,8 +54,8 @@ export default function LeaderboardScreen({ onBack }: Props) {
       ) : rows.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Icon name="trophy" size={32} color={theme.textMuted} />
-          <Text style={styles.emptyTitle}>Пока никто не сыграл</Text>
-          <Text style={styles.emptyText}>Сыграй первым — и займи первую строчку рейтинга!</Text>
+          <Text style={styles.emptyTitle}>{t('leaderboard.emptyTitle')}</Text>
+          <Text style={styles.emptyText}>{t('leaderboard.emptyText')}</Text>
         </View>
       ) : (
         <ScrollView contentContainerStyle={styles.list}>
@@ -70,9 +69,9 @@ export default function LeaderboardScreen({ onBack }: Props) {
                 <View style={styles.rowText}>
                   <Text style={styles.rowName} numberOfLines={1}>
                     {row.username}
-                    {isMe ? ' (ты)' : ''}
+                    {isMe ? t('leaderboard.youSuffix') : ''}
                   </Text>
-                  <Text style={styles.rowSub}>Точность: {accuracy}%</Text>
+                  <Text style={styles.rowSub}>{t('leaderboard.accuracyLine', accuracy)}</Text>
                 </View>
                 <Text style={styles.rowScore}>{row.totalScore}</Text>
               </View>

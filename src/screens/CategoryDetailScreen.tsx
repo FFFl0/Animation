@@ -6,13 +6,15 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { CategoryId, getCategory } from '../data/categories';
-import { TIERS, TierId, isTierUnlocked } from '../data/difficulty';
+import { CategoryId, getCategory, categoryTitle, categoryDescription } from '../data/categories';
+import { TIERS, TierId, isTierUnlocked, tierLabel, tierDescription } from '../data/difficulty';
 import { categoryStatsKey, getStat } from '../quiz/statsKey';
 import { ToriiIcon } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import ProgressBar from '../components/ProgressBar';
 import Icon from '../components/Icon';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 type Props = {
   categoryId: CategoryId;
@@ -24,6 +26,8 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
   const category = getCategory(categoryId);
 
   const bestScoreByTier: Partial<Record<TierId, number>> = {};
@@ -39,14 +43,14 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
         <SoundTouchable onPress={onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Назад</Text>
+          <Text style={styles.backText}>{t('categoryDetail.back')}</Text>
         </SoundTouchable>
 
         <View style={styles.headerIconWrap}>
           <ToriiIcon size={30} color={theme.text} />
         </View>
-        <Text style={styles.title}>{category.title}</Text>
-        <Text style={styles.subtitle}>{category.description}</Text>
+        <Text style={styles.title}>{categoryTitle(category, language)}</Text>
+        <Text style={styles.subtitle}>{categoryDescription(category, language)}</Text>
 
         {showTiers ? (
           <View style={styles.tierList}>
@@ -67,8 +71,8 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
                     <Icon name={unlocked ? tier.icon : 'lock'} size={19} color={unlocked ? tier.color : theme.textMuted} />
                   </View>
                   <View style={styles.tierText}>
-                    <Text style={styles.tierLabel}>{tier.label}</Text>
-                    <Text style={styles.tierDesc}>{unlocked ? tier.description : 'Пройди предыдущий уровень'}</Text>
+                    <Text style={styles.tierLabel}>{tierLabel(tier, language)}</Text>
+                    <Text style={styles.tierDesc}>{unlocked ? tierDescription(tier, language) : t('categoryDetail.lockedDesc')}</Text>
                     {unlocked && (
                       <View style={styles.tierProgressRow}>
                         <View style={styles.tierProgressBar}>
@@ -85,7 +89,7 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
           </View>
         ) : (
           <View style={styles.startWrap}>
-            <PillButton title="Начать квиз" variant="ink" onPress={() => onStartTier(categoryId, undefined)} />
+            <PillButton title={t('categoryDetail.startQuiz')} variant="ink" onPress={() => onStartTier(categoryId, undefined)} />
           </View>
         )}
       </ScrollView>

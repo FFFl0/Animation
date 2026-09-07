@@ -1,3 +1,6 @@
+import { Language } from '../i18n/LanguageContext';
+import { pick } from './localize';
+
 export type AnimeSeries = {
   id: string;
   title: string;
@@ -27,3 +30,35 @@ export const ANIME_SERIES: AnimeSeries[] = [
   { id: 'evangelion', title: 'Евангелион', year: 1995, tags: ['меха', 'психология'] },
   { id: 'tokyoghoul', title: 'Токийский гуль', year: 2014, tags: ['ужасы', 'драма'] },
 ];
+
+const SERIES_EN: Record<string, { title: string; tags: string[] }> = {
+  naruto: { title: 'Naruto', tags: ['shonen', 'ninja'] },
+  aot: { title: 'Attack on Titan', tags: ['action', 'drama'] },
+  onepiece: { title: 'One Piece', tags: ['shonen', 'adventure'] },
+  deathnote: { title: 'Death Note', tags: ['psychological', 'thriller'] },
+  mha: { title: 'My Hero Academia', tags: ['shonen', 'superheroes'] },
+  demonslayer: { title: 'Demon Slayer', tags: ['shonen', 'demons'] },
+  jjk: { title: 'Jujutsu Kaisen', tags: ['shonen', 'supernatural'] },
+  fma: { title: 'Fullmetal Alchemist', tags: ['shonen', 'adventure'] },
+  bleach: { title: 'Bleach', tags: ['shonen', 'spirits'] },
+  hxh: { title: 'Hunter x Hunter', tags: ['shonen', 'adventure'] },
+  opm: { title: 'One Punch Man', tags: ['parody', 'action'] },
+  csm: { title: 'Chainsaw Man', tags: ['shonen', 'horror'] },
+  spyfamily: { title: 'Spy x Family', tags: ['comedy', 'action'] },
+  sao: { title: 'Sword Art Online', tags: ['virtual reality'] },
+  codegeass: { title: 'Code Geass', tags: ['mecha', 'drama'] },
+  frieren: { title: "Frieren: Beyond Journey's End", tags: ['fantasy', 'drama'] },
+  rezero: { title: 'Re:Zero', tags: ['isekai', 'drama'] },
+  konosuba: { title: 'KonoSuba', tags: ['isekai', 'comedy'] },
+  evangelion: { title: 'Evangelion', tags: ['mecha', 'psychological'] },
+  tokyoghoul: { title: 'Tokyo Ghoul', tags: ['horror', 'drama'] },
+};
+
+export function seriesTitle(series: AnimeSeries, lang: Language): string {
+  return pick(series.title, SERIES_EN[series.id]?.title, lang);
+}
+
+export function seriesTitleById(id: string, lang: Language): string {
+  const series = ANIME_SERIES.find((s) => s.id === id);
+  return series ? seriesTitle(series, lang) : id;
+}

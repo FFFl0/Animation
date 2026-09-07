@@ -17,6 +17,7 @@ import { isSupabaseConfigured } from '../auth/supabaseClient';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
 import { ToriiIcon } from '../components/SakuraDecor';
+import { useT, translateAuthError } from '../i18n/strings';
 
 type Props = {
   onBack: () => void;
@@ -28,6 +29,7 @@ export default function AuthScreen({ onBack }: Props) {
   const { login, register, resetPassword, loginWithGoogle } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
   const [mode, setMode] = useState<Mode>('login');
   const [username, setUsername] = useState('');
   const [password, setPassword] = useState('');
@@ -53,7 +55,7 @@ export default function AuthScreen({ onBack }: Props) {
     try {
       await loginWithGoogle();
     } catch (e) {
-      setError(e instanceof AuthError ? e.message : 'Не удалось войти через Google, попробуйте ещё раз');
+      setError(e instanceof AuthError ? translateAuthError(e, t) : t('auth.googleError'));
     } finally {
       setBusy(false);
     }
@@ -67,10 +69,10 @@ export default function AuthScreen({ onBack }: Props) {
       setBusy(true);
       try {
         const result = await resetPassword(username);
-        if (result.ok) setInfo('Письмо со ссылкой для сброса пароля отправлено — проверьте почту.');
-        else setError(result.reason ?? 'Не удалось отправить письмо');
+        if (result.ok) setInfo(t('auth.resetSent'));
+        else setError(result.reason ? t(`authErrors.${result.reason}`) : t('auth.resetFailedFallback'));
       } catch (e) {
-        setError(e instanceof AuthError ? e.message : 'Что-то пошло не так, попробуйте ещё раз');
+        setError(e instanceof AuthError ? translateAuthError(e, t) : t('auth.genericError'));
       } finally {
         setBusy(false);
       }
@@ -78,7 +80,7 @@ export default function AuthScreen({ onBack }: Props) {
     }
 
     if (isRegister && password !== confirmPassword) {
-      setError('Пароли не совпадают');
+      setError(t('auth.passwordsMismatch'));
       return;
     }
     setBusy(true);
@@ -89,7 +91,7 @@ export default function AuthScreen({ onBack }: Props) {
         await login(username, password);
       }
     } catch (e) {
-      setError(e instanceof AuthError ? e.message : 'Что-то пошло не так, попробуйте ещё раз');
+      setError(e instanceof AuthError ? translateAuthError(e, t) : t('auth.genericError'));
     } finally {
       setBusy(false);
     }
@@ -99,48 +101,48 @@ export default function AuthScreen({ onBack }: Props) {
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
         <SoundTouchable onPress={isForgot ? () => switchMode('login') : onBack} style={styles.backButton}>
-          <Text style={styles.backText}>‹ Назад</Text>
+          <Text style={styles.backText}>{t('auth.back')}</Text>
         </SoundTouchable>
 
         <View style={styles.container}>
           <ToriiIcon size={34} color={theme.ink} />
           <Text style={styles.title}>
-            {isForgot ? 'Восстановление пароля' : isRegister ? 'Создать аккаунт' : 'С возвращением'}
+            {isForgot ? t('auth.titleForgot') : isRegister ? t('auth.titleRegister') : t('auth.titleLogin')}
           </Text>
           <Text style={styles.subtitle}>
             {isForgot
-              ? 'Введи имя пользователя — если для аккаунта указан email, пришлём ссылку для сброса'
+              ? t('auth.subtitleForgot')
               : isRegister
-                ? 'Один аккаунт — весь прогресс на этом устройстве'
-                : 'Войди, чтобы продолжить серию ответов'}
+                ? t('auth.subtitleRegister')
+                : t('auth.subtitleLogin')}
           </Text>
 
           {!isForgot && (
             <View style={styles.tabs}>
               <SoundTouchable style={[styles.tab, !isRegister && styles.tabActive]} onPress={() => switchMode('login')}>
-                <Text style={[styles.tabText, !isRegister && styles.tabTextActive]}>Вход</Text>
+                <Text style={[styles.tabText, !isRegister && styles.tabTextActive]}>{t('auth.tabLogin')}</Text>
               </SoundTouchable>
               <SoundTouchable style={[styles.tab, isRegister && styles.tabActive]} onPress={() => switchMode('register')}>
-                <Text style={[styles.tabText, isRegister && styles.tabTextActive]}>Регистрация</Text>
+                <Text style={[styles.tabText, isRegister && styles.tabTextActive]}>{t('auth.tabRegister')}</Text>
               </SoundTouchable>
             </View>
           )}
 
-          <TextInput style={styles.input} placeholder="Имя пользователя" placeholderTextColor={theme.textMuted}
+          <TextInput style={styles.input} placeholder={t('auth.placeholderUsername')} placeholderTextColor={theme.textMuted}
             autoCapitalize="none" autoCorrect={false} value={username} onChangeText={setUsername} />
 
           {!isForgot && (
-            <TextInput style={styles.input} placeholder="Пароль" placeholderTextColor={theme.textMuted}
+            <TextInput style={styles.input} placeholder={t('auth.placeholderPassword')} placeholderTextColor={theme.textMuted}
               secureTextEntry value={password} onChangeText={setPassword} />
           )}
           {isRegister && (
-            <TextInput style={styles.input} placeholder="Повторите пароль" placeholderTextColor={theme.textMuted}
+            <TextInput style={styles.input} placeholder={t('auth.placeholderConfirmPassword')} placeholderTextColor={theme.textMuted}
               secureTextEntry value={confirmPassword} onChangeText={setConfirmPassword} />
           )}
           {isRegister && isSupabaseConfigured && (
             <TextInput
               style={styles.input}
-              placeholder="Email для восстановления пароля (необязательно)"
+              placeholder={t('auth.placeholderRecoveryEmail')}
               placeholderTextColor={theme.textMuted}
               autoCapitalize="none"
               autoCorrect={false}
@@ -154,7 +156,7 @@ export default function AuthScreen({ onBack }: Props) {
           {info && <Text style={styles.info}>{info}</Text>}
 
           <PillButton
-            title={isForgot ? 'Отправить письмо' : isRegister ? 'Создать аккаунт' : 'Войти'}
+            title={isForgot ? t('auth.submitForgot') : isRegister ? t('auth.submitRegister') : t('auth.submitLogin')}
             variant="ink"
             onPress={handleSubmit}
             disabled={busy}
@@ -165,11 +167,11 @@ export default function AuthScreen({ onBack }: Props) {
             <>
               <View style={styles.divider}>
                 <View style={styles.dividerLine} />
-                <Text style={styles.dividerText}>или</Text>
+                <Text style={styles.dividerText}>{t('auth.or')}</Text>
                 <View style={styles.dividerLine} />
               </View>
               <PillButton
-                title="Войти через Google"
+                title={t('auth.googleButton')}
                 variant="outline"
                 onPress={handleGoogleSignIn}
                 disabled={busy}
@@ -180,14 +182,12 @@ export default function AuthScreen({ onBack }: Props) {
 
           {!isRegister && !isForgot && isSupabaseConfigured && (
             <SoundTouchable onPress={() => switchMode('forgot')} style={{ marginTop: 14 }}>
-              <Text style={styles.forgotLink}>Забыли пароль?</Text>
+              <Text style={styles.forgotLink}>{t('auth.forgotLink')}</Text>
             </SoundTouchable>
           )}
 
           <Text style={styles.footer}>
-            {isSupabaseConfigured
-              ? 'Прогресс синхронизируется через облако — можно войти с любого устройства.'
-              : 'Аккаунт хранится только на этом устройстве — пароль не передаётся никуда и не хранится в открытом виде.'}
+            {isSupabaseConfigured ? t('auth.footerCloud') : t('auth.footerLocal')}
           </Text>
         </View>
       </KeyboardAvoidingView>

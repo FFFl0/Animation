@@ -7,6 +7,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { PetalScatter } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import Icon from '../components/Icon';
+import { useT } from '../i18n/strings';
 
 type Props = {
   score: number;
@@ -15,16 +16,17 @@ type Props = {
   onChooseCategory: () => void;
 };
 
-function getMessage(ratio: number) {
-  if (ratio === 1) return 'Идеально! Ты настоящий отаку-эксперт 🏆';
-  if (ratio >= 0.7) return 'Отличный результат! Ещё немного до совершенства ✨';
-  if (ratio >= 0.4) return 'Неплохо! Пересмотри пару серий и попробуй снова 📺';
-  return 'Есть куда расти — новая попытка не помешает 🍥';
+function getMessage(ratio: number, t: ReturnType<typeof useT>) {
+  if (ratio === 1) return t('result.messagePerfect');
+  if (ratio >= 0.7) return t('result.messageGreat');
+  if (ratio >= 0.4) return t('result.messageOk');
+  return t('result.messageLow');
 }
 
 export default function ResultScreen({ score, total, onRestart, onChooseCategory }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
   const wrong = Math.max(total - score, 0);
   const ratio = total > 0 ? score / total : 0;
   const percent = Math.round(ratio * 100);
@@ -39,30 +41,30 @@ export default function ResultScreen({ score, total, onRestart, onChooseCategory
           </View>
         </View>
 
-        <Text style={styles.title}>{ratio >= 0.7 ? 'Отлично!' : 'Хороший старт!'}</Text>
+        <Text style={styles.title}>{ratio >= 0.7 ? t('result.titleGreat') : t('result.titleGoodStart')}</Text>
         <Text style={styles.subtitle}>
-          Ты ответил на {score} из {total}
+          {t('result.answered', score, total)}
         </Text>
-        <Text style={styles.message}>{getMessage(ratio)}</Text>
+        <Text style={styles.message}>{getMessage(ratio, t)}</Text>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
             <Text style={[styles.statValue, { color: theme.success }]}>{score}</Text>
-            <Text style={styles.statLabel}>Правильных</Text>
+            <Text style={styles.statLabel}>{t('result.correct')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statValue, { color: theme.danger }]}>{wrong}</Text>
-            <Text style={styles.statLabel}>Неверных</Text>
+            <Text style={styles.statLabel}>{t('result.wrong')}</Text>
           </View>
           <View style={styles.statCard}>
             <Text style={[styles.statValue, { color: theme.primary }]}>{percent}%</Text>
-            <Text style={styles.statLabel}>Результат</Text>
+            <Text style={styles.statLabel}>{t('result.score')}</Text>
           </View>
         </View>
 
-        <PillButton title="Пройти ещё раз" icon="↻" variant="ink" onPress={onRestart} />
+        <PillButton title={t('result.restart')} icon="↻" variant="ink" onPress={onRestart} />
         <View style={{ height: 12 }} />
-        <PillButton title="Выбрать другую категорию" variant="outline" onPress={onChooseCategory} />
+        <PillButton title={t('result.chooseCategory')} variant="outline" onPress={onChooseCategory} />
       </View>
     </SafeAreaView>
   );

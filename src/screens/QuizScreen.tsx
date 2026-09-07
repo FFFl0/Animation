@@ -12,6 +12,8 @@ import AnimeAvatar from '../components/AnimeAvatar';
 import ProgressBar, { ProgressDots } from '../components/ProgressBar';
 import LivesIndicator from '../components/LivesIndicator';
 import Icon from '../components/Icon';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 type Props = {
   config: RoundConfig;
@@ -25,7 +27,9 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { playCorrect, playWrong } = useSound();
-  const questions = useMemo<Question[]>(() => generateQuiz(config), [config]);
+  const { language } = useLanguage();
+  const t = useT();
+  const questions = useMemo<Question[]>(() => generateQuiz(config, language), [config, language]);
 
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);
@@ -101,13 +105,13 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
             onPress={onClose}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Закрыть квиз"
+            accessibilityLabel={t('quiz.closeLabel')}
           >
             <Icon name="close" size={15} color={theme.textMuted} />
           </SoundTouchable>
           <View style={styles.progressRow}>
             <Text style={styles.progressText}>
-              Вопрос {index + 1} из {questions.length}
+              {t('quiz.questionOf', index + 1, questions.length)}
             </Text>
             {hasLives && <LivesIndicator lives={lives} max={config.lives!} />}
           </View>
@@ -124,7 +128,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
         )}
 
         {hasTimer && (
-          <Text style={[styles.timer, timeLeft <= 3 && { color: theme.danger }]}>⏱ {timeLeft}с</Text>
+          <Text style={[styles.timer, timeLeft <= 3 && { color: theme.danger }]}>⏱ {timeLeft}{t('quiz.seconds')}</Text>
         )}
 
         <View style={styles.centerBlock}>
@@ -169,7 +173,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
           {selected !== null && (
             <SoundTouchable style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
               <Text style={styles.nextButtonText}>
-                {isLast || (hasLives && lives <= 0) ? 'Результаты' : 'Дальше'}
+                {isLast || (hasLives && lives <= 0) ? t('quiz.results') : t('quiz.next')}
               </Text>
             </SoundTouchable>
           )}

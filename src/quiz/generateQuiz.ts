@@ -1,8 +1,10 @@
-import { CHARACTERS, Character } from '../data/characters';
-import { ANIME_SERIES } from '../data/animeSeries';
+import { CHARACTERS, Character, characterName, localizeCharacter } from '../data/characters';
+import { ANIME_SERIES, seriesTitleById } from '../data/animeSeries';
 import { OPENINGS } from '../data/openings';
 import { QuestionType, getCategory } from '../data/categories';
 import { RoundConfig } from './types';
+import { Language } from '../i18n/LanguageContext';
+import { getT } from '../i18n/strings';
 
 export type PromptKind = 'avatar' | 'silhouette' | 'eyes' | 'text';
 
@@ -52,70 +54,68 @@ function sampleDistractors<T>(pool: T[], correct: T, n: number, rng: Rng): T[] {
   return candidates.slice(0, n);
 }
 
-function seriesTitle(seriesId: string): string {
-  return ANIME_SERIES.find((s) => s.id === seriesId)?.title ?? seriesId;
-}
-
 function buildOptions(correct: string, pool: string[], rng: Rng): { options: string[]; correctIndex: number } {
   const distractors = sampleDistractors(pool, correct, 3, rng);
   const options = shuffle([correct, ...distractors], rng);
   return { options, correctIndex: options.indexOf(correct) };
 }
 
-function questionFor(type: QuestionType, character: Character, idSuffix: number, rng: Rng): Question {
+function questionFor(type: QuestionType, character: Character, idSuffix: number, rng: Rng, lang: Language): Question {
   const id = `${character.id}-${type}-${idSuffix}`;
+  const t = getT(lang);
+  const localized = localizeCharacter(character, lang);
 
   switch (type) {
     case 'guessSeries': {
-      const pool = ANIME_SERIES.map((s) => s.title);
-      const { options, correctIndex } = buildOptions(seriesTitle(character.seriesId), pool, rng);
-      return { id, type, promptKind: 'avatar', promptText: 'Из какого аниме этот персонаж?', character, options, correctIndex };
+      const pool = ANIME_SERIES.map((s) => seriesTitleById(s.id, lang));
+      const { options, correctIndex } = buildOptions(seriesTitleById(character.seriesId, lang), pool, rng);
+      return { id, type, promptKind: 'avatar', promptText: t('quiz.promptGuessSeries'), character, options, correctIndex };
     }
     case 'guessCharacterFull': {
-      const pool = CHARACTERS.map((c) => c.name);
-      const { options, correctIndex } = buildOptions(character.name, pool, rng);
-      return { id, type, promptKind: 'avatar', promptText: 'Кто это?', character, options, correctIndex };
+      const pool = CHARACTERS.map((c) => characterName(c, lang));
+      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      return { id, type, promptKind: 'avatar', promptText: t('quiz.promptGuessCharacterFull'), character, options, correctIndex };
     }
     case 'guessCharacterSilhouette': {
-      const pool = CHARACTERS.map((c) => c.name);
-      const { options, correctIndex } = buildOptions(character.name, pool, rng);
-      return { id, type, promptKind: 'silhouette', promptText: 'Кто скрывается за силуэтом?', character, options, correctIndex };
+      const pool = CHARACTERS.map((c) => characterName(c, lang));
+      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      return { id, type, promptKind: 'silhouette', promptText: t('quiz.promptGuessCharacterSilhouette'), character, options, correctIndex };
     }
     case 'guessCharacterEyes': {
-      const pool = CHARACTERS.map((c) => c.name);
-      const { options, correctIndex } = buildOptions(character.name, pool, rng);
-      return { id, type, promptKind: 'eyes', promptText: 'Узнаёшь героя по глазам?', character, options, correctIndex };
+      const pool = CHARACTERS.map((c) => characterName(c, lang));
+      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      return { id, type, promptKind: 'eyes', promptText: t('quiz.promptGuessCharacterEyes'), character, options, correctIndex };
     }
     case 'guessQuote': {
-      const pool = CHARACTERS.map((c) => c.name);
-      const { options, correctIndex } = buildOptions(character.name, pool, rng);
+      const pool = CHARACTERS.map((c) => characterName(c, lang));
+      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
       return {
         id,
         type,
         promptKind: 'text',
-        promptText: `«${character.quote}»\n\nКто это сказал?`,
+        promptText: t('quiz.promptGuessQuote', localized.quote),
         character,
         options,
         correctIndex,
       };
     }
     case 'guessAbility': {
-      const pool = CHARACTERS.map((c) => c.name);
-      const { options, correctIndex } = buildOptions(character.name, pool, rng);
+      const pool = CHARACTERS.map((c) => characterName(c, lang));
+      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
       return {
         id,
         type,
         promptKind: 'text',
-        promptText: `Способность: «${character.ability}»\n\nКому она принадлежит?`,
+        promptText: t('quiz.promptGuessAbility', localized.ability),
         character,
         options,
         correctIndex,
       };
     }
     case 'guessFaction': {
-      const pool = Array.from(new Set(CHARACTERS.map((c) => c.faction)));
-      const { options, correctIndex } = buildOptions(character.faction, pool, rng);
-      return { id, type, promptKind: 'avatar', promptText: 'К какой фракции принадлежит этот персонаж?', character, options, correctIndex };
+      const pool = Array.from(new Set(CHARACTERS.map((c) => localizeCharacter(c, lang).faction)));
+      const { options, correctIndex } = buildOptions(localized.faction, pool, rng);
+      return { id, type, promptKind: 'avatar', promptText: t('quiz.promptGuessFaction'), character, options, correctIndex };
     }
     case 'openingTrivia': {
       const opening = OPENINGS.find((o) => o.seriesId === character.seriesId) ?? OPENINGS[0];
@@ -125,7 +125,7 @@ function questionFor(type: QuestionType, character: Character, idSuffix: number,
         id,
         type,
         promptKind: 'text',
-        promptText: `Какая песня открывает аниме «${seriesTitle(opening.seriesId)}»?`,
+        promptText: t('quiz.promptOpeningTrivia', seriesTitleById(opening.seriesId, lang)),
         options,
         correctIndex,
       };
@@ -133,7 +133,7 @@ function questionFor(type: QuestionType, character: Character, idSuffix: number,
   }
 }
 
-export function generateQuiz(config: RoundConfig): Question[] {
+export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Question[] {
   const rng: Rng = config.seed !== undefined ? seededRng(config.seed) : Math.random;
 
   let pool = config.tier ? CHARACTERS.filter((c) => c.tier === config.tier) : CHARACTERS;
@@ -161,7 +161,7 @@ export function generateQuiz(config: RoundConfig): Question[] {
     }
     const character = cycle[cycleIndex++];
     const type = types[Math.floor(rng() * types.length)];
-    questions.push(questionFor(type, character, i, rng));
+    questions.push(questionFor(type, character, i, rng, lang));
   }
 
   return questions;

@@ -7,24 +7,18 @@ import { radius } from '../theme/tokens';
 import { useTheme, ThemeMode } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
-import { CHARACTERS } from '../data/characters';
-import { ANIME_SERIES } from '../data/animeSeries';
+import { CHARACTERS, characterName } from '../data/characters';
+import { seriesTitleById } from '../data/animeSeries';
 import { HairStyle } from '../data/avatar';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
-
-const SERIES_TITLE_BY_ID: Record<string, string> = Object.fromEntries(ANIME_SERIES.map((s) => [s.id, s.title]));
+import { Language, useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'short', 'spiky', 'ponytail'];
 const COLOR_SWATCHES = ['#2B2B33', '#8B5E3C', '#D9B24C', '#E8632E', '#E85D9C', '#5FB8E0', '#7C5CB8', '#3E3E3E'];
 const ACCENT_SWATCHES = ['#FADDE1', '#DCEFFB', '#E4F7E1', '#FBE9D0', '#EDE3FB', '#FDE2E2'];
-
-const THEME_TABS: { key: ThemeMode; label: string }[] = [
-  { key: 'light', label: 'Светлая' },
-  { key: 'dark', label: 'Тёмная' },
-  { key: 'system', label: 'Системная' },
-];
 
 function cycle<T>(list: T[], current: T, dir: 1 | -1): T {
   const i = list.indexOf(current);
@@ -35,11 +29,24 @@ export default function ProfileScreen() {
   const { profile, logout, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, toggleMusic, toggleSfx } = useSound();
+  const { language, setLanguage } = useLanguage();
+  const t = useT();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState('');
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
+
+  const THEME_TABS: { key: ThemeMode; label: string }[] = [
+    { key: 'light', label: t('profile.themeLight') },
+    { key: 'dark', label: t('profile.themeDark') },
+    { key: 'system', label: t('profile.themeSystem') },
+  ];
+
+  const LANGUAGE_TABS: { key: Language; label: string }[] = [
+    { key: 'ru', label: t('profile.languageRu') },
+    { key: 'en', label: t('profile.languageEn') },
+  ];
 
   useEffect(() => {
     getReminderEnabled().then(setReminderOn);
@@ -48,11 +55,11 @@ export default function ProfileScreen() {
   const handleToggleReminder = async () => {
     setReminderError(null);
     const next = !reminderOn;
-    const result = await setReminderEnabled(next);
+    const result = await setReminderEnabled(next, language);
     if (result.ok) {
       setReminderOn(next);
     } else {
-      setReminderError(result.reason ?? 'Не удалось включить уведомления');
+      setReminderError(result.reason === 'permissionDenied' ? t('profile.reminderPermissionDenied') : t('profile.reminderFallbackError'));
     }
   };
 
@@ -64,28 +71,28 @@ export default function ProfileScreen() {
   const query = search.trim().toLowerCase();
   const visibleCharacters = query
     ? CHARACTERS.filter(
-        (c) => c.name.toLowerCase().includes(query) || SERIES_TITLE_BY_ID[c.seriesId]?.toLowerCase().includes(query)
+        (c) => characterName(c, language).toLowerCase().includes(query) || seriesTitleById(c.seriesId, language).toLowerCase().includes(query)
       )
     : CHARACTERS;
 
   return (
     <ScrollView style={styles.safe} contentContainerStyle={styles.container}>
-      <Text style={styles.pageTitle}>Профиль</Text>
+      <Text style={styles.pageTitle}>{t('profile.pageTitle')}</Text>
 
       <View style={styles.avatarSection}>
         <AnimeAvatar avatar={avatar} size={120} />
         <Text style={styles.username}>{profile.username}</Text>
         <Text style={styles.joined}>
-          С нами с {new Date(profile.createdAt).toLocaleDateString('ru-RU')}
+          {t('profile.since', new Date(profile.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ru-RU'))}
         </Text>
         <SoundTouchable style={styles.editToggle} onPress={() => setEditing((v) => !v)}>
-          <Text style={styles.editToggleText}>{editing ? 'Готово' : 'Настроить аватар'}</Text>
+          <Text style={styles.editToggleText}>{editing ? t('profile.doneEditing') : t('profile.editAvatar')}</Text>
         </SoundTouchable>
       </View>
 
       {editing && (
         <View style={styles.editor}>
-          <EditorRow styles={styles} label="Причёска">
+          <EditorRow styles={styles} label={t('profile.hairStyleLabel')}>
             <SoundTouchable onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, -1) } })}>
               <Text style={styles.arrow}>‹</Text>
             </SoundTouchable>
@@ -95,26 +102,26 @@ export default function ProfileScreen() {
             </SoundTouchable>
           </EditorRow>
 
-          <EditorRow styles={styles} label="Волосы">
+          <EditorRow styles={styles} label={t('profile.hairLabel')}>
             <SwatchRow styles={styles} colors={COLOR_SWATCHES} selected={avatar.hairColor} onSelect={(c) => updateAvatar({ avatar: { ...avatar, hairColor: c } })} />
           </EditorRow>
 
-          <EditorRow styles={styles} label="Глаза">
+          <EditorRow styles={styles} label={t('profile.eyesLabel')}>
             <SwatchRow styles={styles} colors={COLOR_SWATCHES} selected={avatar.eyeColor} onSelect={(c) => updateAvatar({ avatar: { ...avatar, eyeColor: c } })} />
           </EditorRow>
 
-          <EditorRow styles={styles} label="Фон">
+          <EditorRow styles={styles} label={t('profile.backgroundLabel')}>
             <SwatchRow styles={styles} colors={ACCENT_SWATCHES} selected={avatar.accent} onSelect={(c) => updateAvatar({ avatar: { ...avatar, accent: c } })} />
           </EditorRow>
         </View>
       )}
 
-      <Text style={styles.sectionTitle}>Любимый персонаж</Text>
+      <Text style={styles.sectionTitle}>{t('profile.favoriteCharacterTitle')}</Text>
       <View style={styles.searchWrap}>
         <Icon name="search" size={15} color={theme.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Найти персонажа или аниме"
+          placeholder={t('profile.searchPlaceholder')}
           placeholderTextColor={theme.textMuted}
           value={search}
           onChangeText={setSearch}
@@ -123,7 +130,7 @@ export default function ProfileScreen() {
         />
       </View>
       {visibleCharacters.length === 0 ? (
-        <Text style={styles.searchEmpty}>Никого не нашлось</Text>
+        <Text style={styles.searchEmpty}>{t('profile.searchEmpty')}</Text>
       ) : (
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
           {visibleCharacters.map((c) => (
@@ -135,16 +142,16 @@ export default function ProfileScreen() {
               <View style={[styles.favAvatarWrap, c.id === profile.favoriteCharacterId && styles.favAvatarSelected]}>
                 <AnimeAvatar avatar={c.avatar} characterId={c.id} size={56} />
               </View>
-              <Text style={styles.favName} numberOfLines={1}>{c.name.split(' ')[0]}</Text>
+              <Text style={styles.favName} numberOfLines={1}>{characterName(c, language).split(' ')[0]}</Text>
             </SoundTouchable>
           ))}
         </ScrollView>
       )}
       {favoriteCharacter && (
-        <Text style={styles.favSummary}>Любимый персонаж: {favoriteCharacter.name}</Text>
+        <Text style={styles.favSummary}>{t('profile.favoriteSummary', characterName(favoriteCharacter, language))}</Text>
       )}
 
-      <Text style={styles.sectionTitle}>Тема оформления</Text>
+      <Text style={styles.sectionTitle}>{t('profile.themeTitle')}</Text>
       <View style={styles.themeTabs}>
         {THEME_TABS.map((tab) => (
           <SoundTouchable
@@ -157,14 +164,27 @@ export default function ProfileScreen() {
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>Звук</Text>
+      <Text style={styles.sectionTitle}>{t('profile.languageTitle')}</Text>
+      <View style={styles.themeTabs}>
+        {LANGUAGE_TABS.map((tab) => (
+          <SoundTouchable
+            key={tab.key}
+            style={[styles.themeTab, language === tab.key && styles.themeTabActive]}
+            onPress={() => setLanguage(tab.key)}
+          >
+            <Text style={[styles.themeTabText, language === tab.key && styles.themeTabTextActive]}>{tab.label}</Text>
+          </SoundTouchable>
+        ))}
+      </View>
+
+      <Text style={styles.sectionTitle}>{t('profile.soundTitle')}</Text>
       <View style={styles.themeTabs}>
         <SoundTouchable
           style={[styles.themeTab, musicEnabled && styles.themeTabActive]}
           onPress={toggleMusic}
         >
           <Text style={[styles.themeTabText, musicEnabled && styles.themeTabTextActive]}>
-            Музыка {musicEnabled ? 'вкл' : 'выкл'}
+            {musicEnabled ? t('profile.musicOn') : t('profile.musicOff')}
           </Text>
         </SoundTouchable>
         <SoundTouchable
@@ -172,23 +192,23 @@ export default function ProfileScreen() {
           onPress={toggleSfx}
         >
           <Text style={[styles.themeTabText, sfxEnabled && styles.themeTabTextActive]}>
-            Звуки {sfxEnabled ? 'вкл' : 'выкл'}
+            {sfxEnabled ? t('profile.sfxOn') : t('profile.sfxOff')}
           </Text>
         </SoundTouchable>
       </View>
 
-      <Text style={styles.sectionTitle}>Напоминания</Text>
+      <Text style={styles.sectionTitle}>{t('profile.remindersTitle')}</Text>
       <View style={styles.themeTabs}>
         <SoundTouchable style={[styles.themeTab, reminderOn && styles.themeTabActive]} onPress={handleToggleReminder}>
           <Text style={[styles.themeTabText, reminderOn && styles.themeTabTextActive]}>
-            Серия дней {reminderOn ? 'вкл' : 'выкл'}
+            {reminderOn ? t('profile.streakReminderOn') : t('profile.streakReminderOff')}
           </Text>
         </SoundTouchable>
       </View>
       {reminderError && <Text style={styles.reminderError}>{reminderError}</Text>}
 
       <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
-        <Text style={styles.logoutText}>Выйти из аккаунта</Text>
+        <Text style={styles.logoutText}>{t('profile.logout')}</Text>
       </SoundTouchable>
     </ScrollView>
   );

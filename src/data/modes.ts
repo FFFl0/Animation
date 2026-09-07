@@ -1,5 +1,7 @@
 import { RoundConfig } from '../quiz/types';
 import { IconName } from '../components/Icon';
+import { Language } from '../i18n/LanguageContext';
+import { pick } from './localize';
 
 export type ModeId =
   | 'quick'
@@ -88,4 +90,24 @@ export const GAME_MODES: GameMode[] = [
 
 export function getMode(id: ModeId): GameMode {
   return GAME_MODES.find((m) => m.id === id)!;
+}
+
+const MODE_EN: Record<ModeId, { title: string; subtitle: string }> = {
+  quick: { title: 'Quick Quiz', subtitle: '10 questions · against the clock' },
+  survivor: { title: 'Survivor', subtitle: '3 lives — until your first mistake' },
+  perfect10: { title: '10 of 10', subtitle: 'No room for error' },
+  silhouette: { title: 'Guess the Silhouette', subtitle: 'Just a dark outline of the hero' },
+  eyes: { title: 'Guess the Eyes', subtitle: 'Only a fragment of the face' },
+  whoSaidIt: { title: 'Who Said It?', subtitle: 'A quote — pick the hero' },
+  whichAnime: { title: 'Which Anime?', subtitle: 'A character — name the series' },
+  mixed: { title: 'Mixed', subtitle: 'Questions of random difficulty' },
+  daily: { title: 'Daily Challenge', subtitle: 'A new quiz every day' },
+};
+
+export function modeTitle(mode: GameMode, lang: Language): string {
+  return pick(mode.title, MODE_EN[mode.id]?.title, lang);
+}
+
+export function modeSubtitle(mode: GameMode, lang: Language): string {
+  return pick(mode.subtitle, MODE_EN[mode.id]?.subtitle, lang);
 }

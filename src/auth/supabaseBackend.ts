@@ -60,10 +60,10 @@ async function readCachedProfile(): Promise<Profile | null> {
 
 function mapAuthError(message: string): AuthError {
   if (/already registered|already exists/i.test(message)) {
-    return new AuthError('Такое имя пользователя уже занято');
+    return new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
   }
   if (/invalid login credentials/i.test(message)) {
-    return new AuthError('Неверное имя пользователя или пароль');
+    return new AuthError('Неверное имя пользователя или пароль', 'invalidCredentials');
   }
   return new AuthError(message);
 }
@@ -116,12 +116,12 @@ export async function register(username: string, password: string, recoveryEmail
 
   const { data: taken, error: rpcError } = await client.rpc('is_username_taken', { check_username: trimmed });
   if (rpcError) throw new AuthError(rpcError.message);
-  if (taken) throw new AuthError('Такое имя пользователя уже занято');
+  if (taken) throw new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
 
   const email = recoveryEmail?.trim() || usernameToEmail(trimmed);
   const { data, error } = await client.auth.signUp({ email, password });
   if (error) throw mapAuthError(error.message);
-  if (!data.user) throw new AuthError('Не удалось создать аккаунт, попробуйте ещё раз');
+  if (!data.user) throw new AuthError('Не удалось создать аккаунт, попробуйте ещё раз', 'accountCreateFailed');
 
   const row: ProfileRow = {
     id: data.user.id,
@@ -153,7 +153,7 @@ export async function register(username: string, password: string, recoveryEmail
 async function callAuthHelper<T>(body: Record<string, unknown>): Promise<T> {
   const client = supabase!;
   const { data, error } = await client.functions.invoke('auth-helper', { body });
-  if (error) throw new AuthError('Не удалось связаться с сервером, попробуйте ещё раз');
+  if (error) throw new AuthError('Не удалось связаться с сервером, попробуйте ещё раз', 'serverUnreachable');
   if (data?.error) throw mapAuthError(data.error);
   return data as T;
 }
@@ -167,7 +167,7 @@ export async function login(username: string, password: string): Promise<Profile
   });
 
   const { data, error } = await client.auth.setSession({ access_token, refresh_token });
-  if (error || !data.user) throw new AuthError('Не удалось войти, попробуйте ещё раз');
+  if (error || !data.user) throw new AuthError('Не удалось войти, попробуйте ещё раз', 'loginFailed');
 
   return resolveOrCreateProfile(client, data.user.id, data.user.email);
 }
@@ -195,7 +195,7 @@ export async function getSessionProfile(): Promise<Profile | null> {
 
 export async function updateAccount(id: string, patch: Partial<Profile>): Promise<Profile> {
   const cached = await readCachedProfile();
-  if (!cached) throw new AuthError('Профиль не найден');
+  if (!cached) throw new AuthError('Профиль не найден', 'profileNotFound');
   const optimistic: Profile = { ...cached, ...patch, id };
   await cacheProfile(optimistic);
 
@@ -235,13 +235,13 @@ export async function signInWithGoogle(): Promise<Profile | null> {
     provider: 'google',
     options: { redirectTo, skipBrowserRedirect: true },
   });
-  if (error || !data.url) throw new AuthError(error?.message ?? 'Не удалось начать вход через Google');
+  if (error || !data.url) throw new AuthError(error?.message ?? 'Не удалось начать вход через Google', 'googleStartFailed');
 
   const result = await WebBrowser.openAuthSessionAsync(data.url, redirectTo);
-  if (result.type !== 'success') throw new AuthError('Вход через Google отменён');
+  if (result.type !== 'success') throw new AuthError('Вход через Google отменён', 'googleCancelled');
 
   const tokens = parseAuthTokensFromUrl(result.url);
-  if (!tokens) throw new AuthError('Не удалось завершить вход через Google');
+  if (!tokens) throw new AuthError('Не удалось завершить вход через Google', 'googleCompleteFailed');
 
   const { error: sessionError } = await client.auth.setSession({
     access_token: tokens.accessToken,
@@ -250,7 +250,7 @@ export async function signInWithGoogle(): Promise<Profile | null> {
   if (sessionError) throw new AuthError(sessionError.message);
 
   const { data: userData, error: userError } = await client.auth.getUser();
-  if (userError || !userData.user) throw new AuthError(userError?.message ?? 'Не удалось получить данные пользователя');
+  if (userError || !userData.user) throw new AuthError(userError?.message ?? 'Не удалось получить данные пользователя', 'googleUserFetchFailed');
 
   return resolveOrCreateProfile(client, userData.user.id, userData.user.email);
 }

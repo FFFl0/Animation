@@ -3,6 +3,7 @@ import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import SoundTouchable from '../sound/SoundTouchable';
 import Icon, { IconName } from './Icon';
+import { useT } from '../i18n/strings';
 
 export type TabKey = 'home' | 'friends' | 'stats' | 'achievements' | 'profile';
 
@@ -12,16 +13,18 @@ type Props = {
   theme: Theme;
 };
 
-const TABS: { key: TabKey; label: string; icon: IconName }[] = [
-  { key: 'home', label: 'Главная', icon: 'home' },
-  { key: 'friends', label: 'Друзья', icon: 'users' },
-  { key: 'stats', label: 'Статистика', icon: 'stats' },
-  { key: 'achievements', label: 'Достижения', icon: 'medal' },
-  { key: 'profile', label: 'Профиль', icon: 'user' },
-];
-
 export default function BottomTabBar({ active, onChange, theme }: Props) {
   const styles = makeStyles(theme);
+  const t = useT();
+
+  const TABS: { key: TabKey; label: string; icon: IconName }[] = [
+    { key: 'home', label: t('tabs.home'), icon: 'home' },
+    { key: 'friends', label: t('tabs.friends'), icon: 'users' },
+    { key: 'stats', label: t('tabs.stats'), icon: 'stats' },
+    { key: 'achievements', label: t('tabs.achievements'), icon: 'medal' },
+    { key: 'profile', label: t('tabs.profile'), icon: 'user' },
+  ];
+
   return (
     <View style={styles.bar}>
       {TABS.map((tab) => {

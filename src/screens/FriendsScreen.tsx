@@ -20,6 +20,8 @@ import { levelFromTotalCorrect } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
 import SoundTouchable from '../sound/SoundTouchable';
 import Icon from '../components/Icon';
+import { Language, useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 type Props = {
   onBack: () => void;
@@ -34,6 +36,8 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
 
   const [tab, setTab] = useState<Tab>('friends');
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
@@ -105,13 +109,13 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
   const renderPlayerActionRow = (player: PlayerSummary) => {
     const existing = friendshipByPlayerId.get(player.id);
     if (existing?.status === 'accepted') {
-      return <Text style={styles.badgeDone}>Уже друзья</Text>;
+      return <Text style={styles.badgeDone}>{t('friends.alreadyFriends')}</Text>;
     }
     if (existing?.status === 'pending' && existing.isOutgoing) {
-      return <Text style={styles.badgeMuted}>Запрос отправлен</Text>;
+      return <Text style={styles.badgeMuted}>{t('friends.requestSent')}</Text>;
     }
     if (existing?.status === 'pending' && !existing.isOutgoing) {
-      return <Text style={styles.badgeMuted}>Ждёт вашего ответа</Text>;
+      return <Text style={styles.badgeMuted}>{t('friends.awaitingYourResponse')}</Text>;
     }
     return (
       <SoundTouchable
@@ -128,13 +132,11 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
   if (!isSupabaseConfigured) {
     return (
       <SafeAreaView style={styles.safe}>
-        <Header title="Друзья" onBack={onBack} theme={theme} />
+        <Header title={t('friends.title')} onBack={onBack} theme={theme} backLabel={t('friends.back')} />
         <View style={styles.emptyWrap}>
           <Icon name="user" size={32} color={theme.textMuted} />
-          <Text style={styles.emptyTitle}>Нужен облачный аккаунт</Text>
-          <Text style={styles.emptyText}>
-            Друзья работают через синхронизацию в реальном времени — доступно только когда подключён Supabase.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('friends.needsCloudTitle')}</Text>
+          <Text style={styles.emptyText}>{t('friends.needsCloudText')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -142,13 +144,13 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <Header title="Друзья" onBack={onBack} theme={theme} />
+      <Header title={t('friends.title')} onBack={onBack} theme={theme} backLabel={t('friends.back')} />
 
       <View style={styles.searchWrap}>
         <Icon name="search" size={15} color={theme.textMuted} />
         <TextInput
           style={styles.searchInput}
-          placeholder="Найти по имени пользователя"
+          placeholder={t('friends.searchPlaceholder')}
           placeholderTextColor={theme.textMuted}
           value={query}
           onChangeText={setQuery}
@@ -160,7 +162,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
       {query.trim().length >= 2 ? (
         <ScrollView contentContainerStyle={styles.list}>
           {searchResults.length === 0 ? (
-            <Text style={styles.emptyText}>Никого не нашлось</Text>
+            <Text style={styles.emptyText}>{t('friends.noOneFound')}</Text>
           ) : (
             searchResults.map((player) => (
               <PlayerRow
@@ -168,6 +170,8 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                 player={player}
                 theme={theme}
                 styles={styles}
+                language={language}
+                t={t}
                 onPress={() => onOpenFriend(player, friendshipByPlayerId.get(player.id) ?? null)}
                 right={renderPlayerActionRow(player)}
               />
@@ -177,14 +181,14 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
       ) : (
         <>
           <View style={styles.tabs}>
-            <TabButton label="Все друзья" active={tab === 'friends'} onPress={() => setTab('friends')} styles={styles} />
+            <TabButton label={t('friends.tabAllFriends')} active={tab === 'friends'} onPress={() => setTab('friends')} styles={styles} />
             <TabButton
-              label={`Запросы${incoming.length ? ` ${incoming.length}` : ''}`}
+              label={`${t('friends.tabRequests')}${incoming.length ? ` ${incoming.length}` : ''}`}
               active={tab === 'requests'}
               onPress={() => setTab('requests')}
               styles={styles}
             />
-            <TabButton label="Рекомендации" active={tab === 'recommendations'} onPress={() => setTab('recommendations')} styles={styles} />
+            <TabButton label={t('friends.tabRecommendations')} active={tab === 'recommendations'} onPress={() => setTab('recommendations')} styles={styles} />
           </View>
 
           {friendships === null ? (
@@ -195,7 +199,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
             <ScrollView contentContainerStyle={styles.list}>
               {tab === 'friends' &&
                 (friends.length === 0 ? (
-                  <Text style={styles.emptyText}>Пока нет друзей — найдите их через поиск сверху.</Text>
+                  <Text style={styles.emptyText}>{t('friends.noFriendsYet')}</Text>
                 ) : (
                   friends.map((f, i) => (
                     <PlayerRow
@@ -203,9 +207,11 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                       player={f.player}
                       theme={theme}
                       styles={styles}
+                      language={language}
+                      t={t}
                       rank={i < 3 ? i : undefined}
                       onPress={() => onOpenFriend(f.player, f)}
-                      right={<Text style={styles.xpText}>{levelFromTotalCorrect(f.player.totalCorrect).xp} XP</Text>}
+                      right={<Text style={styles.xpText}>{levelFromTotalCorrect(f.player.totalCorrect).xp} {t('friends.xp')}</Text>}
                     />
                   ))
                 ))}
@@ -213,7 +219,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
               {tab === 'requests' && (
                 <>
                   {incoming.length === 0 && outgoing.length === 0 && (
-                    <Text style={styles.emptyText}>Нет активных запросов в друзья.</Text>
+                    <Text style={styles.emptyText}>{t('friends.noRequests')}</Text>
                   )}
                   {incoming.map((f) => (
                     <PlayerRow
@@ -221,6 +227,8 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                       player={f.player}
                       theme={theme}
                       styles={styles}
+                      language={language}
+                      t={t}
                       onPress={() => onOpenFriend(f.player, f)}
                       right={
                         <View style={styles.requestActions}>
@@ -250,10 +258,12 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                       player={f.player}
                       theme={theme}
                       styles={styles}
+                      language={language}
+                      t={t}
                       onPress={() => onOpenFriend(f.player, f)}
                       right={
                         <SoundTouchable onPress={() => handleRemove(f.friendshipId)} disabled={busyId === f.friendshipId}>
-                          <Text style={styles.badgeMuted}>Отменить</Text>
+                          <Text style={styles.badgeMuted}>{t('friends.cancel')}</Text>
                         </SoundTouchable>
                       }
                     />
@@ -265,7 +275,7 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                 (recommendations === null ? (
                   <ActivityIndicator size="small" color={theme.primary} />
                 ) : recommendations.length === 0 ? (
-                  <Text style={styles.emptyText}>Пока некого порекомендовать.</Text>
+                  <Text style={styles.emptyText}>{t('friends.noRecommendations')}</Text>
                 ) : (
                   recommendations.map((player) => (
                     <PlayerRow
@@ -273,6 +283,8 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
                       player={player}
                       theme={theme}
                       styles={styles}
+                      language={language}
+                      t={t}
                       onPress={() => onOpenFriend(player, null)}
                       right={renderPlayerActionRow(player)}
                     />
@@ -286,11 +298,11 @@ export default function FriendsScreen({ onBack, onOpenFriend }: Props) {
   );
 }
 
-function Header({ title, onBack, theme }: { title: string; onBack: () => void; theme: Theme }) {
+function Header({ title, onBack, theme, backLabel }: { title: string; onBack: () => void; theme: Theme; backLabel: string }) {
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
-      <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel="Назад" style={{ marginBottom: 12 }}>
-        <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>‹ Назад</Text>
+      <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={backLabel} style={{ marginBottom: 12 }}>
+        <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>{`‹ ${backLabel}`}</Text>
       </SoundTouchable>
       <Text style={{ fontSize: 26, fontFamily: fontFamily('800'), color: theme.text }}>{title}</Text>
     </View>
@@ -314,6 +326,8 @@ function PlayerRow({
   onPress,
   right,
   rank,
+  language,
+  t,
 }: {
   player: PlayerSummary;
   theme: Theme;
@@ -321,17 +335,17 @@ function PlayerRow({
   onPress: () => void;
   right: React.ReactNode;
   rank?: number;
+  language: Language;
+  t: ReturnType<typeof useT>;
 }) {
-  const { level, title } = levelFromTotalCorrect(player.totalCorrect);
+  const { level, title } = levelFromTotalCorrect(player.totalCorrect, language);
   return (
     <SoundTouchable style={styles.row} onPress={onPress} activeOpacity={0.85}>
       {rank !== undefined && <Text style={[styles.rank, { color: MEDAL_COLORS[rank] }]}>#{rank + 1}</Text>}
       <AnimeAvatar avatar={player.avatar} size={40} />
       <View style={styles.rowText}>
         <Text style={styles.rowName} numberOfLines={1}>{player.username}</Text>
-        <Text style={styles.rowSub}>
-          Уровень {level} · {title} · 🔥{player.streakCount}
-        </Text>
+        <Text style={styles.rowSub}>{t('friends.rowSub', level, title, player.streakCount)}</Text>
       </View>
       {right}
     </SoundTouchable>

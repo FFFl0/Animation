@@ -6,14 +6,16 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { CATEGORIES, CategoryId } from '../data/categories';
+import { CATEGORIES, CategoryId, categoryTitle } from '../data/categories';
 import { CHARACTERS } from '../data/characters';
 import { ANIME_SERIES } from '../data/animeSeries';
 import { OPENINGS } from '../data/openings';
-import { GAME_MODES, ModeId } from '../data/modes';
+import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 type Props = {
   onOpenCategory: (id: CategoryId) => void;
@@ -22,24 +24,24 @@ type Props = {
   onOpenBattle: () => void;
 };
 
-function categoryCount(id: CategoryId): string {
+function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
   switch (id) {
     case 'anime':
-      return `${ANIME_SERIES.length} аниме`;
+      return t('home.countAnime', ANIME_SERIES.length);
     case 'characters':
-      return `${CHARACTERS.length} героев`;
+      return t('home.countCharacters', CHARACTERS.length);
     case 'openings':
-      return `${OPENINGS.length} заставок`;
+      return t('home.countOpenings', OPENINGS.length);
     case 'quotes':
-      return `${CHARACTERS.length} цитат`;
+      return t('home.countQuotes', CHARACTERS.length);
     case 'battles':
-      return `${CHARACTERS.length} способностей`;
+      return t('home.countAbilities', CHARACTERS.length);
     case 'world':
-      return `${new Set(CHARACTERS.map((c) => c.faction)).size} фракций`;
+      return t('home.countFactions', new Set(CHARACTERS.map((c) => c.faction)).size);
     case 'hard':
-      return `${CHARACTERS.filter((c) => c.tier === 'otaku' || c.tier === 'expert' || c.tier === 'legend').length} вопросов`;
+      return t('home.countQuestions', CHARACTERS.filter((c) => c.tier === 'otaku' || c.tier === 'expert' || c.tier === 'legend').length);
     case 'mixed':
-      return `${CHARACTERS.length * 3}+ вопросов`;
+      return t('home.countQuestionsPlus', CHARACTERS.length * 3);
   }
 }
 
@@ -47,6 +49,8 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
 
   if (!profile) return null;
 
@@ -57,15 +61,15 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <View>
-            <Text style={styles.greeting}>Привет, {profile.username}!</Text>
-            <Text style={styles.subGreeting}>Готов проверить свои знания об аниме?</Text>
+            <Text style={styles.greeting}>{t('home.greeting', profile.username)}</Text>
+            <Text style={styles.subGreeting}>{t('home.subGreeting')}</Text>
           </View>
           <SoundTouchable
             style={styles.gearButton}
             onPress={onOpenSettings}
             activeOpacity={0.8}
             accessibilityRole="button"
-            accessibilityLabel="Настройки"
+            accessibilityLabel={t('home.settingsLabel')}
           >
             <Icon name="settings" size={18} color={theme.text} />
           </SoundTouchable>
@@ -74,12 +78,12 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
         <View style={styles.streakCard}>
           <Icon name="flame" size={26} color={theme.primary} />
           <View>
-            <Text style={styles.streakLabel}>Серия ответов</Text>
+            <Text style={styles.streakLabel}>{t('home.streakLabel')}</Text>
             <Text style={styles.streakValue}>{profile.streak.count}</Text>
           </View>
         </View>
 
-        <Text style={styles.sectionTitle}>Выбери категорию</Text>
+        <Text style={styles.sectionTitle}>{t('home.sectionCategory')}</Text>
         <View style={styles.grid}>
           {CATEGORIES.map((cat) => (
             <CategoryTile
@@ -87,8 +91,8 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
               icon={cat.icon}
               iconColor={cat.color}
               iconBg={cat.colorBg}
-              title={cat.title}
-              subtitle={categoryCount(cat.id)}
+              title={categoryTitle(cat, language)}
+              subtitle={categoryCount(cat.id, t)}
               onPress={() => onOpenCategory(cat.id)}
             />
           ))}
@@ -99,12 +103,12 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             <Icon name="swords" size={22} color={theme.onInk} />
           </View>
           <View style={{ flex: 1 }}>
-            <Text style={styles.battleTitle}>Битва фанатов</Text>
-            <Text style={styles.battleSubtitle}>Сразись с другом онлайн, 1 на 1</Text>
+            <Text style={styles.battleTitle}>{t('home.battleTitle')}</Text>
+            <Text style={styles.battleSubtitle}>{t('home.battleSubtitle')}</Text>
           </View>
         </SoundTouchable>
 
-        <Text style={styles.sectionTitle}>Игровые режимы</Text>
+        <Text style={styles.sectionTitle}>{t('home.sectionModes')}</Text>
         <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.modesRow}>
           {GAME_MODES.map((mode) => {
             const isDailyDone = mode.id === 'daily' && dailyDone;
@@ -113,9 +117,9 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
                 <View style={styles.modeIconWrap}>
                   <Icon name={isDailyDone ? 'target' : mode.icon} size={18} color={theme.primary} />
                 </View>
-                <Text style={styles.modeTitle}>{mode.title}</Text>
+                <Text style={styles.modeTitle}>{modeTitle(mode, language)}</Text>
                 <Text style={styles.modeSubtitle}>
-                  {isDailyDone ? `Пройдено: ${dailyDone!.score}/${dailyDone!.total}` : mode.subtitle}
+                  {isDailyDone ? t('home.dailyDone', dailyDone!.score, dailyDone!.total) : modeSubtitle(mode, language)}
                 </Text>
               </SoundTouchable>
             );

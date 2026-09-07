@@ -8,31 +8,9 @@ import { useTheme } from '../theme/ThemeContext';
 import Icon, { IconName } from './Icon';
 import PillButton from './PillButton';
 import SoundTouchable from '../sound/SoundTouchable';
+import { useT } from '../i18n/strings';
 
 const STORAGE_PREFIX = 'animequiz.onboardingSeen.';
-
-const SLIDES: { icon: IconName; title: string; description: string }[] = [
-  {
-    icon: 'shuffle',
-    title: '8 категорий вопросов',
-    description: 'Аниме, персонажи, цитаты, бои, мир аниме и другие — выбирай, что хочешь проверить.',
-  },
-  {
-    icon: 'crown',
-    title: '5 уровней сложности',
-    description: 'От новичка до легенды. Каждый следующий уровень открывается, когда пройдёшь предыдущий.',
-  },
-  {
-    icon: 'bolt',
-    title: '9 игровых режимов',
-    description: 'Быстрый квиз на скорость, «Выживший» с жизнями, силуэты, глаза и ещё несколько форматов.',
-  },
-  {
-    icon: 'flame',
-    title: 'Серия и достижения',
-    description: 'Играй каждый день, чтобы не терять серию, и открывай достижения за успехи.',
-  },
-];
 
 type Props = {
   profileId: string;
@@ -41,8 +19,16 @@ type Props = {
 export default function OnboardingTour({ profileId }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
   const [visible, setVisible] = useState(false);
   const [step, setStep] = useState(0);
+
+  const SLIDES: { icon: IconName; title: string; description: string }[] = [
+    { icon: 'shuffle', title: t('onboarding.slide1Title'), description: t('onboarding.slide1Desc') },
+    { icon: 'crown', title: t('onboarding.slide2Title'), description: t('onboarding.slide2Desc') },
+    { icon: 'bolt', title: t('onboarding.slide3Title'), description: t('onboarding.slide3Desc') },
+    { icon: 'flame', title: t('onboarding.slide4Title'), description: t('onboarding.slide4Desc') },
+  ];
 
   useEffect(() => {
     let cancelled = false;
@@ -70,7 +56,7 @@ export default function OnboardingTour({ profileId }: Props) {
   return (
     <View style={styles.overlay}>
       <SoundTouchable onPress={dismiss} style={styles.skip}>
-        <Text style={styles.skipText}>Пропустить</Text>
+        <Text style={styles.skipText}>{t('onboarding.skip')}</Text>
       </SoundTouchable>
 
       <View style={styles.body}>
@@ -88,7 +74,7 @@ export default function OnboardingTour({ profileId }: Props) {
       </View>
 
       <PillButton
-        title={isLast ? 'Начать!' : 'Далее'}
+        title={isLast ? t('onboarding.start') : t('onboarding.next')}
         variant="ink"
         onPress={() => (isLast ? dismiss() : setStep((s) => s + 1))}
       />

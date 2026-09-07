@@ -20,6 +20,7 @@ import {
   generateRoomCode,
   normalizeRoomCode,
 } from '../battle/battleRoom';
+import { useT } from '../i18n/strings';
 
 type Props = {
   onBack: () => void;
@@ -38,6 +39,7 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const t = useT();
 
   const [phase, setPhase] = useState<Phase>('menu');
   const sharedForChallenge = useRef(false);
@@ -119,7 +121,7 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
       roomRef.current = room;
       setPhase('waiting');
     } catch {
-      setError('Не удалось подключиться к комнате. Проверьте связь и попробуйте ещё раз.');
+      setError(t('battle.connectError'));
       setPhase('menu');
     }
   };
@@ -144,7 +146,7 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
   const handleJoinSubmit = () => {
     const code = normalizeRoomCode(joinCodeInput);
     if (code.length !== 5) {
-      setError('Код состоит из 5 символов');
+      setError(t('battle.codeLengthError'));
       return;
     }
     connect(code, false);
@@ -165,7 +167,7 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
     if (phase === 'waiting' && isHost && challengeFriendUsername && !sharedForChallenge.current) {
       sharedForChallenge.current = true;
       Share.share({
-        message: `Присоединяйся к битве в AnimeQuiz! Код комнаты: ${roomCode}`,
+        message: t('battle.shareMessage', roomCode),
       }).catch(() => {});
     }
   }, [phase, isHost, roomCode, challengeFriendUsername]);
@@ -175,14 +177,11 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
   if (!isSupabaseConfigured) {
     return (
       <SafeAreaView style={styles.safe}>
-        <Header title="Битва фанатов" onBack={onBack} theme={theme} />
+        <Header title={t('battle.title')} onBack={onBack} theme={theme} backLabel={t('battle.back')} />
         <View style={styles.centerFill}>
           <Icon name="swords" size={40} color={theme.textMuted} />
-          <Text style={styles.emptyTitle}>Нужен облачный аккаунт</Text>
-          <Text style={styles.emptyText}>
-            Битва фанатов работает через синхронизацию в реальном времени — она доступна только когда
-            подключён Supabase.
-          </Text>
+          <Text style={styles.emptyTitle}>{t('battle.needsCloudTitle')}</Text>
+          <Text style={styles.emptyText}>{t('battle.needsCloudText')}</Text>
         </View>
       </SafeAreaView>
     );
@@ -207,7 +206,7 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
         )}
         {opponentLeft && (
           <View style={styles.opponentLeftBanner} pointerEvents="none">
-            <Text style={styles.opponentLeftText}>Соперник отключился — можно доиграть в одиночку</Text>
+            <Text style={styles.opponentLeftText}>{t('battle.opponentLeftPlay')}</Text>
           </View>
         )}
       </View>
@@ -216,27 +215,24 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
 
   return (
     <SafeAreaView style={styles.safe}>
-      <Header title="Битва фанатов" onBack={phase === 'menu' ? onBack : resetToMenu} theme={theme} />
+      <Header title={t('battle.title')} onBack={phase === 'menu' ? onBack : resetToMenu} theme={theme} backLabel={t('battle.back')} />
       <View style={styles.container}>
         {phase === 'menu' && (
           <>
             <Icon name="swords" size={40} color={theme.primary} />
-            <Text style={styles.title}>Сразись с другом</Text>
-            <Text style={styles.subtitle}>
-              Один создаёт комнату и делится кодом, второй вводит его — оба получают одинаковые вопросы
-              и играют одновременно.
-            </Text>
+            <Text style={styles.title}>{t('battle.title')}</Text>
+            <Text style={styles.subtitle}>{t('battle.menuSubtitle')}</Text>
             {error && <Text style={styles.error}>{error}</Text>}
-            <PillButton title="Создать битву" variant="ink" onPress={handleCreate} style={{ marginTop: 8 }} />
-            <PillButton title="Присоединиться по коду" variant="outline" onPress={() => setPhase('joinInput')} style={{ marginTop: 12 }} />
+            <PillButton title={t('battle.createBattle')} variant="ink" onPress={handleCreate} style={{ marginTop: 8 }} />
+            <PillButton title={t('battle.joinByCode')} variant="outline" onPress={() => setPhase('joinInput')} style={{ marginTop: 12 }} />
           </>
         )}
 
         {phase === 'joinInput' && (
           <>
             <Icon name="swords" size={40} color={theme.primary} />
-            <Text style={styles.title}>Код комнаты</Text>
-            <Text style={styles.subtitle}>Спроси код у соперника и введи его здесь</Text>
+            <Text style={styles.title}>{t('battle.roomCodeTitle')}</Text>
+            <Text style={styles.subtitle}>{t('battle.roomCodeSubtitle')}</Text>
             {error && <Text style={styles.error}>{error}</Text>}
             <TextInput
               style={styles.codeInput}
@@ -248,42 +244,42 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
               value={joinCodeInput}
               onChangeText={setJoinCodeInput}
             />
-            <PillButton title="Войти в комнату" variant="ink" onPress={handleJoinSubmit} style={{ marginTop: 8 }} />
+            <PillButton title={t('battle.joinRoom')} variant="ink" onPress={handleJoinSubmit} style={{ marginTop: 8 }} />
           </>
         )}
 
         {phase === 'connecting' && (
           <>
             <ActivityIndicator size="large" color={theme.primary} />
-            <Text style={styles.subtitle}>Подключаемся...</Text>
+            <Text style={styles.subtitle}>{t('battle.connecting')}</Text>
           </>
         )}
 
         {phase === 'waiting' && (
           <>
-            <Text style={styles.subtitle}>{isHost ? 'Отправь этот код другу' : 'Ждём начала...'}</Text>
+            <Text style={styles.subtitle}>{isHost ? t('battle.shareCodeHint') : t('battle.waitingForStart')}</Text>
             {isHost && (
               <>
                 <View style={styles.codeBox}>
                   <Text style={styles.codeText}>{roomCode}</Text>
                 </View>
                 <PillButton
-                  title="Поделиться кодом"
+                  title={t('battle.shareCodeButton')}
                   variant="outline"
-                  onPress={() => Share.share({ message: `Присоединяйся к битве в AnimeQuiz! Код комнаты: ${roomCode}` }).catch(() => {})}
+                  onPress={() => Share.share({ message: t('battle.shareMessage', roomCode) }).catch(() => {})}
                   style={{ marginTop: 14 }}
                 />
               </>
             )}
             <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />
-            <Text style={styles.subtitle}>Ожидание соперника...</Text>
+            <Text style={styles.subtitle}>{t('battle.waitingForOpponent')}</Text>
           </>
         )}
 
         {phase === 'countdown' && (
           <>
-            <Text style={styles.subtitle}>Соперник найден!</Text>
-            <Text style={styles.countdownNumber}>{countdown > 0 ? countdown : 'Начали!'}</Text>
+            <Text style={styles.subtitle}>{t('battle.opponentFound')}</Text>
+            <Text style={styles.countdownNumber}>{countdown > 0 ? countdown : t('battle.started')}</Text>
           </>
         )}
 
@@ -304,12 +300,12 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
             />
             <Text style={styles.title}>
               {!opponentFinish
-                ? 'Ждём соперника...'
+                ? t('battle.waitingOpponentFinish')
                 : localResult.score > opponentFinish.score
-                  ? 'Победа!'
+                  ? t('battle.win')
                   : localResult.score < opponentFinish.score
-                    ? 'Поражение'
-                    : 'Ничья'}
+                    ? t('battle.lose')
+                    : t('battle.draw')}
             </Text>
             <View style={styles.resultRow}>
               <View style={styles.resultCard}>
@@ -328,9 +324,9 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
               </View>
             </View>
             {opponentLeft && !opponentFinish && (
-              <Text style={styles.subtitle}>Соперник отключился до конца раунда</Text>
+              <Text style={styles.subtitle}>{t('battle.opponentLeftResult')}</Text>
             )}
-            <PillButton title="Сыграть ещё" variant="ink" onPress={resetToMenu} style={{ marginTop: 20 }} />
+            <PillButton title={t('battle.playAgain')} variant="ink" onPress={resetToMenu} style={{ marginTop: 20 }} />
           </>
         )}
       </View>
@@ -338,13 +334,13 @@ export default function BattleScreen({ onBack, challengeFriendUsername }: Props)
   );
 }
 
-function Header({ title, onBack, theme }: { title: string; onBack: () => void; theme: Theme }) {
+function Header({ title, onBack, theme, backLabel }: { title: string; onBack: () => void; theme: Theme; backLabel: string }) {
   return (
     <SoundTouchable
       onPress={onBack}
       style={{ paddingHorizontal: 24, paddingTop: 12, paddingBottom: 4 }}
       accessibilityRole="button"
-      accessibilityLabel="Назад"
+      accessibilityLabel={backLabel}
     >
       <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>‹ {title}</Text>
     </SoundTouchable>

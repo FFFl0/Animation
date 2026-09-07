@@ -12,6 +12,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { LanguageProvider } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 import AchievementToastHost from './src/components/AchievementToast';
@@ -303,15 +304,17 @@ export default function App() {
 
   return (
     <ThemeProvider>
-      <SoundProvider>
-        <AuthProvider>
-          <ResponsiveShell>
-            <DeepLinkGate>
-              <AppShell />
-            </DeepLinkGate>
-          </ResponsiveShell>
-        </AuthProvider>
-      </SoundProvider>
+      <LanguageProvider>
+        <SoundProvider>
+          <AuthProvider>
+            <ResponsiveShell>
+              <DeepLinkGate>
+                <AppShell />
+              </DeepLinkGate>
+            </ResponsiveShell>
+          </AuthProvider>
+        </SoundProvider>
+      </LanguageProvider>
     </ThemeProvider>
   );
 }

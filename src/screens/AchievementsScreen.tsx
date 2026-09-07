@@ -5,13 +5,17 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { ACHIEVEMENTS } from '../data/achievements';
+import { ACHIEVEMENTS, achievementTitle, achievementDescription } from '../data/achievements';
 import Icon from '../components/Icon';
+import { useLanguage } from '../i18n/LanguageContext';
+import { useT } from '../i18n/strings';
 
 export default function AchievementsScreen() {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
+  const { language } = useLanguage();
+  const t = useT();
 
   if (!profile) return null;
 
@@ -20,8 +24,8 @@ export default function AchievementsScreen() {
   return (
     <SafeAreaView style={styles.safe}>
       <ScrollView contentContainerStyle={styles.container}>
-        <Text style={styles.pageTitle}>Достижения</Text>
-        <Text style={styles.subtitle}>Открыто {unlockedCount} из {ACHIEVEMENTS.length}</Text>
+        <Text style={styles.pageTitle}>{t('achievements.pageTitle')}</Text>
+        <Text style={styles.subtitle}>{t('achievements.unlockedOf', unlockedCount, ACHIEVEMENTS.length)}</Text>
 
         <View style={styles.grid}>
           {ACHIEVEMENTS.map((a) => {
@@ -31,8 +35,8 @@ export default function AchievementsScreen() {
                 <View style={[styles.iconWrap, unlocked && { backgroundColor: theme.primaryLight }]}>
                   <Icon name={unlocked ? a.icon : 'lock'} size={18} color={unlocked ? theme.primary : theme.textMuted} />
                 </View>
-                <Text style={styles.title}>{a.title}</Text>
-                <Text style={styles.description}>{a.description}</Text>
+                <Text style={styles.title}>{achievementTitle(a, language)}</Text>
+                <Text style={styles.description}>{achievementDescription(a, language)}</Text>
               </View>
             );
           })}
