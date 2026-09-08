@@ -294,6 +294,7 @@ const ru: StringDict = {
     placeholder: 'Написать сообщение...',
     empty: 'Пока нет сообщений — напиши первым!',
     back: 'Назад',
+    emojiLabel: 'Эмодзи',
   },
   cosmetics: {
     frameLabel: 'Рамка',
@@ -601,6 +602,7 @@ const en: StringDict = {
     placeholder: 'Type a message...',
     empty: 'No messages yet — say hi!',
     back: 'Back',
+    emojiLabel: 'Emoji',
   },
   cosmetics: {
     frameLabel: 'Frame',

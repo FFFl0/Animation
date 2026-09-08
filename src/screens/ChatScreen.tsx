@@ -25,6 +25,12 @@ type Props = {
   onBack: () => void;
 };
 
+const EMOJI = [
+  '😀', '😂', '😍', '😎', '🤔', '😭', '😡', '😱',
+  '🥳', '😴', '👀', '🙌', '👍', '👎', '🙏', '👋',
+  '❤️', '🔥', '✨', '🎉', '💯', '⚡', '🌸', '😊',
+];
+
 export default function ChatScreen({ friend, onBack }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
@@ -32,6 +38,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
   const t = useT();
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const [draft, setDraft] = useState('');
+  const [showEmoji, setShowEmoji] = useState(false);
   const scrollRef = useRef<ScrollView>(null);
   const meId = profile?.id ?? '';
 
@@ -56,6 +63,10 @@ export default function ChatScreen({ friend, onBack }: Props) {
     setDraft('');
     const sent = await sendMessage(meId, friend.id, text);
     if (sent) setMessages((prev) => [...prev, sent]);
+  };
+
+  const handlePickEmoji = (emoji: string) => {
+    setDraft((prev) => prev + emoji);
   };
 
   return (
@@ -88,13 +99,32 @@ export default function ChatScreen({ friend, onBack }: Props) {
           )}
         </ScrollView>
 
+        {showEmoji && (
+          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
+            {EMOJI.map((emoji) => (
+              <SoundTouchable key={emoji} onPress={() => handlePickEmoji(emoji)} style={styles.emojiButton}>
+                <Text style={styles.emojiText}>{emoji}</Text>
+              </SoundTouchable>
+            ))}
+          </ScrollView>
+        )}
+
         <View style={styles.inputRow}>
+          <SoundTouchable
+            style={styles.emojiToggle}
+            onPress={() => setShowEmoji((v) => !v)}
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.emojiLabel')}
+          >
+            <Icon name="smile" size={20} color={showEmoji ? theme.primary : theme.textMuted} />
+          </SoundTouchable>
           <TextInput
             style={styles.input}
             placeholder={t('chat.placeholder')}
             placeholderTextColor={theme.textMuted}
             value={draft}
             onChangeText={setDraft}
+            onFocus={() => setShowEmoji(false)}
             onSubmitEditing={handleSend}
             multiline
           />
@@ -125,6 +155,20 @@ function makeStyles(theme: Theme) {
     bubbleMine: { backgroundColor: theme.primary, borderBottomRightRadius: 4 },
     bubbleText: { fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, lineHeight: 19 },
     bubbleTextMine: { color: theme.onPrimary },
+    emojiRow: {
+      gap: 6,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+    },
+    emojiButton: {
+      width: 40,
+      height: 40,
+      borderRadius: radius.md,
+      backgroundColor: theme.card,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    emojiText: { fontSize: 20 },
     inputRow: {
       flexDirection: 'row',
       alignItems: 'flex-end',
@@ -133,6 +177,13 @@ function makeStyles(theme: Theme) {
       paddingVertical: 12,
       borderTopWidth: 1,
       borderTopColor: theme.border,
+    },
+    emojiToggle: {
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      alignItems: 'center',
+      justifyContent: 'center',
     },
     input: {
       flex: 1,

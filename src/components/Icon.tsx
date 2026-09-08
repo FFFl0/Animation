@@ -39,7 +39,8 @@ export type IconName =
   | 'check'
   | 'bell'
   | 'send'
-  | 'sparkles';
+  | 'sparkles'
+  | 'smile';
 
 type Props = {
   name: IconName;
@@ -338,6 +339,15 @@ function renderIcon(name: IconName, common: any, color: string) {
         <>
           <Path d="M12 3l1.5 4.5L18 9l-4.5 1.5L12 15l-1.5-4.5L6 9l4.5-1.5L12 3z" {...common} />
           <Path d="M19 15l.8 2.2L22 18l-2.2.8L19 21l-.8-2.2L16 18l2.2-.8L19 15z" {...common} />
+        </>
+      );
+    case 'smile':
+      return (
+        <>
+          <Circle cx="12" cy="12" r="8.5" {...common} />
+          <Path d="M8 14c1.2 1.5 2.6 2.2 4 2.2s2.8-.7 4-2.2" {...common} />
+          <Circle cx="9" cy="10" r="1" fill={color} stroke="none" />
+          <Circle cx="15" cy="10" r="1" fill={color} stroke="none" />
         </>
       );
   }
