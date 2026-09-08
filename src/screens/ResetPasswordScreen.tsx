@@ -50,7 +50,7 @@ export default function ResetPasswordScreen({ accessToken, refreshToken, onDone 
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.container}>
           <ToriiIcon size={34} color={theme.ink} />
           <Text style={styles.title}>{t('resetPassword.title')}</Text>

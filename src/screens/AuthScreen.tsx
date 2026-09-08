@@ -99,7 +99,7 @@ export default function AuthScreen({ onBack }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <SoundTouchable onPress={isForgot ? () => switchMode('login') : onBack} style={styles.backButton}>
           <Text style={styles.backText}>{t('auth.back')}</Text>
         </SoundTouchable>

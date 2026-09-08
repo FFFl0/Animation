@@ -60,7 +60,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
 
   return (
     <SafeAreaView style={styles.safe}>
-      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : undefined}>
+      <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
         <View style={styles.header}>
           <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('chat.back')} style={styles.backButton}>
             <Text style={styles.backText}>{`‹ ${t('chat.back')}`}</Text>
@@ -71,7 +71,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
           </View>
         </View>
 
-        <ScrollView ref={scrollRef} contentContainerStyle={styles.list}>
+        <ScrollView ref={scrollRef} style={styles.flex} contentContainerStyle={styles.list}>
           {messages.length === 0 ? (
             <Text style={styles.emptyText}>{t('chat.empty')}</Text>
           ) : (
