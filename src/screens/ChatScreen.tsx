@@ -116,7 +116,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
             accessibilityRole="button"
             accessibilityLabel={t('chat.emojiLabel')}
           >
-            <Icon name="smile" size={20} color={showEmoji ? theme.primary : theme.textMuted} />
+            <Icon name="smile" size={26} color={showEmoji ? theme.primary : theme.textMuted} />
           </SoundTouchable>
           <TextInput
             style={styles.input}
@@ -179,9 +179,9 @@ function makeStyles(theme: Theme) {
       borderTopColor: theme.border,
     },
     emojiToggle: {
-      width: 42,
-      height: 42,
-      borderRadius: 21,
+      width: 48,
+      height: 48,
+      borderRadius: 24,
       alignItems: 'center',
       justifyContent: 'center',
     },
