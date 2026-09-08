@@ -9,7 +9,6 @@ import { useAuth } from '../auth/AuthContext';
 import { PlayerSummary } from '../friends/friendsApi';
 import { levelFromStats, levelFromTotalCorrect, sumTotalCorrect } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
-import ProgressBar from '../components/ProgressBar';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -89,7 +88,9 @@ function CompareRow({
   theme: Theme;
   styles: Styles;
 }) {
-  const max = Math.max(mine, theirs, 1);
+  const total = mine + theirs;
+  const minePct = total > 0 ? (mine / total) * 100 : 50;
+  const theirPct = total > 0 ? (theirs / total) * 100 : 50;
   return (
     <View style={styles.compareRow}>
       <View style={styles.compareValuesRow}>
@@ -98,12 +99,8 @@ function CompareRow({
         <Text style={styles.compareValueTheirs}>{theirs}{suffix}</Text>
       </View>
       <View style={styles.compareBarsRow}>
-        <View style={{ flex: 1, transform: [{ scaleX: -1 }] }}>
-          <ProgressBar progress={mine / max} color={theme.textMuted} />
-        </View>
-        <View style={{ flex: 1 }}>
-          <ProgressBar progress={theirs / max} color={theme.primary} />
-        </View>
+        <View style={[styles.compareBarFill, { width: `${minePct}%`, backgroundColor: theme.textMuted }]} />
+        <View style={[styles.compareBarFill, { width: `${theirPct}%`, backgroundColor: theme.primary }]} />
       </View>
     </View>
   );
@@ -125,6 +122,13 @@ function makeStyles(theme: Theme) {
     compareValueMine: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.textMuted, width: 60 },
     compareLabel: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, flex: 1, textAlign: 'center' },
     compareValueTheirs: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.primary, width: 60, textAlign: 'right' },
-    compareBarsRow: { flexDirection: 'row', gap: 4 },
+    compareBarsRow: {
+      flexDirection: 'row',
+      height: 8,
+      borderRadius: 4,
+      overflow: 'hidden',
+      backgroundColor: theme.border,
+    },
+    compareBarFill: { height: '100%' },
   });
 }
