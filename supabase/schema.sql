@@ -66,20 +66,12 @@ end $$;
 -- Adds daily-challenge tracking to an existing profiles table.
 alter table public.profiles add column if not exists daily_challenge jsonb;
 
--- Public leaderboard: exposes only username/avatar/aggregate score for every
--- player, without loosening the profiles RLS policies above (this view is
--- owned by the migration-running role, which bypasses RLS, by design — the
--- standard Supabase pattern for a public leaderboard over a private table).
-create or replace view public.leaderboard as
-select
-  username,
-  avatar,
-  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
-  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
-  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions
-from public.profiles;
-
-grant select on public.leaderboard to authenticated;
+-- Public leaderboard was first added here, exposing only
+-- username/avatar/aggregate score for every player without loosening the
+-- profiles RLS policies above. Superseded a few migrations down by a wider
+-- version of the same view (adds id/streak/achievements/stats for the
+-- Friends feature) — that's the definition that actually takes effect, this
+-- comment is kept only as a record of when the view was first added.
 
 -- get_auth_email (added above in an earlier version of this file, since
 -- removed) let any anonymous caller resolve a username straight to its
@@ -134,7 +126,11 @@ create policy "Either side can remove a friendship"
 -- your own profile) alongside what the leaderboard already showed —
 -- extending the same safe view rather than adding a near-duplicate one.
 -- Still no email or other sensitive column, still authenticated-only.
-create or replace view public.leaderboard as
+-- Dropped first: CREATE OR REPLACE VIEW can't change a view's column list
+-- (add/remove/reorder), only append columns at the end, so a plain REPLACE
+-- here fails once the narrower version above has already been created.
+drop view if exists public.leaderboard cascade;
+create view public.leaderboard as
 select
   id,
   username,
@@ -272,7 +268,8 @@ create index if not exists round_results_user_created_idx on public.round_result
 -- round_results the same "safe view over a private table" way as
 -- public.leaderboard above — no per-row access to round_results is granted,
 -- only these pre-aggregated totals.
-create or replace view public.leaderboard_weekly as
+drop view if exists public.leaderboard_weekly cascade;
+create view public.leaderboard_weekly as
 select
   p.id,
   p.username,
@@ -285,7 +282,8 @@ group by p.id, p.username, p.avatar;
 
 grant select on public.leaderboard_weekly to authenticated;
 
-create or replace view public.leaderboard_season as
+drop view if exists public.leaderboard_season cascade;
+create view public.leaderboard_season as
 select
   p.id,
   p.username,
