@@ -89,8 +89,18 @@ function CompareRow({
   styles: Styles;
 }) {
   const total = mine + theirs;
-  const minePct = total > 0 ? (mine / total) * 100 : 50;
-  const theirPct = total > 0 ? (theirs / total) * 100 : 50;
+  let minePct = total > 0 ? (mine / total) * 100 : 50;
+  let theirPct = total > 0 ? (theirs / total) * 100 : 50;
+  // Keep the trailing side visible as a sliver instead of vanishing entirely
+  // at 0 — the bar should always read as "two sides", not "one solid bar".
+  const MIN_PCT = 6;
+  if (total > 0 && minePct < MIN_PCT) {
+    theirPct -= MIN_PCT - minePct;
+    minePct = MIN_PCT;
+  } else if (total > 0 && theirPct < MIN_PCT) {
+    minePct -= MIN_PCT - theirPct;
+    theirPct = MIN_PCT;
+  }
   return (
     <View style={styles.compareRow}>
       <View style={styles.compareValuesRow}>
