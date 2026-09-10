@@ -295,3 +295,72 @@ left join public.round_results r on r.user_id = p.id
 group by p.id, p.username, p.avatar;
 
 grant select on public.leaderboard_season to authenticated;
+
+-- Chat: replies, reactions and deleting your own messages.
+
+-- A reply points at the message it answers. `on delete set null` keeps the
+-- reply itself when the quoted message is deleted — it just stops showing
+-- the quote, rather than cascading the deletion into unrelated messages.
+alter table public.messages add column if not exists reply_to_id uuid references public.messages(id) on delete set null;
+
+-- One reaction per person per message (tapping a different emoji replaces
+-- it, tapping the same one removes it — enforced by the unique constraint
+-- plus an upsert on the client side).
+create table if not exists public.message_reactions (
+  id uuid primary key default gen_random_uuid(),
+  message_id uuid not null references public.messages(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  constraint message_reactions_one_per_user unique (message_id, user_id)
+);
+
+alter table public.message_reactions enable row level security;
+
+-- Reactions are visible to exactly the two people who can see the message
+-- they belong to, mirroring the messages policies above.
+drop policy if exists "See reactions in your conversations" on public.message_reactions;
+create policy "See reactions in your conversations"
+  on public.message_reactions for select
+  using (exists (
+    select 1 from public.messages m
+    where m.id = message_id and (m.sender_id = auth.uid() or m.recipient_id = auth.uid())
+  ));
+
+drop policy if exists "React as yourself" on public.message_reactions;
+create policy "React as yourself"
+  on public.message_reactions for insert
+  with check (user_id = auth.uid() and exists (
+    select 1 from public.messages m
+    where m.id = message_id and (m.sender_id = auth.uid() or m.recipient_id = auth.uid())
+  ));
+
+drop policy if exists "Change your own reaction" on public.message_reactions;
+create policy "Change your own reaction"
+  on public.message_reactions for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Remove your own reaction" on public.message_reactions;
+create policy "Remove your own reaction"
+  on public.message_reactions for delete
+  using (user_id = auth.uid());
+
+create index if not exists message_reactions_message_idx on public.message_reactions (message_id);
+
+-- Deleting is sender-only: you can take back what you said, not what the
+-- other person did.
+drop policy if exists "Delete your own messages" on public.messages;
+create policy "Delete your own messages"
+  on public.messages for delete
+  using (auth.uid() = sender_id);
+
+-- Realtime DELETE events only carry the primary key under the default
+-- replica identity, which isn't enough for RLS to decide who may see the
+-- event — so the other side would never learn a message was deleted.
+alter table public.messages replica identity full;
+
+do $$ begin
+  alter publication supabase_realtime add table public.message_reactions;
+exception when duplicate_object then null;
+end $$;

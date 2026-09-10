@@ -40,7 +40,9 @@ export type IconName =
   | 'bell'
   | 'send'
   | 'sparkles'
-  | 'smile';
+  | 'smile'
+  | 'reply'
+  | 'trash';
 
 type Props = {
   name: IconName;
@@ -348,6 +350,23 @@ function renderIcon(name: IconName, common: any, color: string) {
           <Path d="M8 14c1.2 1.5 2.6 2.2 4 2.2s2.8-.7 4-2.2" {...common} />
           <Circle cx="9" cy="10" r="1" fill={color} stroke="none" />
           <Circle cx="15" cy="10" r="1" fill={color} stroke="none" />
+        </>
+      );
+    case 'reply':
+      return (
+        <>
+          <Path d="M9 7 4 12l5 5" {...common} />
+          <Path d="M4 12h9a6 6 0 0 1 6 6v1" {...common} />
+        </>
+      );
+    case 'trash':
+      return (
+        <>
+          <Path d="M4 7h16" {...common} />
+          <Path d="M9 7V5a1 1 0 0 1 1-1h4a1 1 0 0 1 1 1v2" {...common} />
+          <Path d="M6.5 7l.8 12a1 1 0 0 0 1 1h7.4a1 1 0 0 0 1-1l.8-12" {...common} />
+          <Line x1="10" y1="11" x2="10" y2="17" {...common} />
+          <Line x1="14" y1="11" x2="14" y2="17" {...common} />
         </>
       );
   }

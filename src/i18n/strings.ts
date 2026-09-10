@@ -297,6 +297,11 @@ const ru: StringDict = {
     empty: 'Пока нет сообщений — напиши первым!',
     back: 'Назад',
     emojiLabel: 'Эмодзи',
+    you: 'Ты',
+    reply: 'Ответить',
+    delete: 'Удалить',
+    replyingTo: (name: string) => `Ответ ${name}`,
+    cancelReply: 'Отменить ответ',
   },
   cosmetics: {
     frameLabel: 'Рамка',
@@ -607,6 +612,11 @@ const en: StringDict = {
     empty: 'No messages yet — say hi!',
     back: 'Back',
     emojiLabel: 'Emoji',
+    you: 'You',
+    reply: 'Reply',
+    delete: 'Delete',
+    replyingTo: (name: string) => `Replying to ${name}`,
+    cancelReply: 'Cancel reply',
   },
   cosmetics: {
     frameLabel: 'Frame',
