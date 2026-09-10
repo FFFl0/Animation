@@ -4,6 +4,7 @@ import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { Avatar, HairStyle } from '../data/avatar';
 import { AVATAR_IMAGES } from '../data/avatarImages';
 import { FRAME_IMAGES } from '../data/cosmeticImages';
+import { PRESET_AVATAR_IMAGES, isPresetAvatarId } from '../data/presetAvatars';
 import { fontFamily } from '../theme/fonts';
 
 /** How much wider than the avatar itself a frame ring renders — it's meant
@@ -72,9 +73,11 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
 
   if (variant === 'full') {
     // Roster characters keep their pre-rendered portrait; a player shows
-    // whatever picture they added, and an initial until they add one.
-    const source = characterId ? AVATAR_IMAGES[characterId] : undefined;
-    const photo = characterId ? undefined : avatar.photoUri;
+    // whatever picture they added — uploaded or one of the ready-made ones —
+    // and an initial until they pick something.
+    const preset = !characterId && isPresetAvatarId(avatar.presetId) ? PRESET_AVATAR_IMAGES[avatar.presetId] : undefined;
+    const source = characterId ? AVATAR_IMAGES[characterId] : preset;
+    const photo = characterId || preset ? undefined : avatar.photoUri;
 
     if (source || photo) {
       return withFrame(
@@ -82,7 +85,7 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
           <Image source={source ?? { uri: photo! }} style={{ width: size, height: size }} resizeMode="cover" />
         </View>,
         // Roster portraits are shown as-is, frames belong to players only.
-        source ? undefined : avatar.frameId,
+        characterId ? undefined : avatar.frameId,
         size
       );
     }

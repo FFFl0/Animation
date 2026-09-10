@@ -12,6 +12,8 @@ import { seriesTitleById } from '../data/animeSeries';
 import { FrameId, FRAMES } from '../data/cosmetics';
 import { FRAME_IMAGES } from '../data/cosmeticImages';
 import { pickProfilePhoto } from '../avatar/photoPicker';
+import { deleteAvatarPhoto, uploadAvatarPhoto } from '../avatar/avatarStorage';
+import { PresetAvatarId, PRESET_AVATAR_IDS, PRESET_AVATAR_IMAGES } from '../data/presetAvatars';
 import { levelFromStats } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
@@ -64,7 +66,12 @@ export default function ProfileScreen() {
     setPhotoError(null);
     const result = await pickProfilePhoto();
     if (result.status === 'ok') {
-      await updateAvatar({ avatar: { ...profile.avatar, photoUri: result.photoUri } });
+      // Uploading returns null in fully local mode (and if the bucket is
+      // unreachable) — inlining the same bytes still gets the player their
+      // avatar, so a picked picture is never lost to a network hiccup.
+      const uploaded = await uploadAvatarPhoto(profile.id, result.base64);
+      const { presetId, ...rest } = profile.avatar;
+      await updateAvatar({ avatar: { ...rest, photoUri: uploaded ?? result.dataUri } });
     } else if (result.status === 'permissionDenied') {
       setPhotoError(t('profile.photoPermissionDenied'));
     } else if (result.status === 'failed') {
@@ -78,6 +85,17 @@ export default function ProfileScreen() {
     setPhotoError(null);
     const { photoUri, ...rest } = profile.avatar;
     await updateAvatar({ avatar: rest });
+    await deleteAvatarPhoto(profile.id);
+  };
+
+  /** Tapping the picture already in use clears it, so the ready-made row
+   * doubles as the way back to the plain initial. */
+  const handlePickPreset = async (id: PresetAvatarId) => {
+    if (!profile) return;
+    setPhotoError(null);
+    const { photoUri, presetId, ...rest } = profile.avatar;
+    await updateAvatar({ avatar: presetId === id ? rest : { ...rest, presetId: id } });
+    if (photoUri) await deleteAvatarPhoto(profile.id);
   };
 
   if (!profile) return null;
@@ -118,6 +136,18 @@ export default function ProfileScreen() {
         <Text style={styles.photoHint}>{t('profile.photoHint')}</Text>
         {photoError && <Text style={styles.photoError}>{photoError}</Text>}
       </View>
+
+      <Text style={styles.sectionTitle}>{t('profile.presetsTitle')}</Text>
+      <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>
+        {PRESET_AVATAR_IDS.map((id) => (
+          <SoundTouchable key={id} style={styles.favItem} onPress={() => handlePickPreset(id)}>
+            <View style={[styles.cosmeticThumbWrap, avatar.presetId === id && styles.favAvatarSelected]}>
+              <Image source={PRESET_AVATAR_IMAGES[id]} style={styles.cosmeticThumb} resizeMode="cover" />
+            </View>
+            <Text style={styles.favName} numberOfLines={1}>{t(`profile.presetNames.${id}`)}</Text>
+          </SoundTouchable>
+        ))}
+      </ScrollView>
 
       <Text style={styles.sectionTitle}>{t('cosmetics.frameLabel')}</Text>
       <CosmeticRow

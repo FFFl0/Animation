@@ -364,3 +364,41 @@ do $$ begin
   alter publication supabase_realtime add table public.message_reactions;
 exception when duplicate_object then null;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Avatars: player-uploaded profile pictures live in Storage, not in a table.
+-- `profiles.avatar` keeps only the public URL, so a leaderboard page carries
+-- fifty short strings instead of fifty inlined images.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values ('avatars', 'avatars', true, 1048576, array['image/jpeg', 'image/png', 'image/webp'])
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+-- Anyone may read: avatars show up next to friends, in chat and in the
+-- global leaderboard, including for players who aren't signed in yet.
+drop policy if exists "Avatars are readable by everyone" on storage.objects;
+create policy "Avatars are readable by everyone"
+  on storage.objects for select
+  using (bucket_id = 'avatars');
+
+-- Writing is confined to a folder named after the player's own user id, so
+-- nobody can overwrite or delete somebody else's picture.
+drop policy if exists "Upload your own avatar" on storage.objects;
+create policy "Upload your own avatar"
+  on storage.objects for insert
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "Replace your own avatar" on storage.objects;
+create policy "Replace your own avatar"
+  on storage.objects for update
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text)
+  with check (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+drop policy if exists "Delete your own avatar" on storage.objects;
+create policy "Delete your own avatar"
+  on storage.objects for delete
+  using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);

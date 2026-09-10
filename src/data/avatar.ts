@@ -1,4 +1,5 @@
 import { FrameId } from './cosmetics';
+import { PresetAvatarId } from './presetAvatars';
 
 export type HairStyle = 'long' | 'twin' | 'bob' | 'short' | 'spiky' | 'ponytail';
 
@@ -8,6 +9,9 @@ export type Avatar = {
    * means they haven't added one yet and the app shows a plain initial
    * instead: player avatars are never drawn procedurally any more. */
   photoUri?: string;
+  /** One of the ready-made pictures shipped with the app, picked instead of
+   * uploading one. Mutually exclusive with `photoUri`. */
+  presetId?: PresetAvatarId;
   /** Frame unlocked by player level — absent means "none equipped". */
   frameId?: FrameId;
   /** The rest only describes the 54 fixed roster characters: their portraits

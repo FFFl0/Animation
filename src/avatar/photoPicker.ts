@@ -12,21 +12,22 @@ const PHOTO_SIZE = 224;
 const PHOTO_QUALITY = 0.6;
 
 export type PickPhotoResult =
-  | { status: 'ok'; photoUri: string }
+  /** `base64` is the JPEG to upload; `dataUri` the same bytes ready to be
+   * used directly when there is nowhere to upload them to. */
+  | { status: 'ok'; base64: string; dataUri: string }
   | { status: 'canceled' }
   | { status: 'permissionDenied' }
   | { status: 'failed' };
 
 /**
- * Asks for a picture from the device gallery and returns it as a `data:` URI.
+ * Asks for a picture from the device gallery, crops it square and re-encodes
+ * it small.
  *
- * Inlining the bytes instead of uploading them keeps avatars working in the
- * fully local mode (no Supabase configured at all) and, when Supabase *is*
- * configured, lets the picture ride along in the `profiles.avatar` JSON that
- * already syncs between devices and is already readable by friends — no
- * storage bucket and no extra access rules to set up. That only holds while
- * the payload stays small — a leaderboard page pulls fifty of these at once —
- * hence the downscale above.
+ * The result goes to the `avatars` storage bucket (see avatarStorage.ts) so
+ * the profile itself only carries a URL. Without a Supabase project — or if
+ * the upload fails — the caller inlines `dataUri` in the profile instead,
+ * which still works everywhere; the downscale above is what keeps that
+ * fallback cheap enough for a leaderboard page pulling fifty of them.
  */
 export async function pickProfilePhoto(): Promise<PickPhotoResult> {
   const permission = await ImagePicker.requestMediaLibraryPermissionsAsync();
@@ -62,7 +63,7 @@ export async function pickProfilePhoto(): Promise<PickPhotoResult> {
       base64: true,
     });
     if (!saved.base64) return { status: 'failed' };
-    return { status: 'ok', photoUri: `data:image/jpeg;base64,${saved.base64}` };
+    return { status: 'ok', base64: saved.base64, dataUri: `data:image/jpeg;base64,${saved.base64}` };
   } catch {
     return { status: 'failed' };
   }
