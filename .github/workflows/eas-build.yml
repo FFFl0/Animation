@@ -1,8 +1,17 @@
-name: EAS Build (Android)
+name: EAS Build
 
 on:
   workflow_dispatch:
     inputs:
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
       profile:
         description: 'EAS build profile'
         required: true
@@ -11,6 +20,7 @@ on:
         options:
           - preview
           - production
+          - simulator
 
 jobs:
   build:
@@ -35,23 +45,35 @@ jobs:
         run: npx eas-cli init --non-interactive --force
 
       - name: Build
-        run: npx eas-cli build --platform android --profile ${{ github.event.inputs.profile }} --non-interactive --json > build-output.json
+        run: |
+          npx eas-cli build \
+            --platform ${{ github.event.inputs.platform }} \
+            --profile ${{ github.event.inputs.profile }} \
+            --non-interactive --json > build-output.json
 
-      - name: Publish download link to job summary
+      - name: Publish download links to job summary
         if: always()
         run: |
           echo "## Build result" >> "$GITHUB_STEP_SUMMARY"
           if [ -s build-output.json ]; then
             node -e "
-              const builds = JSON.parse(require('fs').readFileSync('build-output.json', 'utf8'));
-              const b = Array.isArray(builds) ? builds[0] : builds;
               const fs = require('fs');
-              if (b && b.artifacts && b.artifacts.buildUrl) {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\n**APK ready:** [Download](' + b.artifacts.buildUrl + ')\n');
-              } else if (b) {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nBuild status: ' + b.status + '. Check the log above or your expo.dev dashboard for details.\n');
-              } else {
-                fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, '\nNo build info captured — check the log above.\n');
+              const parsed = JSON.parse(fs.readFileSync('build-output.json', 'utf8'));
+              // --platform all returns one entry per platform, a single
+              // platform may return a bare object.
+              const builds = Array.isArray(parsed) ? parsed : [parsed];
+              const write = (line) => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
+              if (builds.length === 0) {
+                write('\nNo build info captured — check the log above.');
+              }
+              for (const b of builds) {
+                const platform = (b.platform || '?').toLowerCase();
+                const url = b.artifacts && b.artifacts.buildUrl;
+                if (url) {
+                  write('\n**' + platform + ' ready:** [Download](' + url + ')');
+                } else {
+                  write('\n**' + platform + '** — status: ' + b.status + '. See the log above or your expo.dev dashboard.');
+                }
               }
             "
           else
