@@ -15,7 +15,7 @@ import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { NotificationsProvider } from './src/notifications/NotificationsContext';
 import { PresenceProvider } from './src/presence/PresenceContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
-import { LanguageProvider } from './src/i18n/LanguageContext';
+import { LanguageProvider, useLanguage } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 import AchievementToastHost from './src/components/AchievementToast';
@@ -38,9 +38,10 @@ import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import { Friendship, PlayerSummary } from './src/friends/friendsApi';
-import { CategoryId } from './src/data/categories';
-import { TierId, getTier } from './src/data/difficulty';
-import { GAME_MODES, ModeId } from './src/data/modes';
+import { CategoryId, getCategory, categoryTitle } from './src/data/categories';
+import { TierId, getTier, tierLabel } from './src/data/difficulty';
+import { GAME_MODES, ModeId, getMode, modeTitle } from './src/data/modes';
+import { categoryStatsKey, getStat } from './src/quiz/statsKey';
 import { RoundConfig } from './src/quiz/types';
 import { Achievement } from './src/data/achievements';
 import { dateSeed } from './src/quiz/generateQuiz';
@@ -88,6 +89,7 @@ function AppShell() {
   const { theme, resolvedScheme } = useTheme();
   const { setMusicContext } = useSound();
   const t = useT();
+  const { language } = useLanguage();
 
   const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
@@ -95,7 +97,7 @@ function AppShell() {
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
-  const [result, setResult] = useState({ score: 0, total: 0 });
+  const [result, setResult] = useState({ score: 0, total: 0, isRecord: false, contextLabel: '' });
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<PlayerSummary | null>(null);
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
@@ -219,8 +221,28 @@ function AppShell() {
     setScreen('quiz');
   };
 
+  /** What the round was, for the shared image: the mode if one was picked,
+   * otherwise the category with its difficulty. */
+  const describeRound = (config: RoundConfig, modeId: ModeId | null) => {
+    if (modeId === 'daily') return t('result.dailyContext');
+    if (modeId) return modeTitle(getMode(modeId), language);
+    const category = categoryTitle(getCategory(config.categoryId), language);
+    return config.tier ? `${category} · ${tierLabel(getTier(config.tier), language)}` : category;
+  };
+
   const finishQuiz = async (score: number, total: number) => {
-    setResult({ score, total });
+    // Read the old best before recording, or the round just played would
+    // already have overwritten what we are comparing against.
+    const previousBest =
+      profile && roundConfig ? getStat(profile, categoryStatsKey(roundConfig.categoryId, roundConfig.tier)).bestScore : 0;
+
+    setResult({
+      score,
+      total,
+      isRecord: score > previousBest && score > 0,
+      contextLabel: roundConfig ? describeRound(roundConfig, activeModeId) : '',
+    });
+
     if (roundConfig) {
       const unlocked = await recordRoundResult(roundConfig, activeModeId, score, total);
       if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
@@ -310,7 +332,14 @@ function AppShell() {
             <QuizScreen key={quizKey} config={roundConfig} onFinish={finishQuiz} onClose={() => setScreen('home')} />
           )}
           {screen === 'result' && (
-            <ResultScreen score={result.score} total={result.total} onRestart={restart} onChooseCategory={() => setScreen('home')} />
+            <ResultScreen
+              score={result.score}
+              total={result.total}
+              isRecord={result.isRecord}
+              contextLabel={result.contextLabel}
+              onRestart={restart}
+              onChooseCategory={() => setScreen('home')}
+            />
           )}
           {screen === 'stats' && <StatsScreen onOpenLeaderboard={() => setScreen('leaderboard')} />}
           {screen === 'leaderboard' && (

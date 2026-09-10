@@ -3,6 +3,7 @@ import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Achievement } from '../data/achievements';
 import { useTheme } from '../theme/ThemeContext';
+import { useSound } from '../sound/SoundContext';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import Icon from './Icon';
@@ -21,6 +22,7 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
   const { theme } = useTheme();
   const insets = useSafeAreaInsets();
   const { language } = useLanguage();
+  const { buzz } = useSound();
   const t = useT();
   const translateY = useRef(new Animated.Value(-120)).current;
   const opacity = useRef(new Animated.Value(0)).current;
@@ -29,6 +31,8 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
 
   useEffect(() => {
     if (!current) return;
+    // The toast has no sound of its own, so the buzz is the whole alert.
+    buzz('heavy');
     translateY.setValue(-120);
     opacity.setValue(0);
     const showAnim = Animated.parallel([

@@ -2,21 +2,30 @@ import { createContext, useContext, useEffect, useMemo, useRef, useState, ReactN
 import { Platform } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { createAudioPlayer, AudioPlayer } from 'expo-audio';
+import { hapticError, hapticHeavy, hapticSuccess, hapticTap } from '../haptics/haptics';
 
 const MUSIC_KEY = 'animequiz.musicEnabled';
 const SFX_KEY = 'animequiz.sfxEnabled';
+const HAPTICS_KEY = 'animequiz.hapticsEnabled';
 
 export type MusicContext = 'menu' | 'quiz';
 
 type SoundContextValue = {
   musicEnabled: boolean;
   sfxEnabled: boolean;
+  hapticsEnabled: boolean;
   toggleMusic: () => void;
   toggleSfx: () => void;
+  toggleHaptics: () => void;
   setMusicContext: (ctx: MusicContext) => void;
+  // Sound and vibration are two ways of saying the same thing, so they are
+  // triggered together from one call rather than by every screen remembering
+  // to fire both.
   playClick: () => void;
   playCorrect: () => void;
   playWrong: () => void;
+  /** Vibration without a sound, for moments that have no sound of their own. */
+  buzz: (kind: 'tap' | 'success' | 'error' | 'heavy') => void;
 };
 
 const SoundContext = createContext<SoundContextValue | null>(null);
@@ -24,6 +33,7 @@ const SoundContext = createContext<SoundContextValue | null>(null);
 export function SoundProvider({ children }: { children: ReactNode }) {
   const [musicEnabled, setMusicEnabled] = useState(true);
   const [sfxEnabled, setSfxEnabled] = useState(true);
+  const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const musicContextRef = useRef<MusicContext>('menu');
 
@@ -35,9 +45,14 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   const wrongPlayerRef = useRef<AudioPlayer | null>(null);
 
   useEffect(() => {
-    Promise.all([AsyncStorage.getItem(MUSIC_KEY), AsyncStorage.getItem(SFX_KEY)]).then(([m, s]) => {
+    Promise.all([
+      AsyncStorage.getItem(MUSIC_KEY),
+      AsyncStorage.getItem(SFX_KEY),
+      AsyncStorage.getItem(HAPTICS_KEY),
+    ]).then(([m, s, h]) => {
       if (m !== null) setMusicEnabled(m === '1');
       if (s !== null) setSfxEnabled(s === '1');
+      if (h !== null) setHapticsEnabled(h === '1');
       setLoaded(true);
     });
 
@@ -104,6 +119,10 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     AsyncStorage.setItem(SFX_KEY, sfxEnabled ? '1' : '0');
   }, [sfxEnabled]);
 
+  useEffect(() => {
+    AsyncStorage.setItem(HAPTICS_KEY, hapticsEnabled ? '1' : '0');
+  }, [hapticsEnabled]);
+
   const setMusicContext = (ctx: MusicContext) => {
     musicContextRef.current = ctx;
     syncMusic();
@@ -120,18 +139,43 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     }
   }
 
+  function buzz(kind: 'tap' | 'success' | 'error' | 'heavy') {
+    if (!hapticsEnabled) return;
+    if (kind === 'tap') hapticTap();
+    else if (kind === 'success') hapticSuccess();
+    else if (kind === 'error') hapticError();
+    else hapticHeavy();
+  }
+
   const value = useMemo<SoundContextValue>(
     () => ({
       musicEnabled,
       sfxEnabled,
+      hapticsEnabled,
       toggleMusic: () => setMusicEnabled((v) => !v),
       toggleSfx: () => setSfxEnabled((v) => !v),
+      toggleHaptics: () =>
+        setHapticsEnabled((v) => {
+          // Buzz on the way *on* so the player feels what they just enabled.
+          if (!v) hapticTap();
+          return !v;
+        }),
       setMusicContext,
-      playClick: () => playSfx(clickPlayerRef.current),
-      playCorrect: () => playSfx(correctPlayerRef.current),
-      playWrong: () => playSfx(wrongPlayerRef.current),
+      playClick: () => {
+        playSfx(clickPlayerRef.current);
+        buzz('tap');
+      },
+      playCorrect: () => {
+        playSfx(correctPlayerRef.current);
+        buzz('success');
+      },
+      playWrong: () => {
+        playSfx(wrongPlayerRef.current);
+        buzz('error');
+      },
+      buzz,
     }),
-    [musicEnabled, sfxEnabled]
+    [musicEnabled, sfxEnabled, hapticsEnabled]
   );
 
   if (!loaded) return null;

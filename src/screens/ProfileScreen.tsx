@@ -24,7 +24,7 @@ import { useT } from '../i18n/strings';
 export default function ProfileScreen() {
   const { profile, logout, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
-  const { musicEnabled, sfxEnabled, toggleMusic, toggleSfx } = useSound();
+  const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
   const { language, setLanguage } = useLanguage();
   const t = useT();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -38,6 +38,15 @@ export default function ProfileScreen() {
     { key: 'light', label: t('profile.themeLight') },
     { key: 'dark', label: t('profile.themeDark') },
     { key: 'system', label: t('profile.themeSystem') },
+  ];
+
+  // Three side-by-side pills: the filled state carries on/off, the same way
+  // the theme and language rows above do, so the labels stay short enough
+  // to fit on a phone.
+  const SOUND_TOGGLES = [
+    { label: t('profile.musicLabel'), on: musicEnabled, toggle: toggleMusic },
+    { label: t('profile.sfxLabel'), on: sfxEnabled, toggle: toggleSfx },
+    { label: t('profile.hapticsLabel'), on: hapticsEnabled, toggle: toggleHaptics },
   ];
 
   const LANGUAGE_TABS: { key: Language; label: string }[] = [
@@ -225,22 +234,17 @@ export default function ProfileScreen() {
 
       <Text style={styles.sectionTitle}>{t('profile.soundTitle')}</Text>
       <View style={styles.themeTabs}>
-        <SoundTouchable
-          style={[styles.themeTab, musicEnabled && styles.themeTabActive]}
-          onPress={toggleMusic}
-        >
-          <Text style={[styles.themeTabText, musicEnabled && styles.themeTabTextActive]}>
-            {musicEnabled ? t('profile.musicOn') : t('profile.musicOff')}
-          </Text>
-        </SoundTouchable>
-        <SoundTouchable
-          style={[styles.themeTab, sfxEnabled && styles.themeTabActive]}
-          onPress={toggleSfx}
-        >
-          <Text style={[styles.themeTabText, sfxEnabled && styles.themeTabTextActive]}>
-            {sfxEnabled ? t('profile.sfxOn') : t('profile.sfxOff')}
-          </Text>
-        </SoundTouchable>
+        {SOUND_TOGGLES.map((toggle) => (
+          <SoundTouchable
+            key={toggle.label}
+            style={[styles.themeTab, toggle.on && styles.themeTabActive]}
+            onPress={toggle.toggle}
+            accessibilityRole="switch"
+            accessibilityState={{ checked: toggle.on }}
+          >
+            <Text style={[styles.themeTabText, toggle.on && styles.themeTabTextActive]}>{toggle.label}</Text>
+          </SoundTouchable>
+        ))}
       </View>
 
       <Text style={styles.sectionTitle}>{t('profile.remindersTitle')}</Text>
