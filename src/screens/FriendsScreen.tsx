@@ -30,13 +30,14 @@ type Props = {
   onBack: () => void;
   onOpenFriend: (player: PlayerSummary, friendship: Friendship | null) => void;
   onAcceptBattleInvite: (roomCode: string) => void;
+  onOpenGroups: () => void;
 };
 
 type Tab = 'friends' | 'requests' | 'recommendations';
 
 const MEDAL_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
 
-export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvite }: Props) {
+export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvite, onOpenGroups }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -148,7 +149,14 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
   if (!isSupabaseConfigured) {
     return (
       <SafeAreaView style={styles.safe}>
-        <Header title={t('friends.title')} onBack={onBack} theme={theme} backLabel={t('friends.back')} />
+        <Header
+        title={t('friends.title')}
+        onBack={onBack}
+        theme={theme}
+        backLabel={t('friends.back')}
+        groupsLabel={t('groups.open')}
+        onOpenGroups={onOpenGroups}
+      />
         <View style={styles.emptyWrap}>
           <Icon name="user" size={32} color={theme.textMuted} />
           <Text style={styles.emptyTitle}>{t('friends.needsCloudTitle')}</Text>
@@ -160,7 +168,14 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
 
   return (
     <SafeAreaView style={styles.safe}>
-      <Header title={t('friends.title')} onBack={onBack} theme={theme} backLabel={t('friends.back')} />
+      <Header
+        title={t('friends.title')}
+        onBack={onBack}
+        theme={theme}
+        backLabel={t('friends.back')}
+        groupsLabel={t('groups.open')}
+        onOpenGroups={onOpenGroups}
+      />
 
       <View style={styles.searchWrap}>
         <Icon name="search" size={15} color={theme.textMuted} />
@@ -353,13 +368,48 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
   );
 }
 
-function Header({ title, onBack, theme, backLabel }: { title: string; onBack: () => void; theme: Theme; backLabel: string }) {
+function Header({
+  title,
+  onBack,
+  theme,
+  backLabel,
+  groupsLabel,
+  onOpenGroups,
+}: {
+  title: string;
+  onBack: () => void;
+  theme: Theme;
+  backLabel: string;
+  groupsLabel: string;
+  onOpenGroups: () => void;
+}) {
   return (
     <View style={{ paddingHorizontal: 20, paddingTop: 12, paddingBottom: 8 }}>
       <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={backLabel} style={{ marginBottom: 12 }}>
         <Text style={{ color: theme.text, fontSize: 15, fontFamily: fontFamily('700') }}>{`‹ ${backLabel}`}</Text>
       </SoundTouchable>
-      <Text style={{ fontSize: 26, fontFamily: fontFamily('800'), color: theme.text }}>{title}</Text>
+      <View style={{ flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 12 }}>
+        <Text style={{ fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, flexShrink: 1 }}>{title}</Text>
+        {/* Groups get their own screen rather than a fourth tab: the three
+            here are already as narrow as their labels allow. */}
+        <SoundTouchable
+          onPress={onOpenGroups}
+          accessibilityRole="button"
+          style={{
+            flexDirection: 'row',
+            alignItems: 'center',
+            gap: 6,
+            borderWidth: 1.5,
+            borderColor: theme.primary,
+            borderRadius: radius.pill,
+            paddingHorizontal: 12,
+            paddingVertical: 7,
+          }}
+        >
+          <Icon name="users" size={15} color={theme.primary} />
+          <Text style={{ fontSize: 12, fontFamily: fontFamily('700'), color: theme.primary }}>{groupsLabel}</Text>
+        </SoundTouchable>
+      </View>
     </View>
   );
 }

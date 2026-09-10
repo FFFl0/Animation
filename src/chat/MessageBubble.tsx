@@ -5,7 +5,19 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import Icon from '../components/Icon';
-import { ChatMessage } from './chatApi';
+
+/** The shape a bubble needs. Direct messages and group messages both satisfy
+ * it, so one bubble renders either. */
+export type BubbleMessage = {
+  id: string;
+  senderId: string;
+  body: string;
+  createdAt: string;
+  replyToId: string | null;
+  /** Direct messages only — a group message has no single recipient to have
+   * read it, and the delivery check is hidden when this is absent. */
+  read?: boolean;
+};
 
 /** How far the bubble must travel before releasing counts as "reply". */
 const REPLY_THRESHOLD = 55;
@@ -14,18 +26,21 @@ const DOUBLE_TAP_MS = 280;
 
 export type ReactionGroup = { emoji: string; count: number; mine: boolean };
 
-type Props = {
-  message: ChatMessage;
+type Props<T extends BubbleMessage> = {
+  message: T;
   isMine: boolean;
   /** The message this one answers, when it's still in the loaded history. */
-  repliedTo: ChatMessage | null;
-  /** Display name of whoever wrote `repliedTo` ("You" / the friend's name). */
+  repliedTo: BubbleMessage | null;
+  /** Display name of whoever wrote `repliedTo` ("You" / the sender's name). */
   repliedToLabel: string;
+  /** Who wrote this one, shown above the bubble in a group where "not me"
+   * isn't enough to identify them. Omitted in a one-to-one chat. */
+  authorLabel?: string;
   reactions: ReactionGroup[];
-  onReply: (message: ChatMessage) => void;
-  onQuickReact: (message: ChatMessage) => void;
-  onToggleReaction: (message: ChatMessage, emoji: string) => void;
-  onLongPress: (message: ChatMessage) => void;
+  onReply: (message: T) => void;
+  onQuickReact: (message: T) => void;
+  onToggleReaction: (message: T, emoji: string) => void;
+  onLongPress: (message: T) => void;
   onJumpToReplied: (messageId: string) => void;
   highlighted: boolean;
 };
@@ -36,11 +51,12 @@ function formatTime(iso: string): string {
   return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
 }
 
-export default function MessageBubble({
+export default function MessageBubble<T extends BubbleMessage>({
   message,
   isMine,
   repliedTo,
   repliedToLabel,
+  authorLabel,
   reactions,
   onReply,
   onQuickReact,
@@ -48,7 +64,7 @@ export default function MessageBubble({
   onLongPress,
   onJumpToReplied,
   highlighted,
-}: Props) {
+}: Props<T>) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const translateX = useRef(new Animated.Value(0)).current;
@@ -114,6 +130,8 @@ export default function MessageBubble({
               highlighted && styles.bubbleHighlighted,
             ]}
           >
+            {authorLabel && !isMine && <Text style={styles.author}>{authorLabel}</Text>}
+
             {repliedTo && (
               <Pressable onPress={() => onJumpToReplied(repliedTo.id)} style={styles.quote}>
                 <View style={[styles.quoteBar, { backgroundColor: isMine ? theme.onPrimary : theme.primary }]} />
@@ -132,7 +150,7 @@ export default function MessageBubble({
 
             <View style={styles.metaRow}>
               <Text style={[styles.time, isMine && styles.timeMine]}>{formatTime(message.createdAt)}</Text>
-              {isMine && (
+              {isMine && message.read !== undefined && (
                 <Icon name="check" size={11} color={message.read ? theme.onPrimary : 'rgba(255,255,255,0.55)'} strokeWidth={2.6} />
               )}
             </View>
@@ -176,6 +194,7 @@ function makeStyles(theme: Theme) {
     bubbleTheirs: { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderBottomLeftRadius: 4 },
     bubbleMine: { backgroundColor: theme.primary, borderBottomRightRadius: 4 },
     bubbleHighlighted: { borderWidth: 2, borderColor: theme.ink },
+    author: { fontSize: 11, fontFamily: fontFamily('800'), color: theme.primary, marginBottom: 2 },
     quote: { flexDirection: 'row', gap: 6, marginBottom: 5, opacity: 0.85 },
     quoteBar: { width: 2.5, borderRadius: 2 },
     quoteTextWrap: { flex: 1 },

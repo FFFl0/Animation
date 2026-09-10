@@ -37,7 +37,10 @@ import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import GroupsScreen from './src/screens/GroupsScreen';
+import GroupChatScreen from './src/screens/GroupChatScreen';
 import { Friendship, PlayerSummary } from './src/friends/friendsApi';
+import { ChatGroup } from './src/chat/groupApi';
 import { CategoryId, getCategory, categoryTitle } from './src/data/categories';
 import { TierId, getTier, tierLabel } from './src/data/difficulty';
 import { GAME_MODES, ModeId, getMode, modeTitle } from './src/data/modes';
@@ -62,7 +65,9 @@ type Screen =
   | 'friends'
   | 'friendProfile'
   | 'compare'
-  | 'chat';
+  | 'chat'
+  | 'groups'
+  | 'groupChat';
 
 const TAB_SCREENS: Screen[] = ['home', 'friends', 'stats', 'achievements', 'profile'];
 
@@ -103,6 +108,7 @@ function AppShell() {
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
   const [challengeFriend, setChallengeFriend] = useState<PlayerSummary | null>(null);
   const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
+  const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const lastBackPressRef = useRef(0);
 
   useEffect(() => {
@@ -144,6 +150,12 @@ function AppShell() {
         case 'chat':
         case 'compare':
           setScreen('friendProfile');
+          return true;
+        case 'groupChat':
+          setScreen('groups');
+          return true;
+        case 'groups':
+          setScreen('friends');
           return true;
         case 'categoryDetail':
         case 'quiz':
@@ -296,6 +308,28 @@ function AppShell() {
               onAcceptBattleInvite={(roomCode) => {
                 setAutoJoinRoomCode(roomCode);
                 setScreen('battle');
+              }}
+              onOpenGroups={() => setScreen('groups')}
+            />
+          )}
+
+          {screen === 'groups' && (
+            <GroupsScreen
+              onBack={() => setScreen('friends')}
+              onOpenGroup={(group) => {
+                setSelectedGroup(group);
+                setScreen('groupChat');
+              }}
+            />
+          )}
+
+          {screen === 'groupChat' && selectedGroup && (
+            <GroupChatScreen
+              group={selectedGroup}
+              onBack={() => setScreen('groups')}
+              onLeft={() => {
+                setSelectedGroup(null);
+                setScreen('groups');
               }}
             />
           )}

@@ -43,7 +43,8 @@ export type IconName =
   | 'smile'
   | 'reply'
   | 'trash'
-  | 'image';
+  | 'image'
+  | 'chevronRight';
 
 type Props = {
   name: IconName;
@@ -370,6 +371,8 @@ function renderIcon(name: IconName, common: any, color: string) {
           <Line x1="14" y1="11" x2="14" y2="17" {...common} />
         </>
       );
+    case 'chevronRight':
+      return <Path d="M9 5l7 7-7 7" {...common} />;
     case 'image':
       return (
         <>

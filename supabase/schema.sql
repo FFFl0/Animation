@@ -402,3 +402,168 @@ drop policy if exists "Delete your own avatar" on storage.objects;
 create policy "Delete your own avatar"
   on storage.objects for delete
   using (bucket_id = 'avatars' and (storage.foldername(name))[1] = auth.uid()::text);
+
+-- ---------------------------------------------------------------------------
+-- Group chats. Separate tables rather than nullable columns on `messages`:
+-- a direct message is addressed to a person and a group message to a room,
+-- and squeezing both into one row makes every policy on it harder to read.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.chat_groups (
+  id uuid primary key default gen_random_uuid(),
+  name text not null check (char_length(trim(name)) between 1 and 40),
+  owner_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.chat_group_members (
+  group_id uuid not null references public.chat_groups(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  joined_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
+create table if not exists public.group_messages (
+  id uuid primary key default gen_random_uuid(),
+  group_id uuid not null references public.chat_groups(id) on delete cascade,
+  sender_id uuid not null references auth.users(id) on delete cascade,
+  body text not null check (char_length(body) between 1 and 2000),
+  reply_to_id uuid references public.group_messages(id) on delete set null,
+  created_at timestamptz not null default now()
+);
+
+create table if not exists public.group_message_reactions (
+  message_id uuid not null references public.group_messages(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  emoji text not null check (char_length(emoji) between 1 and 16),
+  created_at timestamptz not null default now(),
+  primary key (message_id, user_id)
+);
+
+create index if not exists group_messages_group_idx on public.group_messages (group_id, created_at);
+create index if not exists chat_group_members_user_idx on public.chat_group_members (user_id);
+
+-- Membership has to be checked from inside the policies ON the membership
+-- table, which would recurse forever. A SECURITY DEFINER function reads the
+-- table with RLS bypassed, breaking the cycle; it is deliberately narrow —
+-- it answers one yes/no question and exposes no rows.
+create or replace function public.is_group_member(gid uuid, uid uuid)
+returns boolean
+language sql
+security definer
+stable
+set search_path = public
+as $$
+  select exists (select 1 from public.chat_group_members m where m.group_id = gid and m.user_id = uid);
+$$;
+
+revoke all on function public.is_group_member(uuid, uuid) from public;
+grant execute on function public.is_group_member(uuid, uuid) to authenticated;
+
+alter table public.chat_groups enable row level security;
+alter table public.chat_group_members enable row level security;
+alter table public.group_messages enable row level security;
+alter table public.group_message_reactions enable row level security;
+
+drop policy if exists "See groups you belong to" on public.chat_groups;
+create policy "See groups you belong to"
+  on public.chat_groups for select
+  using (public.is_group_member(id, auth.uid()));
+
+drop policy if exists "Create your own group" on public.chat_groups;
+create policy "Create your own group"
+  on public.chat_groups for insert
+  with check (owner_id = auth.uid());
+
+drop policy if exists "Owner renames the group" on public.chat_groups;
+create policy "Owner renames the group"
+  on public.chat_groups for update
+  using (owner_id = auth.uid())
+  with check (owner_id = auth.uid());
+
+drop policy if exists "Owner deletes the group" on public.chat_groups;
+create policy "Owner deletes the group"
+  on public.chat_groups for delete
+  using (owner_id = auth.uid());
+
+drop policy if exists "See members of your groups" on public.chat_group_members;
+create policy "See members of your groups"
+  on public.chat_group_members for select
+  using (public.is_group_member(group_id, auth.uid()));
+
+-- Only the owner adds people. Their own first row passes this too, because
+-- the group they just created is one they own.
+drop policy if exists "Owner adds members" on public.chat_group_members;
+create policy "Owner adds members"
+  on public.chat_group_members for insert
+  with check (exists (select 1 from public.chat_groups g where g.id = group_id and g.owner_id = auth.uid()));
+
+-- Leaving is always yours to do; the owner may also remove someone.
+drop policy if exists "Leave or be removed by the owner" on public.chat_group_members;
+create policy "Leave or be removed by the owner"
+  on public.chat_group_members for delete
+  using (
+    user_id = auth.uid()
+    or exists (select 1 from public.chat_groups g where g.id = group_id and g.owner_id = auth.uid())
+  );
+
+drop policy if exists "Read your groups' messages" on public.group_messages;
+create policy "Read your groups' messages"
+  on public.group_messages for select
+  using (public.is_group_member(group_id, auth.uid()));
+
+drop policy if exists "Write to your groups" on public.group_messages;
+create policy "Write to your groups"
+  on public.group_messages for insert
+  with check (sender_id = auth.uid() and public.is_group_member(group_id, auth.uid()));
+
+drop policy if exists "Delete your own group message" on public.group_messages;
+create policy "Delete your own group message"
+  on public.group_messages for delete
+  using (sender_id = auth.uid());
+
+drop policy if exists "Read your groups' reactions" on public.group_message_reactions;
+create policy "Read your groups' reactions"
+  on public.group_message_reactions for select
+  using (exists (
+    select 1 from public.group_messages m
+    where m.id = message_id and public.is_group_member(m.group_id, auth.uid())
+  ));
+
+drop policy if exists "React in your groups" on public.group_message_reactions;
+create policy "React in your groups"
+  on public.group_message_reactions for insert
+  with check (user_id = auth.uid() and exists (
+    select 1 from public.group_messages m
+    where m.id = message_id and public.is_group_member(m.group_id, auth.uid())
+  ));
+
+drop policy if exists "Change your own group reaction" on public.group_message_reactions;
+create policy "Change your own group reaction"
+  on public.group_message_reactions for update
+  using (user_id = auth.uid())
+  with check (user_id = auth.uid());
+
+drop policy if exists "Remove your own group reaction" on public.group_message_reactions;
+create policy "Remove your own group reaction"
+  on public.group_message_reactions for delete
+  using (user_id = auth.uid());
+
+-- As with direct messages, a DELETE event has to carry enough of the old row
+-- for RLS to work out who may see it.
+alter table public.group_messages replica identity full;
+
+do $$ begin
+  alter publication supabase_realtime add table public.group_messages;
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.group_message_reactions;
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.chat_group_members;
+exception when duplicate_object then null;
+end $$;
