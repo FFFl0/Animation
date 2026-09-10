@@ -13,6 +13,7 @@ import {
 } from '@expo-google-fonts/manrope';
 import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { NotificationsProvider } from './src/notifications/NotificationsContext';
+import { PresenceProvider } from './src/presence/PresenceContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
 import { LanguageProvider } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
@@ -312,7 +313,22 @@ function AppShell() {
             <ResultScreen score={result.score} total={result.total} onRestart={restart} onChooseCategory={() => setScreen('home')} />
           )}
           {screen === 'stats' && <StatsScreen onOpenLeaderboard={() => setScreen('leaderboard')} />}
-          {screen === 'leaderboard' && <LeaderboardScreen onBack={() => setScreen('stats')} />}
+          {screen === 'leaderboard' && (
+            <LeaderboardScreen
+              onBack={() => setScreen('stats')}
+              onOpenChat={(player) => {
+                setSelectedFriend(player);
+                setSelectedFriendship(null);
+                setScreen('chat');
+              }}
+              onChallenge={(player) => {
+                setSelectedFriend(player);
+                setSelectedFriendship(null);
+                setChallengeFriend(player);
+                setScreen('battle');
+              }}
+            />
+          )}
           {screen === 'achievements' && <AchievementsScreen />}
           {screen === 'profile' && <ProfileScreen />}
         </ScreenTransition>
@@ -391,13 +407,15 @@ export default function App() {
         <LanguageProvider>
           <SoundProvider>
             <AuthProvider>
-              <NotificationsProvider>
-                <ResponsiveShell>
-                  <DeepLinkGate>
-                    <AppShell />
-                  </DeepLinkGate>
-                </ResponsiveShell>
-              </NotificationsProvider>
+              <PresenceProvider>
+                <NotificationsProvider>
+                  <ResponsiveShell>
+                    <DeepLinkGate>
+                      <AppShell />
+                    </DeepLinkGate>
+                  </ResponsiveShell>
+                </NotificationsProvider>
+              </PresenceProvider>
             </AuthProvider>
           </SoundProvider>
         </LanguageProvider>

@@ -4,6 +4,7 @@ import { Avatar } from '../data/avatar';
 export type LeaderboardPeriod = 'all' | 'week' | 'season';
 
 export type LeaderboardRow = {
+  id: string;
   username: string;
   avatar: Avatar;
   score: number;
@@ -12,6 +13,7 @@ export type LeaderboardRow = {
 };
 
 type LeaderboardViewRow = {
+  id: string;
   username: string;
   avatar: Avatar;
   total_score: number;
@@ -20,6 +22,7 @@ type LeaderboardViewRow = {
 };
 
 type PeriodViewRow = {
+  id: string;
   username: string;
   avatar: Avatar;
   period_score: number;
@@ -45,6 +48,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
 
     if (error || !data) return [];
     return (data as LeaderboardViewRow[]).map((row) => ({
+      id: row.id,
       username: row.username,
       avatar: row.avatar,
       score: row.total_score,
@@ -64,6 +68,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
   return (data as PeriodViewRow[])
     .filter((row) => row.period_score > 0 || row.period_questions > 0)
     .map((row) => ({
+      id: row.id,
       username: row.username,
       avatar: row.avatar,
       score: row.period_score,

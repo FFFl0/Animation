@@ -168,6 +168,8 @@ const ru: StringDict = {
     emptyText: 'Сыграй первым — и займи первую строчку рейтинга!',
     accuracyLine: (acc: number) => `Точность: ${acc}%`,
     youSuffix: ' (ты)',
+    online: 'В сети',
+    offline: 'Не в сети',
   },
   battle: {
     title: 'Битва фанатов',
@@ -476,6 +478,8 @@ const en: StringDict = {
     emptyText: 'Be the first — take the top spot on the leaderboard!',
     accuracyLine: (acc: number) => `Accuracy: ${acc}%`,
     youSuffix: ' (you)',
+    online: 'Online',
+    offline: 'Offline',
   },
   battle: {
     title: 'Fan Battle',
