@@ -84,7 +84,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         </SoundTouchable>
 
         <View style={styles.header}>
-          <AnimeAvatar avatar={player.avatar} size={110} />
+          <AnimeAvatar avatar={player.avatar} size={110} name={player.username} />
           <Text style={styles.name}>{player.username}</Text>
           <Text style={styles.levelLine}>{t('friendProfile.levelLine', level, title)}</Text>
         </View>

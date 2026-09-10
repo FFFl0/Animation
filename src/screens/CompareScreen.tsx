@@ -50,12 +50,12 @@ export default function CompareScreen({ friend, onBack, onChallenge }: Props) {
 
         <View style={styles.vsRow}>
           <View style={styles.vsSide}>
-            <AnimeAvatar avatar={profile.avatar} size={72} />
+            <AnimeAvatar avatar={profile.avatar} size={72} name={profile.username} />
             <Text style={styles.vsName}>{t('compare.you')}</Text>
           </View>
           <Text style={styles.vsLabel}>{t('compare.vs')}</Text>
           <View style={styles.vsSide}>
-            <AnimeAvatar avatar={friend.avatar} size={72} />
+            <AnimeAvatar avatar={friend.avatar} size={72} name={friend.username} />
             <Text style={styles.vsName}>{friend.username}</Text>
           </View>
         </View>

@@ -1,17 +1,23 @@
-import { FrameId, BackgroundId } from './cosmetics';
+import { FrameId } from './cosmetics';
 
 export type HairStyle = 'long' | 'twin' | 'bob' | 'short' | 'spiky' | 'ponytail';
 
 export type Avatar = {
+  /** The picture the player picked for themselves — a small square JPEG
+   * stored inline as a `data:` URI (see src/avatar/photoPicker.ts). Absent
+   * means they haven't added one yet and the app shows a plain initial
+   * instead: player avatars are never drawn procedurally any more. */
+  photoUri?: string;
+  /** Frame unlocked by player level — absent means "none equipped". */
+  frameId?: FrameId;
+  /** The rest only describes the 54 fixed roster characters: their portraits
+   * are pre-rendered PNGs, but the "silhouette" and "eyes" quiz modes still
+   * redraw them from these traits (see src/components/AnimeAvatar.tsx). */
   hairStyle: HairStyle;
   hairColor: string;
   eyeColor: string;
   skinTone: string;
   accent: string;
-  /** Cosmetics unlocked by player level — absent means "none equipped",
-   * which renders exactly as before (no frame, solid `accent` circle). */
-  frameId?: FrameId;
-  backgroundId?: BackgroundId;
 };
 
 const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'short', 'spiky', 'ponytail'];
@@ -32,6 +38,8 @@ function pick<T>(list: T[], hash: number, salt: number): T {
   return list[(hash + salt) % list.length];
 }
 
+/** Seeds the drawable traits above. Used for the fixed roster and to give a
+ * freshly registered player a stable placeholder tint until they add a photo. */
 export function makeAvatar(seed: string, overrides: Partial<Avatar> = {}): Avatar {
   const hash = hashSeed(seed);
   return {

@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Image, ImageSourcePropType, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -9,24 +9,15 @@ import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
 import { CHARACTERS, characterName } from '../data/characters';
 import { seriesTitleById } from '../data/animeSeries';
-import { HairStyle } from '../data/avatar';
-import { BackgroundId, BACKGROUNDS, FrameId, FRAMES } from '../data/cosmetics';
-import { BACKGROUND_IMAGES, FRAME_IMAGES } from '../data/cosmeticImages';
+import { FrameId, FRAMES } from '../data/cosmetics';
+import { FRAME_IMAGES } from '../data/cosmeticImages';
+import { pickProfilePhoto } from '../avatar/photoPicker';
 import { levelFromStats } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
-
-const HAIR_STYLES: HairStyle[] = ['long', 'twin', 'bob', 'short', 'spiky', 'ponytail'];
-const COLOR_SWATCHES = ['#2B2B33', '#8B5E3C', '#D9B24C', '#E8632E', '#E85D9C', '#5FB8E0', '#7C5CB8', '#3E3E3E'];
-const ACCENT_SWATCHES = ['#FADDE1', '#DCEFFB', '#E4F7E1', '#FBE9D0', '#EDE3FB', '#FDE2E2'];
-
-function cycle<T>(list: T[], current: T, dir: 1 | -1): T {
-  const i = list.indexOf(current);
-  return list[(i + dir + list.length) % list.length];
-}
 
 export default function ProfileScreen() {
   const { profile, logout, updateAvatar } = useAuth();
@@ -35,8 +26,9 @@ export default function ProfileScreen() {
   const { language, setLanguage } = useLanguage();
   const t = useT();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const [editing, setEditing] = useState(false);
   const [search, setSearch] = useState('');
+  const [photoBusy, setPhotoBusy] = useState(false);
+  const [photoError, setPhotoError] = useState<string | null>(null);
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -66,6 +58,28 @@ export default function ProfileScreen() {
     }
   };
 
+  const handlePickPhoto = async () => {
+    if (photoBusy || !profile) return;
+    setPhotoBusy(true);
+    setPhotoError(null);
+    const result = await pickProfilePhoto();
+    if (result.status === 'ok') {
+      await updateAvatar({ avatar: { ...profile.avatar, photoUri: result.photoUri } });
+    } else if (result.status === 'permissionDenied') {
+      setPhotoError(t('profile.photoPermissionDenied'));
+    } else if (result.status === 'failed') {
+      setPhotoError(t('profile.photoFailed'));
+    }
+    setPhotoBusy(false);
+  };
+
+  const handleRemovePhoto = async () => {
+    if (!profile) return;
+    setPhotoError(null);
+    const { photoUri, ...rest } = profile.avatar;
+    await updateAvatar({ avatar: rest });
+  };
+
   if (!profile) return null;
   const { avatar } = profile;
   const { level } = levelFromStats(profile.stats);
@@ -84,75 +98,39 @@ export default function ProfileScreen() {
       <Text style={styles.pageTitle}>{t('profile.pageTitle')}</Text>
 
       <View style={styles.avatarSection}>
-        <AnimeAvatar avatar={avatar} size={120} />
+        <AnimeAvatar avatar={avatar} size={120} name={profile.username} />
         <Text style={styles.username}>{profile.username}</Text>
         <Text style={styles.joined}>
           {t('profile.since', new Date(profile.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ru-RU'))}
         </Text>
-        <SoundTouchable style={styles.editToggle} onPress={() => setEditing((v) => !v)}>
-          <Text style={styles.editToggleText}>{editing ? t('profile.doneEditing') : t('profile.editAvatar')}</Text>
-        </SoundTouchable>
+        <View style={styles.photoButtons}>
+          <SoundTouchable style={styles.photoButton} onPress={handlePickPhoto} disabled={photoBusy}>
+            <Icon name="image" size={14} color={theme.primary} />
+            <Text style={styles.photoButtonText}>{avatar.photoUri ? t('profile.changePhoto') : t('profile.addPhoto')}</Text>
+          </SoundTouchable>
+          {avatar.photoUri && (
+            <SoundTouchable style={styles.photoButton} onPress={handleRemovePhoto}>
+              <Icon name="trash" size={14} color={theme.danger} />
+              <Text style={[styles.photoButtonText, { color: theme.danger }]}>{t('profile.removePhoto')}</Text>
+            </SoundTouchable>
+          )}
+        </View>
+        <Text style={styles.photoHint}>{t('profile.photoHint')}</Text>
+        {photoError && <Text style={styles.photoError}>{photoError}</Text>}
       </View>
 
-      {editing && (
-        <View style={styles.editor}>
-          <EditorRow styles={styles} label={t('profile.hairStyleLabel')}>
-            <SoundTouchable onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, -1) } })}>
-              <Text style={styles.arrow}>‹</Text>
-            </SoundTouchable>
-            <Text style={styles.editorValue}>{avatar.hairStyle}</Text>
-            <SoundTouchable onPress={() => updateAvatar({ avatar: { ...avatar, hairStyle: cycle(HAIR_STYLES, avatar.hairStyle, 1) } })}>
-              <Text style={styles.arrow}>›</Text>
-            </SoundTouchable>
-          </EditorRow>
-
-          <EditorRow styles={styles} label={t('profile.hairLabel')}>
-            <SwatchRow styles={styles} colors={COLOR_SWATCHES} selected={avatar.hairColor} onSelect={(c) => updateAvatar({ avatar: { ...avatar, hairColor: c } })} />
-          </EditorRow>
-
-          <EditorRow styles={styles} label={t('profile.eyesLabel')}>
-            <SwatchRow styles={styles} colors={COLOR_SWATCHES} selected={avatar.eyeColor} onSelect={(c) => updateAvatar({ avatar: { ...avatar, eyeColor: c } })} />
-          </EditorRow>
-
-          <EditorRow styles={styles} label={t('profile.backgroundLabel')}>
-            <SwatchRow styles={styles} colors={ACCENT_SWATCHES} selected={avatar.accent} onSelect={(c) => updateAvatar({ avatar: { ...avatar, accent: c } })} />
-          </EditorRow>
-        </View>
-      )}
-
-      {editing && (
-        <>
-          <Text style={styles.sectionTitle}>{t('cosmetics.frameLabel')}</Text>
-          <CosmeticRow
-            styles={styles}
-            theme={theme}
-            t={t}
-            items={FRAMES}
-            images={FRAME_IMAGES}
-            selectedId={avatar.frameId}
-            level={level}
-            noneLabel={t('cosmetics.none')}
-            nameNamespace="frameNames"
-            thumbMode="contain"
-            onSelect={(id) => updateAvatar({ avatar: { ...avatar, frameId: id as FrameId | undefined } })}
-          />
-
-          <Text style={styles.sectionTitle}>{t('cosmetics.backgroundLabel')}</Text>
-          <CosmeticRow
-            styles={styles}
-            theme={theme}
-            t={t}
-            items={BACKGROUNDS}
-            images={BACKGROUND_IMAGES}
-            selectedId={avatar.backgroundId}
-            level={level}
-            noneLabel={t('cosmetics.none')}
-            nameNamespace="backgroundNames"
-            thumbMode="cover"
-            onSelect={(id) => updateAvatar({ avatar: { ...avatar, backgroundId: id as BackgroundId | undefined } })}
-          />
-        </>
-      )}
+      <Text style={styles.sectionTitle}>{t('cosmetics.frameLabel')}</Text>
+      <CosmeticRow
+        styles={styles}
+        theme={theme}
+        t={t}
+        items={FRAMES}
+        images={FRAME_IMAGES}
+        selectedId={avatar.frameId}
+        level={level}
+        noneLabel={t('cosmetics.none')}
+        onSelect={(id) => updateAvatar({ avatar: { ...avatar, frameId: id as FrameId | undefined } })}
+      />
 
       <Text style={styles.sectionTitle}>{t('profile.favoriteCharacterTitle')}</Text>
       <View style={styles.searchWrap}>
@@ -254,23 +232,12 @@ export default function ProfileScreen() {
 
 type Styles = ReturnType<typeof makeStyles>;
 
-function EditorRow({ label, children, styles }: { label: string; children: ReactNode; styles: Styles }) {
-  return (
-    <View style={styles.editorRow}>
-      <Text style={styles.editorLabel}>{label}</Text>
-      <View style={styles.editorControls}>{children}</View>
-    </View>
-  );
-}
-
 function CosmeticRow<TId extends string>({
   items,
   images,
   selectedId,
   level,
   noneLabel,
-  nameNamespace,
-  thumbMode,
   onSelect,
   styles,
   theme,
@@ -281,8 +248,6 @@ function CosmeticRow<TId extends string>({
   selectedId: TId | undefined;
   level: number;
   noneLabel: string;
-  nameNamespace: 'frameNames' | 'backgroundNames';
-  thumbMode: 'contain' | 'cover';
   onSelect: (id: TId | undefined) => void;
   styles: Styles;
   theme: Theme;
@@ -307,7 +272,7 @@ function CosmeticRow<TId extends string>({
             onPress={() => onSelect(item.id)}
           >
             <View style={[styles.cosmeticThumbWrap, selectedId === item.id && styles.favAvatarSelected]}>
-              <Image source={images[item.id]} style={styles.cosmeticThumb} resizeMode={thumbMode} />
+              <Image source={images[item.id]} style={styles.cosmeticThumb} resizeMode="contain" />
               {!unlocked && (
                 <View style={styles.cosmeticLockOverlay}>
                   <Icon name="lock" size={16} color="#FFFFFF" />
@@ -315,29 +280,11 @@ function CosmeticRow<TId extends string>({
               )}
             </View>
             <Text style={styles.favName} numberOfLines={1}>
-              {unlocked ? t(`cosmetics.${nameNamespace}.${item.id}`) : t('cosmetics.lockedAtLevel', item.unlockLevel)}
+              {unlocked ? t(`cosmetics.frameNames.${item.id}`) : t('cosmetics.lockedAtLevel', item.unlockLevel)}
             </Text>
           </SoundTouchable>
         );
       })}
-    </ScrollView>
-  );
-}
-
-function SwatchRow({ colors, selected, onSelect, styles }: { colors: string[]; selected: string; onSelect: (c: string) => void; styles: Styles }) {
-  return (
-    <ScrollView horizontal showsHorizontalScrollIndicator={false}>
-      {colors.map((c) => (
-        <SoundTouchable
-          key={c}
-          onPress={() => onSelect(c)}
-          style={[
-            styles.swatch,
-            { backgroundColor: c },
-            c === selected && styles.swatchSelected,
-          ]}
-        />
-      ))}
     </ScrollView>
   );
 }
@@ -350,38 +297,20 @@ function makeStyles(theme: Theme) {
     avatarSection: { alignItems: 'center', marginBottom: 12 },
     username: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
     joined: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2 },
-    editToggle: {
-      marginTop: 14,
-      borderWidth: 1.5,
-      borderColor: theme.primary,
-      borderRadius: radius.pill,
-      paddingHorizontal: 18,
-      paddingVertical: 8,
-    },
-    editToggleText: { color: theme.primary, fontFamily: fontFamily('700'), fontSize: 13 },
-    editor: {
-      backgroundColor: theme.card,
-      borderRadius: radius.lg,
+    photoButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 14 },
+    photoButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
       borderWidth: 1.5,
       borderColor: theme.border,
-      padding: 14,
-      marginTop: 16,
-      gap: 10,
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
     },
-    editorRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
-    editorLabel: { width: 78, fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
-    editorControls: { flex: 1, flexDirection: 'row', alignItems: 'center', gap: 10 },
-    editorValue: { fontSize: 14, fontFamily: fontFamily('600'), color: theme.text, minWidth: 80 },
-    arrow: { fontSize: 22, color: theme.primary, fontFamily: fontFamily('800'), paddingHorizontal: 6 },
-    swatch: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      marginRight: 8,
-      borderWidth: 2,
-      borderColor: 'transparent',
-    },
-    swatchSelected: { borderColor: theme.text },
+    photoButtonText: { color: theme.primary, fontFamily: fontFamily('700'), fontSize: 13 },
+    photoHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 10, textAlign: 'center' },
+    photoError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 6, textAlign: 'center' },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
     searchWrap: {
       flexDirection: 'row',

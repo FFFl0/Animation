@@ -124,7 +124,7 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
               >
                 <Text style={[styles.rank, i < 3 && { color: MEDAL_COLORS[i] }]}>#{i + 1}</Text>
                 <View style={styles.avatarWrap}>
-                  <AnimeAvatar avatar={row.avatar} size={36} />
+                  <AnimeAvatar avatar={row.avatar} size={36} name={row.username} />
                   <View style={[styles.statusDot, { backgroundColor: online ? theme.success : theme.textMuted, borderColor: theme.card }]} />
                 </View>
                 <View style={styles.rowText}>
@@ -147,7 +147,7 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
             {selectedRow && (
               <>
                 <View style={styles.modalAvatarWrap}>
-                  <AnimeAvatar avatar={selectedRow.avatar} size={64} />
+                  <AnimeAvatar avatar={selectedRow.avatar} size={64} name={selectedRow.username} />
                   <View
                     style={[
                       styles.statusDotLarge,

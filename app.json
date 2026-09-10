@@ -8,7 +8,15 @@
     "icon": "./assets/icon.png",
     "userInterfaceStyle": "automatic",
     "scheme": "animequiz",
-    "plugins": ["expo-notifications"],
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Разрешите доступ к галерее, чтобы выбрать фото для аватара."
+        }
+      ]
+    ],
     "ios": {
       "supportsTablet": true
     },

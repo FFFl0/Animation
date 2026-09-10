@@ -173,7 +173,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
             <Text style={styles.backText}>{`‹ ${t('chat.back')}`}</Text>
           </SoundTouchable>
           <View style={styles.headerRow}>
-            <AnimeAvatar avatar={friend.avatar} size={36} />
+            <AnimeAvatar avatar={friend.avatar} size={36} name={friend.username} />
             <Text style={styles.headerName} numberOfLines={1}>{friend.username}</Text>
           </View>
         </View>

@@ -1,8 +1,10 @@
-import { Image, View } from 'react-native';
+import { ReactElement } from 'react';
+import { Image, StyleSheet, Text, View } from 'react-native';
 import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { Avatar, HairStyle } from '../data/avatar';
 import { AVATAR_IMAGES } from '../data/avatarImages';
-import { FRAME_IMAGES, BACKGROUND_IMAGES } from '../data/cosmeticImages';
+import { FRAME_IMAGES } from '../data/cosmeticImages';
+import { fontFamily } from '../theme/fonts';
 
 /** How much wider than the avatar itself a frame ring renders — it's meant
  * to bleed slightly past the circular edge, not clip against it. */
@@ -14,9 +16,12 @@ type Props = {
   variant?: 'full' | 'silhouette' | 'eyes';
   /** One of the 54 fixed roster characters — when set (and variant is
    * 'full'), renders the pre-rendered PNG for that character instead of
-   * redrawing the SVG. Player-customized avatars have no fixed id and
-   * always fall back to the live SVG drawing below. */
+   * redrawing the SVG. Player avatars have no fixed id: they show the
+   * picture the player added, or the initial placeholder below. */
   characterId?: string;
+  /** The player's name, used for the single-letter placeholder shown until
+   * they add a photo of their own. */
+  name?: string;
 };
 
 function HairBack({ style, color }: { style: HairStyle; color: string }) {
@@ -55,18 +60,51 @@ function HairFront({ style, color }: { style: HairStyle; color: string }) {
   }
 }
 
-export default function AnimeAvatar({ avatar, size = 96, variant = 'full', characterId }: Props) {
+/** First letter of the name, or a dash when there is nothing to take one
+ * from — Intl-free so it behaves the same for Cyrillic and Latin names. */
+function initialOf(name: string | undefined): string {
+  const first = (name ?? '').trim().charAt(0);
+  return first ? first.toUpperCase() : '—';
+}
+
+export default function AnimeAvatar({ avatar, size = 96, variant = 'full', characterId, name }: Props) {
   const viewBox = variant === 'eyes' ? '52 108 96 46' : '0 0 200 200';
 
-  const image = variant === 'full' && characterId ? AVATAR_IMAGES[characterId] : undefined;
-  if (image) {
-    return (
-      <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
-        <Image source={image} style={{ width: size, height: size }} resizeMode="cover" />
-      </View>
-    );
+  if (variant === 'full') {
+    // Roster characters keep their pre-rendered portrait; a player shows
+    // whatever picture they added, and an initial until they add one.
+    const source = characterId ? AVATAR_IMAGES[characterId] : undefined;
+    const photo = characterId ? undefined : avatar.photoUri;
+
+    if (source || photo) {
+      return withFrame(
+        <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
+          <Image source={source ?? { uri: photo! }} style={{ width: size, height: size }} resizeMode="cover" />
+        </View>,
+        // Roster portraits are shown as-is, frames belong to players only.
+        source ? undefined : avatar.frameId,
+        size
+      );
+    }
+
+    if (!characterId) {
+      return withFrame(
+        <View
+          style={[
+            styles.placeholder,
+            { width: size, height: size, borderRadius: size / 2, backgroundColor: avatar.accent },
+          ]}
+        >
+          <Text style={[styles.placeholderText, { fontSize: Math.round(size * 0.42) }]}>{initialOf(name)}</Text>
+        </View>,
+        avatar.frameId,
+        size
+      );
+    }
   }
 
+  // Quiz-only drawings: the roster character redrawn from its traits, either
+  // blacked out ("guess the silhouette") or cropped to the eyes.
   if (variant === 'silhouette') {
     return (
       <View style={{ width: size, height: size }}>
@@ -80,20 +118,10 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
     );
   }
 
-  // Cosmetics only apply to a player's own customizable avatar rendered at
-  // full size — not to the fixed-roster character images above, and not to
-  // the cropped 'eyes' variant used for that quiz question type.
-  const isCustomizable = variant === 'full';
-  const backgroundImage = isCustomizable && avatar.backgroundId ? BACKGROUND_IMAGES[avatar.backgroundId] : undefined;
-  const frameImage = isCustomizable && avatar.frameId ? FRAME_IMAGES[avatar.frameId] : undefined;
-
-  const circle = (
+  return (
     <View style={{ width: size, height: size, overflow: 'hidden', borderRadius: size / 2 }}>
-      {backgroundImage && (
-        <Image source={backgroundImage} style={{ position: 'absolute', width: size, height: size }} resizeMode="cover" />
-      )}
       <Svg width={size} height={size} viewBox={viewBox}>
-        {!backgroundImage && <Circle cx="100" cy="100" r="100" fill={avatar.accent} />}
+        <Circle cx="100" cy="100" r="100" fill={avatar.accent} />
         <HairBack style={avatar.hairStyle} color={avatar.hairColor} />
         <Ellipse cx="100" cy="118" rx="46" ry="50" fill={avatar.skinTone} />
         <Ellipse cx="78" cy="128" rx="7" ry="9" fill={avatar.eyeColor} />
@@ -103,7 +131,10 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
       </Svg>
     </View>
   );
+}
 
+function withFrame(circle: ReactElement, frameId: Avatar['frameId'], size: number) {
+  const frameImage = frameId ? FRAME_IMAGES[frameId] : undefined;
   if (!frameImage) return circle;
 
   const frameSize = Math.round(size * FRAME_OVERHANG);
@@ -119,3 +150,8 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
     </View>
   );
 }
+
+const styles = StyleSheet.create({
+  placeholder: { alignItems: 'center', justifyContent: 'center' },
+  placeholderText: { fontFamily: fontFamily('800'), color: '#3A3A44' },
+});

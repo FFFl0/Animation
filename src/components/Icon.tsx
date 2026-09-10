@@ -42,7 +42,8 @@ export type IconName =
   | 'sparkles'
   | 'smile'
   | 'reply'
-  | 'trash';
+  | 'trash'
+  | 'image';
 
 type Props = {
   name: IconName;
@@ -367,6 +368,15 @@ function renderIcon(name: IconName, common: any, color: string) {
           <Path d="M6.5 7l.8 12a1 1 0 0 0 1 1h7.4a1 1 0 0 0 1-1l.8-12" {...common} />
           <Line x1="10" y1="11" x2="10" y2="17" {...common} />
           <Line x1="14" y1="11" x2="14" y2="17" {...common} />
+        </>
+      );
+    case 'image':
+      return (
+        <>
+          <Rect x="3" y="4" width="18" height="16" rx="3" {...common} />
+          <Circle cx="8.75" cy="9.5" r="1.6" {...common} />
+          <Path d="M4 17l4.5-4.5a2 2 0 0 1 2.8 0L16 17" {...common} />
+          <Path d="M14.5 15l1.8-1.8a2 2 0 0 1 2.8 0L20 14.4" {...common} />
         </>
       );
   }

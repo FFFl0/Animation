@@ -402,7 +402,7 @@ function PlayerRow({
     <SoundTouchable style={styles.row} onPress={onPress} activeOpacity={0.85}>
       {rank !== undefined && <Text style={[styles.rank, { color: MEDAL_COLORS[rank] }]}>#{rank + 1}</Text>}
       <View>
-        <AnimeAvatar avatar={player.avatar} size={40} />
+        <AnimeAvatar avatar={player.avatar} size={40} name={player.username} />
         {hasUnread && <View style={[styles.unreadDot, { backgroundColor: theme.danger, borderColor: theme.card }]} />}
       </View>
       <View style={styles.rowText}>
