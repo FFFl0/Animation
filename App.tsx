@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Platform, ToastAndroid, View } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Modal, Platform, ToastAndroid, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
@@ -39,6 +39,8 @@ import CompareScreen from './src/screens/CompareScreen';
 import ChatScreen from './src/screens/ChatScreen';
 import GroupsScreen from './src/screens/GroupsScreen';
 import GroupChatScreen from './src/screens/GroupChatScreen';
+import AboutScreen from './src/screens/AboutScreen';
+import PrivacyScreen from './src/screens/PrivacyScreen';
 import { Friendship, PlayerSummary } from './src/friends/friendsApi';
 import { ChatGroup } from './src/chat/groupApi';
 import { CategoryId, getCategory, categoryTitle } from './src/data/categories';
@@ -67,7 +69,9 @@ type Screen =
   | 'compare'
   | 'chat'
   | 'groups'
-  | 'groupChat';
+  | 'groupChat'
+  | 'about'
+  | 'privacy';
 
 const TAB_SCREENS: Screen[] = ['home', 'friends', 'stats', 'achievements', 'profile'];
 
@@ -96,7 +100,10 @@ function AppShell() {
   const t = useT();
   const { language } = useLanguage();
 
-  const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth'>('welcome');
+  // The policy has to be readable before signing up — that is the moment
+  // somebody is agreeing to it — and the signed-in navigation is not mounted
+  // yet at that point, hence its own state rather than a Screen.
+  const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth' | 'privacy'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
@@ -109,6 +116,7 @@ function AppShell() {
   const [challengeFriend, setChallengeFriend] = useState<PlayerSummary | null>(null);
   const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
+  const [privacyFrom, setPrivacyFrom] = useState<Screen>('profile');
   const lastBackPressRef = useRef(0);
 
   useEffect(() => {
@@ -135,6 +143,10 @@ function AppShell() {
 
     const onBackPress = () => {
       if (!profile) {
+        if (preAuthScreen === 'privacy') {
+          setPreAuthScreen('auth');
+          return true;
+        }
         if (preAuthScreen === 'auth') {
           setPreAuthScreen('welcome');
           return true;
@@ -162,6 +174,14 @@ function AppShell() {
           return true;
         case 'groups':
           setScreen('friends');
+          return true;
+        case 'privacy':
+          // Reachable from both the profile and About, so go back to
+          // whichever opened it rather than always to one of them.
+          setScreen(privacyFrom);
+          return true;
+        case 'about':
+          setScreen('profile');
           return true;
         case 'categoryDetail':
         case 'quiz':
@@ -210,8 +230,22 @@ function AppShell() {
         {preAuthScreen === 'welcome' ? (
           <WelcomeScreen onStart={() => setPreAuthScreen('auth')} />
         ) : (
-          <AuthScreen onBack={() => setPreAuthScreen('welcome')} />
+          <AuthScreen
+            onBack={() => setPreAuthScreen('welcome')}
+            onOpenPrivacy={() => setPreAuthScreen('privacy')}
+          />
         )}
+
+        {/* Over the auth screen rather than instead of it: reading the policy
+            is something you do mid-signup, and unmounting the form would
+            throw away the name and password already typed into it. */}
+        <Modal
+          visible={preAuthScreen === 'privacy'}
+          animationType="slide"
+          onRequestClose={() => setPreAuthScreen('auth')}
+        >
+          <PrivacyScreen onBack={() => setPreAuthScreen('auth')} />
+        </Modal>
         <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
       </>
     );
@@ -319,6 +353,18 @@ function AppShell() {
             />
           )}
 
+          {screen === 'about' && (
+            <AboutScreen
+              onBack={() => setScreen('profile')}
+              onOpenPrivacy={() => {
+                setPrivacyFrom('about');
+                setScreen('privacy');
+              }}
+            />
+          )}
+
+          {screen === 'privacy' && <PrivacyScreen onBack={() => setScreen(privacyFrom)} />}
+
           {screen === 'groups' && (
             <GroupsScreen
               onBack={() => setScreen('friends')}
@@ -399,7 +445,15 @@ function AppShell() {
             />
           )}
           {screen === 'achievements' && <AchievementsScreen />}
-          {screen === 'profile' && <ProfileScreen />}
+          {screen === 'profile' && (
+            <ProfileScreen
+              onOpenAbout={() => setScreen('about')}
+              onOpenPrivacy={() => {
+                setPrivacyFrom('profile');
+                setScreen('privacy');
+              }}
+            />
+          )}
         </ScreenTransition>
       </View>
       {showTabBar && (

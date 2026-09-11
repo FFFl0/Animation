@@ -21,11 +21,12 @@ import { useT, translateAuthError } from '../i18n/strings';
 
 type Props = {
   onBack: () => void;
+  onOpenPrivacy: () => void;
 };
 
 type Mode = 'login' | 'register' | 'forgot';
 
-export default function AuthScreen({ onBack }: Props) {
+export default function AuthScreen({ onBack, onOpenPrivacy }: Props) {
   const { login, register, resetPassword, loginWithGoogle } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -186,6 +187,12 @@ export default function AuthScreen({ onBack }: Props) {
             </SoundTouchable>
           )}
 
+          {mode === 'register' && (
+            <SoundTouchable onPress={onOpenPrivacy} accessibilityRole="link">
+              <Text style={styles.policyLink}>{t('legal.agreeOnSignUp')}</Text>
+            </SoundTouchable>
+          )}
+
           <Text style={styles.footer}>
             {isSupabaseConfigured ? t('auth.footerCloud') : t('auth.footerLocal')}
           </Text>
@@ -216,6 +223,15 @@ function makeStyles(theme: Theme) {
     divider: { flexDirection: 'row', alignItems: 'center', width: '100%', marginVertical: 14, gap: 10 },
     dividerLine: { flex: 1, height: 1, backgroundColor: theme.border },
     dividerText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted },
+    policyLink: {
+      marginTop: 18,
+      fontSize: 12,
+      fontFamily: fontFamily('600'),
+      color: theme.primary,
+      textAlign: 'center',
+      lineHeight: 17,
+      textDecorationLine: 'underline',
+    },
     footer: { marginTop: 20, fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', lineHeight: 17 },
   });
 }

@@ -21,7 +21,12 @@ import { getReminderEnabled, setReminderEnabled } from '../notifications/streakR
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 
-export default function ProfileScreen() {
+type Props = {
+  onOpenAbout: () => void;
+  onOpenPrivacy: () => void;
+};
+
+export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
   const { profile, logout, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
@@ -257,6 +262,18 @@ export default function ProfileScreen() {
       </View>
       {reminderError && <Text style={styles.reminderError}>{reminderError}</Text>}
 
+      <Text style={styles.sectionTitle}>{t('profile.aboutTitle')}</Text>
+      <SoundTouchable style={styles.linkRow} onPress={onOpenAbout} accessibilityRole="button">
+        <Icon name="sparkles" size={16} color={theme.primary} />
+        <Text style={styles.linkText}>{t('about.title')}</Text>
+        <Icon name="chevronRight" size={15} color={theme.textMuted} />
+      </SoundTouchable>
+      <SoundTouchable style={styles.linkRow} onPress={onOpenPrivacy} accessibilityRole="button">
+        <Icon name="lock" size={16} color={theme.primary} />
+        <Text style={styles.linkText}>{t('legal.privacyTitle')}</Text>
+        <Icon name="chevronRight" size={15} color={theme.textMuted} />
+      </SoundTouchable>
+
       <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
         <Text style={styles.logoutText}>{t('profile.logout')}</Text>
       </SoundTouchable>
@@ -397,6 +414,19 @@ function makeStyles(theme: Theme) {
     themeTabActive: { backgroundColor: theme.primary },
     themeTabText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
     themeTabTextActive: { color: theme.onPrimary },
+    linkRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      marginBottom: 10,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.lg,
+      paddingHorizontal: 16,
+      paddingVertical: 14,
+    },
+    linkText: { flex: 1, fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     logout: {
       marginTop: 30,
       alignItems: 'center',
