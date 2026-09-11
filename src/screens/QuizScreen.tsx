@@ -16,6 +16,7 @@ import Icon from '../components/Icon';
 import FadeIn from '../components/FadeIn';
 import AnswerOption from '../quiz/AnswerOption';
 import VideoPrompt from '../quiz/VideoPrompt';
+import QuoteAudio from '../quiz/QuoteAudio';
 import QuizTimer from '../quiz/QuizTimer';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
@@ -179,6 +180,12 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
             )}
 
             <Text style={styles.hint}>{question.promptText}</Text>
+
+            {question.type === 'guessQuote' && question.character && (
+              // Keyed on the question so the next quote gets a fresh player
+              // instead of replaying through the previous one.
+              <QuoteAudio key={question.id} characterId={question.character.id} />
+            )}
           </Animated.View>
 
           <View style={styles.options}>

@@ -2,6 +2,7 @@ import { generateQuiz, seededRng, dateSeed } from '../generateQuiz';
 import { CHARACTERS } from '../../data/characters';
 import { ANIME_SERIES } from '../../data/animeSeries';
 import { OPENING_VIDEOS } from '../../data/openingVideos';
+import { QUOTE_AUDIO } from '../../data/quoteAudio';
 import { RoundConfig } from '../types';
 
 function baseConfig(overrides: Partial<RoundConfig> = {}): RoundConfig {
@@ -53,6 +54,22 @@ describe('generateQuiz', () => {
   it('ships a clip for every series', () => {
     for (const series of ANIME_SERIES) {
       expect(OPENING_VIDEOS[series.id]).toBeDefined();
+    }
+  });
+
+  it('ships a voice line for every character', () => {
+    for (const character of CHARACTERS) {
+      expect(QUOTE_AUDIO[character.id]).toBeDefined();
+    }
+  });
+
+  it('keeps the quote itself in the prompt text', () => {
+    const questions = generateQuiz(baseConfig({ categoryId: 'quotes', questionCount: 8, forceType: 'guessQuote' }));
+    for (const q of questions) {
+      expect(q.character).toBeDefined();
+      // The audio is an addition, not a replacement: the written line has to
+      // still be there for anyone playing with the sound off.
+      expect(q.promptText).toContain(q.character!.quote);
     }
   });
 

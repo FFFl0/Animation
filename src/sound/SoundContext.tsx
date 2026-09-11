@@ -18,6 +18,9 @@ type SoundContextValue = {
   toggleSfx: () => void;
   toggleHaptics: () => void;
   setMusicContext: (ctx: MusicContext) => void;
+  /** Holds the soundtrack while something else in the app is speaking — a
+   * voiced quote, say — without changing which track is "current". */
+  setMusicSuspended: (suspended: boolean) => void;
   // Sound and vibration are two ways of saying the same thing, so they are
   // triggered together from one call rather than by every screen remembering
   // to fire both.
@@ -36,6 +39,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
   const [hapticsEnabled, setHapticsEnabled] = useState(true);
   const [loaded, setLoaded] = useState(false);
   const musicContextRef = useRef<MusicContext>('menu');
+  const suspendedRef = useRef(false);
 
   const unlockedRef = useRef(Platform.OS !== 'web');
   const menuPlayerRef = useRef<AudioPlayer | null>(null);
@@ -93,7 +97,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     const quiz = quizPlayerRef.current;
     if (!menu || !quiz) return;
 
-    if (!musicEnabled || (Platform.OS === 'web' && !unlockedRef.current)) {
+    if (!musicEnabled || suspendedRef.current || (Platform.OS === 'web' && !unlockedRef.current)) {
       menu.pause();
       quiz.pause();
       return;
@@ -134,6 +138,11 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     syncMusic();
   };
 
+  const setMusicSuspended = (suspended: boolean) => {
+    suspendedRef.current = suspended;
+    syncMusic();
+  };
+
   function playSfx(player: AudioPlayer | null) {
     if (!sfxEnabled || !player) return;
     if (Platform.OS === 'web' && !unlockedRef.current) return;
@@ -167,6 +176,7 @@ export function SoundProvider({ children }: { children: ReactNode }) {
           return !v;
         }),
       setMusicContext,
+      setMusicSuspended,
       playClick: () => {
         playSfx(clickPlayerRef.current);
         buzz('tap');

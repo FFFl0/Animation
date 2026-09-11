@@ -45,7 +45,8 @@ export type IconName =
   | 'trash'
   | 'image'
   | 'chevronRight'
-  | 'play';
+  | 'play'
+  | 'pause';
 
 type Props = {
   name: IconName;
@@ -374,6 +375,13 @@ function renderIcon(name: IconName, common: any, color: string) {
       );
     case 'play':
       return <Path d="M8 5.5l10 6.5-10 6.5z" fill={color} stroke={color} strokeLinejoin="round" strokeWidth={2} />;
+    case 'pause':
+      return (
+        <>
+          <Rect x="7" y="5" width="3.5" height="14" rx="1.2" fill={color} stroke="none" />
+          <Rect x="13.5" y="5" width="3.5" height="14" rx="1.2" fill={color} stroke="none" />
+        </>
+      );
     case 'chevronRight':
       return <Path d="M9 5l7 7-7 7" {...common} />;
     case 'image':
