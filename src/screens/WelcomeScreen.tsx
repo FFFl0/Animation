@@ -20,18 +20,17 @@ export default function WelcomeScreen({ onStart }: Props) {
   return (
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
-        <View style={styles.hero}>
-          <ToriiHero size={180} />
-        </View>
-
         <Text style={styles.title}>
           Anime<Text style={{ color: theme.primary }}>Quiz</Text>
         </Text>
         <Text style={styles.jp}>アニメクイズ</Text>
 
-        <Text style={styles.tagline}>TEST YOUR KNOWLEDGE{'\n'}LIVE THE ANIME</Text>
+        {/* takes the space between the wordmark and the tagline, so the gate sits centred */}
+        <View style={styles.hero}>
+          <ToriiHero size={210} />
+        </View>
 
-        <View style={styles.spacer} />
+        <Text style={styles.tagline}>TEST YOUR KNOWLEDGE{'\n'}LIVE THE ANIME</Text>
 
         <PillButton title={t('welcome.start')} icon="→" variant="ink" onPress={onStart} />
       </View>
@@ -42,12 +41,12 @@ export default function WelcomeScreen({ onStart }: Props) {
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
-    container: { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 64, paddingBottom: 32 },
-    hero: { marginBottom: 12 },
+    container: { flex: 1, alignItems: 'center', paddingHorizontal: 32, paddingTop: 56, paddingBottom: 32 },
+    hero: { flex: 1, justifyContent: 'center' },
     title: { fontSize: 34, fontFamily: fontFamily('800'), color: theme.text },
     jp: { fontSize: 14, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2 },
     tagline: {
-      marginTop: 18,
+      marginBottom: 32,
       fontSize: 12,
       fontFamily: fontFamily('700'),
       color: theme.textMuted,
@@ -55,6 +54,5 @@ function makeStyles(theme: Theme) {
       letterSpacing: 2,
       lineHeight: 20,
     },
-    spacer: { flex: 1 },
   });
 }
