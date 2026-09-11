@@ -75,12 +75,54 @@ export default function ChatRoom<T extends BubbleMessage>({
   const [replyTo, setReplyTo] = useState<T | null>(null);
   const [menuFor, setMenuFor] = useState<T | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
+  const [searching, setSearching] = useState(false);
+  const [query, setQuery] = useState('');
+  const [matchIndex, setMatchIndex] = useState(0);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
+  const searchRef = useRef<TextInput>(null);
+  // Where each message sits in the scroll view, so a search hit can be
+  // scrolled to. Filled as rows lay out; a message that has never been on
+  // screen simply isn't in here yet, and the scroll is skipped.
+  const positionsRef = useRef(new Map<string, number>());
 
   useEffect(() => {
-    scrollRef.current?.scrollToEnd({ animated: true });
-  }, [messages.length]);
+    // Jumping to the bottom while reading a search hit would undo the jump
+    // that just put it on screen.
+    if (!searching) scrollRef.current?.scrollToEnd({ animated: true });
+  }, [messages.length, searching]);
+
+  const needle = query.trim().toLowerCase();
+  const matches = useMemo(
+    () => (needle ? messages.filter((m) => m.body.toLowerCase().includes(needle)).map((m) => m.id) : []),
+    [messages, needle]
+  );
+
+  // Newest first: a search in a chat is usually looking for something recent.
+  const orderedMatches = useMemo(() => [...matches].reverse(), [matches]);
+  const currentMatchId = orderedMatches[matchIndex] ?? null;
+
+  useEffect(() => {
+    setMatchIndex(0);
+  }, [needle]);
+
+  useEffect(() => {
+    if (!currentMatchId) return;
+    setHighlightedId(currentMatchId);
+    const y = positionsRef.current.get(currentMatchId);
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(y - 80, 0), animated: true });
+  }, [currentMatchId]);
+
+  const closeSearch = () => {
+    setSearching(false);
+    setQuery('');
+    setHighlightedId(null);
+  };
+
+  const stepMatch = (delta: number) => {
+    if (orderedMatches.length === 0) return;
+    setMatchIndex((i) => (i + delta + orderedMatches.length) % orderedMatches.length);
+  };
 
   const handleSend = () => {
     const text = draft.trim();
@@ -113,7 +155,53 @@ export default function ChatRoom<T extends BubbleMessage>({
           <SoundTouchable onPress={onBack} accessibilityRole="button" accessibilityLabel={t('chat.back')} style={styles.backButton}>
             <Text style={styles.backText}>{`‹ ${t('chat.back')}`}</Text>
           </SoundTouchable>
-          {header}
+          {searching ? (
+            <View style={styles.searchRow}>
+              <Icon name="search" size={15} color={theme.textMuted} />
+              <TextInput
+                ref={searchRef}
+                style={styles.searchInput}
+                placeholder={t('chat.searchPlaceholder')}
+                placeholderTextColor={theme.textMuted}
+                value={query}
+                onChangeText={setQuery}
+                autoFocus
+                autoCorrect={false}
+                returnKeyType="search"
+              />
+              {needle.length > 0 && (
+                <>
+                  <Text style={styles.searchCount}>
+                    {orderedMatches.length === 0
+                      ? t('chat.searchNoMatches')
+                      : t('chat.searchPosition', matchIndex + 1, orderedMatches.length)}
+                  </Text>
+                  <SoundTouchable
+                    onPress={() => stepMatch(1)}
+                    accessibilityRole="button"
+                    accessibilityLabel={t('chat.searchOlder')}
+                  >
+                    <Icon name="chevronRight" size={16} color={theme.textMuted} />
+                  </SoundTouchable>
+                </>
+              )}
+              <SoundTouchable onPress={closeSearch} accessibilityRole="button" accessibilityLabel={t('chat.searchClose')}>
+                <Icon name="close" size={16} color={theme.textMuted} />
+              </SoundTouchable>
+            </View>
+          ) : (
+            <View style={styles.headerRow}>
+              <View style={styles.headerContent}>{header}</View>
+              <SoundTouchable
+                onPress={() => setSearching(true)}
+                accessibilityRole="button"
+                accessibilityLabel={t('chat.searchLabel')}
+                style={styles.searchButton}
+              >
+                <Icon name="search" size={17} color={theme.textMuted} />
+              </SoundTouchable>
+            </View>
+          )}
         </View>
 
         <ScrollView ref={scrollRef} style={styles.flex} contentContainerStyle={styles.list}>
@@ -123,8 +211,8 @@ export default function ChatRoom<T extends BubbleMessage>({
             messages.map((m) => {
               const repliedTo = m.replyToId ? messages.find((x) => x.id === m.replyToId) ?? null : null;
               return (
+                <View key={m.id} onLayout={(e) => positionsRef.current.set(m.id, e.nativeEvent.layout.y)}>
                 <MessageBubble
-                  key={m.id}
                   message={m}
                   isMine={m.senderId === meId}
                   repliedTo={repliedTo}
@@ -138,6 +226,7 @@ export default function ChatRoom<T extends BubbleMessage>({
                   onLongPress={setMenuFor}
                   onJumpToReplied={jumpToMessage}
                 />
+                </View>
               );
             })
           )}
@@ -252,6 +341,22 @@ function makeStyles(theme: Theme) {
     flex: { flex: 1 },
     header: { paddingHorizontal: 20, paddingTop: 12, paddingBottom: 10, borderBottomWidth: 1, borderBottomColor: theme.border },
     backButton: { marginBottom: 10 },
+    headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
+    headerContent: { flex: 1 },
+    searchButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
+    searchRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
+    searchCount: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted },
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     list: { paddingHorizontal: 16, paddingVertical: 16, gap: 10, flexGrow: 1 },
     emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', marginTop: 40 },
