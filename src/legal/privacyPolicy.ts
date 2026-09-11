@@ -80,13 +80,13 @@ const RU: PolicySection[] = [
     body: [
       'Посмотреть и изменить свои данные — в профиле.',
       'Удалить аккаунт — в профиле, раздел «Удалить аккаунт». Это необратимо и подтверждается отдельно.',
-      'Если что-то непонятно или нужна копия данных — напишите нам (контакт на странице проекта в GitHub).',
+      'Если что-то непонятно или нужна копия данных — напишите на riz_zl@outlook.com.',
     ],
   },
   {
     title: 'Дети',
     body: [
-      'Приложение не рассчитано на детей младше 13 лет и не собирает данные о них осознанно. Если вы родитель и считаете, что ребёнок завёл аккаунт, напишите нам — мы его удалим.',
+      'Приложение не рассчитано на детей младше 13 лет и не собирает данные о них осознанно. Если вы родитель и считаете, что ребёнок завёл аккаунт, напишите на riz_zl@outlook.com — мы его удалим.',
     ],
   },
   {
@@ -165,13 +165,13 @@ const EN: PolicySection[] = [
     body: [
       'See and change your data — in the profile.',
       'Delete the account — in the profile, "Delete account". It cannot be undone and is confirmed separately.',
-      'If something is unclear or you want a copy of your data, write to us (contact details on the project page on GitHub).',
+      'If something is unclear or you want a copy of your data, write to riz_zl@outlook.com.',
     ],
   },
   {
     title: 'Children',
     body: [
-      'The app is not aimed at children under 13 and does not knowingly collect data about them. If you are a parent and believe your child made an account, write to us and we will remove it.',
+      'The app is not aimed at children under 13 and does not knowingly collect data about them. If you are a parent and believe your child made an account, write to riz_zl@outlook.com and we will remove it.',
     ],
   },
   {
