@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
+import { reportHandledError } from '../monitoring/sentry';
 
 export { isSupabaseConfigured };
 
@@ -100,6 +101,7 @@ export async function createGroup(name: string, ownerId: string, memberIds: stri
 
   if (memberError) {
     // A group nobody can see is worse than no group: undo it.
+    reportHandledError(memberError, { where: 'seed group roster', groupId: group.id });
     await supabase.from('chat_groups').delete().eq('id', group.id);
     return null;
   }

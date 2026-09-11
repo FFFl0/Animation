@@ -42,6 +42,7 @@ import GroupChatScreen from './src/screens/GroupChatScreen';
 import AboutScreen from './src/screens/AboutScreen';
 import PrivacyScreen from './src/screens/PrivacyScreen';
 import { Friendship, PlayerSummary } from './src/friends/friendsApi';
+import { identifyForCrashReports } from './src/monitoring/sentry';
 import { ChatGroup } from './src/chat/groupApi';
 import { CategoryId, getCategory, categoryTitle } from './src/data/categories';
 import { TierId, getTier, tierLabel } from './src/data/difficulty';
@@ -122,6 +123,12 @@ function AppShell() {
   useEffect(() => {
     setScreen('home');
     setPreAuthScreen('welcome');
+  }, [profile?.id]);
+
+  // Only the opaque account id, never the username — the policy says reports
+  // carry nothing personal, and this is where that has to hold.
+  useEffect(() => {
+    identifyForCrashReports(profile?.id ?? null);
   }, [profile?.id]);
 
   useEffect(() => {

@@ -2,6 +2,7 @@ import { RefObject } from 'react';
 import { View } from 'react-native';
 import { captureRef } from 'react-native-view-shot';
 import * as Sharing from 'expo-sharing';
+import { reportHandledError } from '../monitoring/sentry';
 
 export type ShareResult = 'ok' | 'unavailable' | 'failed';
 
@@ -30,7 +31,8 @@ export async function shareViewAsImage(ref: RefObject<View | null>, dialogTitle:
     const uri = await captureRef(ref, { format: 'png', quality: 1, result: 'tmpfile' });
     await Sharing.shareAsync(uri, { mimeType: 'image/png', dialogTitle, UTI: 'public.png' });
     return 'ok';
-  } catch {
+  } catch (error) {
+    reportHandledError(error, { where: 'share result image' });
     return 'failed';
   }
 }

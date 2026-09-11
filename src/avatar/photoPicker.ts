@@ -1,5 +1,6 @@
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
+import { reportHandledError } from '../monitoring/sentry';
 
 /**
  * Side of the square the picked photo is downscaled to. Profile pictures are
@@ -64,7 +65,8 @@ export async function pickProfilePhoto(): Promise<PickPhotoResult> {
     });
     if (!saved.base64) return { status: 'failed' };
     return { status: 'ok', base64: saved.base64, dataUri: `data:image/jpeg;base64,${saved.base64}` };
-  } catch {
+  } catch (error) {
+    reportHandledError(error, { where: 'crop and encode picked photo' });
     return { status: 'failed' };
   }
 }

@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { base64ToBytes } from './base64';
+import { reportHandledError } from '../monitoring/sentry';
 
 const BUCKET = 'avatars';
 
@@ -39,7 +40,12 @@ async function upload(userId: string, prefix: string, base64: string): Promise<s
   const { error } = await supabase.storage
     .from(BUCKET)
     .upload(path, base64ToBytes(base64), { contentType: 'image/jpeg', upsert: true });
-  if (error) return null;
+  if (error) {
+    // The caller falls back quietly, so without this the only trace of a
+    // broken bucket would be players saying their avatar "doesn't save".
+    reportHandledError(error, { where: 'avatar upload', prefix });
+    return null;
+  }
 
   if (stale.length > 0) await supabase.storage.from(BUCKET).remove(stale);
 
