@@ -1,29 +1,26 @@
-import Svg, { Circle, Path, Rect } from 'react-native-svg';
-import { View } from 'react-native';
+import Svg, { Path, Rect } from 'react-native-svg';
+import { Image, View } from 'react-native';
+import { useTheme } from '../theme/ThemeContext';
+
+// The hero gate is artwork (sun + petals baked in), with a light-ink variant
+// so the silhouette still reads on the dark background.
+const TORII_LIGHT = require('../../assets/brand/torii-hero.png');
+const TORII_DARK = require('../../assets/brand/torii-hero-dark.png');
 
 type HeroProps = {
   size?: number;
-  accent: string;
-  ink: string;
 };
 
-/** Torii gate silhouette in front of a soft sun circle, with a few petals. */
-export function ToriiHero({ size = 220, accent, ink }: HeroProps) {
+/** Torii gate in front of a sun circle, with sakura petals drifting around it. */
+export function ToriiHero({ size = 220 }: HeroProps) {
+  const { resolvedScheme } = useTheme();
   return (
     <View style={{ width: size, height: size }}>
-      <Svg width={size} height={size} viewBox="0 0 220 220">
-        <Circle cx="110" cy="120" r="78" fill={accent} opacity={0.55} />
-        <Petal x={40} y={40} rotate={-20} scale={1} color={accent} />
-        <Petal x={175} y={55} rotate={35} scale={0.8} color={accent} />
-        <Petal x={30} y={150} rotate={70} scale={0.7} color={accent} />
-        <Petal x={185} y={165} rotate={-45} scale={0.9} color={accent} />
-        {/* Torii gate: upswept kasagi over a thinner shimagi, tapered pillars, one nuki. */}
-        <Path d="M8 54 Q110 66 212 54 L212 68 Q110 74 8 68 Z" fill={ink} />
-        <Path d="M20 72 Q110 80 200 72 L200 79 Q110 87 20 79 Z" fill={ink} />
-        <Path d="M36 80 L54 80 L56 198 L32 198 Z" fill={ink} />
-        <Path d="M184 80 L166 80 L164 198 L188 198 Z" fill={ink} />
-        <Rect x="30" y="110" width="160" height="16" rx="2" fill={ink} />
-      </Svg>
+      <Image
+        source={resolvedScheme === 'dark' ? TORII_DARK : TORII_LIGHT}
+        style={{ width: size, height: size }}
+        resizeMode="contain"
+      />
     </View>
   );
 }
@@ -67,15 +64,19 @@ export function PetalScatter({ size = 200, color, count = 6 }: PetalsProps) {
   );
 }
 
-/** A small torii glyph used as a header/section icon. */
+/** A small torii glyph used as a header/section icon — the hero gate, simplified. */
 export function ToriiIcon({ size = 28, color }: { size?: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Path d="M1 10 Q24 13 47 10 L47 16 Q24 20 1 16 Z" fill={color} />
-      <Path d="M5 18.5 Q24 22 43 18.5 L43 22.5 Q24 26 5 22.5 Z" fill={color} />
-      <Path d="M9 23 L16 23 L17.5 45 L7 45 Z" fill={color} />
-      <Path d="M39 23 L32 23 L30.5 45 L41 45 Z" fill={color} />
-      <Rect x="6" y="30" width="36" height="5" rx="1" fill={color} />
+      {/* kasagi: sharply upswept, tapering to points at the tips */}
+      <Path d="M1 8.5 Q24 15 47 8.5 L47 12.5 Q24 23 1 12.5 Z" fill={color} />
+      {/* shimagi */}
+      <Path d="M4.5 16.5 Q24 21.5 43.5 16.5 L43.5 20.5 Q24 25.5 4.5 20.5 Z" fill={color} />
+      {/* pillars, splaying outwards towards the base */}
+      <Path d="M11 22.5 L17 22.5 L14 45 L7 45 Z" fill={color} />
+      <Path d="M37 22.5 L31 22.5 L34 45 L41 45 Z" fill={color} />
+      {/* nuki */}
+      <Rect x="6.5" y="28.5" width="35" height="5" rx="1" fill={color} />
     </Svg>
   );
 }

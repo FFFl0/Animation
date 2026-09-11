@@ -21,7 +21,7 @@ export default function WelcomeScreen({ onStart }: Props) {
     <SafeAreaView style={styles.safe}>
       <View style={styles.container}>
         <View style={styles.hero}>
-          <ToriiHero size={180} accent={theme.primaryLight} ink={theme.ink} />
+          <ToriiHero size={180} />
         </View>
 
         <Text style={styles.title}>

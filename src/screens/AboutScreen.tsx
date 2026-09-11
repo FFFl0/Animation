@@ -49,7 +49,7 @@ export default function AboutScreen({ onBack, onOpenPrivacy }: Props) {
         </SoundTouchable>
 
         <View style={styles.hero}>
-          <ToriiHero size={150} accent={theme.primaryLight} ink={theme.text} />
+          <ToriiHero size={150} />
           <Text style={styles.name}>AnimeQuiz</Text>
           <Text style={styles.tagline}>{t('about.tagline')}</Text>
         </View>
