@@ -13,6 +13,7 @@ import {
   subscribeIncomingFriendRequests,
 } from './notificationsApi';
 import { presentLocalNotification } from './localNotify';
+import { registerPushToken } from './pushTokens';
 
 type NotificationsContextValue = {
   incomingRequests: Friendship[];
@@ -44,6 +45,10 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     getIncomingFriendRequests(meId).then(setIncomingRequests);
     getPendingBattleInvites(meId).then(setBattleInvites);
+    // Re-registered on every sign-in and language change: the token can be
+    // reissued by the OS, and the server needs to know which language to
+    // write the notification in.
+    registerPushToken(meId, language);
 
     const t = getT(language);
     const unsubFriend = subscribeIncomingFriendRequests(meId, () => {

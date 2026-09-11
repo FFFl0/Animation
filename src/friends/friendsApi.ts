@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { Avatar } from '../data/avatar';
 import { ModeStat } from '../auth/types';
+import { sendPush } from '../notifications/pushTokens';
 
 export { isSupabaseConfigured };
 
@@ -137,7 +138,13 @@ export async function sendFriendRequest(meId: string, targetId: string): Promise
     return;
   }
 
-  await supabase.from('friendships').insert({ requester_id: meId, addressee_id: targetId, status: 'pending' });
+  const { error } = await supabase
+    .from('friendships')
+    .insert({ requester_id: meId, addressee_id: targetId, status: 'pending' });
+
+  // Only once the row exists — the server refuses to notify about an
+  // invitation it cannot find.
+  if (!error) await sendPush('friendRequest', targetId);
 }
 
 export async function respondToRequest(friendshipId: string, accept: boolean): Promise<void> {

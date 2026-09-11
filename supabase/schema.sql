@@ -580,3 +580,46 @@ do $$ begin
   alter publication supabase_realtime add table public.chat_group_members;
 exception when duplicate_object then null;
 end $$;
+
+-- ---------------------------------------------------------------------------
+-- Push notifications. A row per device rather than a column on `profiles`:
+-- one account can be signed in on a phone and a tablet, and both should be
+-- reachable. The device's language rides along because the server composes
+-- the notification text and has no other way to know it.
+-- ---------------------------------------------------------------------------
+
+create table if not exists public.push_tokens (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  token text not null,
+  platform text not null check (platform in ('ios', 'android')),
+  language text not null default 'ru' check (language in ('ru', 'en')),
+  updated_at timestamptz not null default now(),
+  primary key (user_id, token)
+);
+
+alter table public.push_tokens enable row level security;
+
+-- Only ever your own: nobody needs to read where somebody else is signed in,
+-- and the function that actually sends uses the service role.
+drop policy if exists "See your own push tokens" on public.push_tokens;
+create policy "See your own push tokens"
+  on public.push_tokens for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Register your own push token" on public.push_tokens;
+create policy "Register your own push token"
+  on public.push_tokens for insert
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Refresh your own push token" on public.push_tokens;
+create policy "Refresh your own push token"
+  on public.push_tokens for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+drop policy if exists "Drop your own push token" on public.push_tokens;
+create policy "Drop your own push token"
+  on public.push_tokens for delete
+  using (auth.uid() = user_id);
+
+create index if not exists push_tokens_user_idx on public.push_tokens (user_id);

@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
+import { sendPush } from './pushTokens';
 import { Friendship, PlayerSummary, fetchPlayers } from '../friends/friendsApi';
 
 export { isSupabaseConfigured };
@@ -76,7 +77,13 @@ export async function getPendingBattleInvites(meId: string): Promise<BattleInvit
 
 export async function sendBattleInvite(fromUserId: string, toUserId: string, roomCode: string): Promise<void> {
   if (!supabase) return;
-  await supabase.from('battle_invites').insert({ from_user_id: fromUserId, to_user_id: toUserId, room_code: roomCode });
+  const { error } = await supabase
+    .from('battle_invites')
+    .insert({ from_user_id: fromUserId, to_user_id: toUserId, room_code: roomCode });
+
+  // Only once the row exists — the server refuses to notify about an
+  // invitation it cannot find.
+  if (!error) await sendPush('battleInvite', toUserId);
 }
 
 export async function respondToBattleInvite(inviteId: string, accept: boolean): Promise<void> {

@@ -2,6 +2,7 @@ import { createContext, useContext, useEffect, useMemo, useState, ReactNode } fr
 import * as Storage from './backend';
 import { Profile } from './types';
 import { Avatar } from '../data/avatar';
+import { unregisterPushToken } from '../notifications/pushTokens';
 import { RoundConfig } from '../quiz/types';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
@@ -85,6 +86,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   };
 
   const logout = async () => {
+    // Before the session goes, while the row is still ours to delete: the
+    // next person on this device should not get the previous one's pushes.
+    if (profile) await unregisterPushToken(profile.id);
     await Storage.logout();
     setProfile(null);
   };
