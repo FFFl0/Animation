@@ -1,5 +1,6 @@
 export type AuthErrorCode =
   | 'usernameTooShort'
+  | 'usernameTooLong'
   | 'passwordTooShort'
   | 'usernameTaken'
   | 'invalidCredentials'
@@ -15,7 +16,8 @@ export type AuthErrorCode =
   | 'googleCancelled'
   | 'googleCompleteFailed'
   | 'googleUserFetchFailed'
-  | 'deleteAccountFailed';
+  | 'deleteAccountFailed'
+  | 'renameFailed';
 
 export class AuthError extends Error {
   code?: AuthErrorCode;

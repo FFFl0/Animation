@@ -5,7 +5,7 @@ import * as WebBrowser from 'expo-web-browser';
 import { SupabaseClient } from '@supabase/supabase-js';
 import { supabase } from './supabaseClient';
 import { AuthError } from './authError';
-import { validateCredentials, usernameToEmail } from './validation';
+import { validateCredentials, validateUsername, usernameToEmail } from './validation';
 import { parseAuthTokensFromUrl } from './parseRecoveryUrl';
 import { Profile } from './types';
 import { makeAvatar } from '../data/avatar';
@@ -235,6 +235,38 @@ export async function updateAccount(id: string, patch: Partial<Profile>): Promis
     });
 
   return optimistic;
+}
+
+/**
+ * Renames the account. Unlike the other profile writes this one is awaited
+ * and not optimistic: the name has to be unique, so the server has the last
+ * word. Sign-in keeps working afterwards — `auth-helper` resolves a login
+ * through the profiles table, never through the account's email address.
+ */
+export async function renameAccount(id: string, username: string): Promise<Profile> {
+  const trimmed = validateUsername(username);
+  const cached = await readCachedProfile();
+  const client = supabase!;
+
+  // Skip the pre-check when only the casing of the player's own name
+  // changes, since the RPC would report their current name as taken.
+  if (cached?.username.toLowerCase() !== trimmed.toLowerCase()) {
+    const { data: taken, error: rpcError } = await client.rpc('is_username_taken', { check_username: trimmed });
+    if (rpcError) throw new AuthError('Не удалось связаться с сервером, попробуйте ещё раз', 'serverUnreachable');
+    if (taken) throw new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
+  }
+
+  const { data, error } = await client.from('profiles').update({ username: trimmed }).eq('id', id).select().single();
+  if (error) {
+    // 23505 is the unique-violation on profiles.username: someone claimed
+    // the name between the check above and this write.
+    if (error.code === '23505') throw new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
+    throw new AuthError('Не удалось изменить имя, попробуйте ещё раз', 'renameFailed');
+  }
+
+  const profile = rowToProfile(data as ProfileRow);
+  await cacheProfile(profile);
+  return profile;
 }
 
 /**

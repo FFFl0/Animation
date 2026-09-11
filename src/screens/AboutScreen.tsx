@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { Linking, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
@@ -12,8 +12,6 @@ import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { isSupabaseConfigured } from '../auth/supabaseClient';
 import { useT } from '../i18n/strings';
-
-const REPO_URL = 'https://github.com/FFFl0/Animation';
 
 type Props = {
   onBack: () => void;
@@ -66,12 +64,6 @@ export default function AboutScreen({ onBack, onOpenPrivacy }: Props) {
         <SoundTouchable style={styles.link} onPress={onOpenPrivacy} accessibilityRole="button">
           <Icon name="lock" size={16} color={theme.primary} />
           <Text style={styles.linkText}>{t('legal.privacyTitle')}</Text>
-          <Icon name="chevronRight" size={15} color={theme.textMuted} />
-        </SoundTouchable>
-
-        <SoundTouchable style={styles.link} onPress={() => Linking.openURL(REPO_URL)} accessibilityRole="link">
-          <Icon name="globe" size={16} color={theme.primary} />
-          <Text style={styles.linkText}>{t('about.sourceCode')}</Text>
           <Icon name="chevronRight" size={15} color={theme.textMuted} />
         </SoundTouchable>
 

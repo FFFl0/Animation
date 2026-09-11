@@ -12,6 +12,7 @@ const ru: StringDict = {
   },
   authErrors: {
     usernameTooShort: 'Имя пользователя должно быть не короче 3 символов',
+    usernameTooLong: 'Имя пользователя не длиннее 20 символов',
     passwordTooShort: 'Пароль должен быть не короче 4 символов',
     usernameTaken: 'Такое имя пользователя уже занято',
     invalidCredentials: 'Неверное имя пользователя или пароль',
@@ -28,6 +29,7 @@ const ru: StringDict = {
     googleCancelled: 'Вход через Google отменён',
     googleCompleteFailed: 'Не удалось завершить вход через Google',
     googleUserFetchFailed: 'Не удалось получить данные пользователя',
+    renameFailed: 'Не удалось изменить имя, попробуйте ещё раз',
   },
   auth: {
     back: '‹ Назад',
@@ -142,6 +144,11 @@ const ru: StringDict = {
     changePhoto: 'Сменить фото',
     removePhoto: 'Убрать фото',
     photoHint: 'Аватар — это ваша картинка из галереи телефона.',
+    renameAction: 'Изменить имя',
+    renamePlaceholder: 'Новое имя пользователя',
+    renameSave: 'Сохранить',
+    renameCancel: 'Отмена',
+    renameHint: 'Имя видят другие игроки в чатах и таблице лидеров. Входить вы будете уже под новым именем.',
     presetsTitle: 'Готовые аватарки',
     presetNames: { manga: 'Манга', ramen: 'Рамен', pixel: 'Пиксели' },
     photoPermissionDenied: 'Нет доступа к галерее — разрешите его в настройках телефона.',
@@ -335,7 +342,6 @@ const ru: StringDict = {
     sync: 'Синхронизация',
     syncOn: 'включена',
     syncOff: 'только на устройстве',
-    sourceCode: 'Исходный код',
     credits: 'Сделано с любовью к аниме.\nШрифт Manrope, звуки и иллюстрации — собственные.',
   },
   legal: {
@@ -399,6 +405,7 @@ const en: StringDict = {
   },
   authErrors: {
     usernameTooShort: 'Username must be at least 3 characters',
+    usernameTooLong: 'Username must be at most 20 characters',
     passwordTooShort: 'Password must be at least 4 characters',
     usernameTaken: 'That username is already taken',
     invalidCredentials: 'Invalid username or password',
@@ -415,6 +422,7 @@ const en: StringDict = {
     googleCancelled: 'Google sign-in was cancelled',
     googleCompleteFailed: 'Could not complete Google sign-in',
     googleUserFetchFailed: 'Could not fetch user data',
+    renameFailed: 'Could not change the name, please try again',
   },
   auth: {
     back: '‹ Back',
@@ -529,6 +537,11 @@ const en: StringDict = {
     changePhoto: 'Change photo',
     removePhoto: 'Remove photo',
     photoHint: 'Your avatar is a picture you pick from your phone gallery.',
+    renameAction: 'Change name',
+    renamePlaceholder: 'New username',
+    renameSave: 'Save',
+    renameCancel: 'Cancel',
+    renameHint: 'Other players see this name in chats and on the leaderboard. You will sign in with the new name from now on.',
     presetsTitle: 'Ready-made avatars',
     presetNames: { manga: 'Manga', ramen: 'Ramen', pixel: 'Pixels' },
     photoPermissionDenied: 'No access to the gallery — allow it in your phone settings.',
@@ -722,7 +735,6 @@ const en: StringDict = {
     sync: 'Sync',
     syncOn: 'on',
     syncOff: 'this device only',
-    sourceCode: 'Source code',
     credits: 'Made with love for anime.\nManrope typeface; sounds and artwork are our own.',
   },
   legal: {

@@ -6,7 +6,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme, ThemeMode } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
-import { useAuth } from '../auth/AuthContext';
+import { useAuth, AuthError } from '../auth/AuthContext';
 import { CHARACTERS, characterName } from '../data/characters';
 import { seriesTitleById } from '../data/animeSeries';
 import { FrameId, FRAMES } from '../data/cosmetics';
@@ -18,8 +18,9 @@ import { levelFromStats } from '../data/level';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
+import { USERNAME_MAX } from '../auth/validation';
 import { Language, useLanguage } from '../i18n/LanguageContext';
-import { useT } from '../i18n/strings';
+import { useT, translateAuthError } from '../i18n/strings';
 
 type Props = {
   onOpenAbout: () => void;
@@ -27,7 +28,7 @@ type Props = {
 };
 
 export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
-  const { profile, logout, deleteAccount, updateAvatar } = useAuth();
+  const { profile, logout, deleteAccount, updateAvatar, rename } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
   const { language, setLanguage } = useLanguage();
@@ -39,6 +40,10 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [deleting, setDeleting] = useState(false);
   const [deleteError, setDeleteError] = useState<string | null>(null);
+  const [renaming, setRenaming] = useState(false);
+  const [draftName, setDraftName] = useState('');
+  const [renameBusy, setRenameBusy] = useState(false);
+  const [renameError, setRenameError] = useState<string | null>(null);
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -111,6 +116,30 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
     }
   };
 
+  const startRename = () => {
+    if (!profile) return;
+    setRenameError(null);
+    setDraftName(profile.username);
+    setRenaming(true);
+  };
+
+  const handleRename = async () => {
+    if (renameBusy || !profile) return;
+    if (draftName.trim() === profile.username) {
+      setRenaming(false);
+      return;
+    }
+    setRenameBusy(true);
+    setRenameError(null);
+    try {
+      await rename(draftName);
+      setRenaming(false);
+    } catch (e) {
+      setRenameError(e instanceof AuthError ? translateAuthError(e, t) : t('authErrors.renameFailed'));
+    }
+    setRenameBusy(false);
+  };
+
   const handleRemovePhoto = async () => {
     if (!profile) return;
     setPhotoError(null);
@@ -148,7 +177,43 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
 
       <View style={styles.avatarSection}>
         <AnimeAvatar avatar={avatar} size={120} name={profile.username} />
-        <Text style={styles.username}>{profile.username}</Text>
+        {renaming ? (
+          <View style={styles.renameBlock}>
+            <TextInput
+              style={styles.renameInput}
+              value={draftName}
+              onChangeText={setDraftName}
+              placeholder={t('profile.renamePlaceholder')}
+              placeholderTextColor={theme.textMuted}
+              maxLength={USERNAME_MAX}
+              autoCapitalize="none"
+              autoCorrect={false}
+              autoFocus
+              editable={!renameBusy}
+              onSubmitEditing={handleRename}
+              returnKeyType="done"
+            />
+            <View style={styles.renameActions}>
+              <SoundTouchable style={styles.renameCancel} onPress={() => setRenaming(false)} disabled={renameBusy}>
+                <Text style={styles.renameCancelText}>{t('profile.renameCancel')}</Text>
+              </SoundTouchable>
+              <SoundTouchable style={styles.renameSave} onPress={handleRename} disabled={renameBusy}>
+                {renameBusy ? (
+                  <ActivityIndicator color={theme.onInk} />
+                ) : (
+                  <Text style={styles.renameSaveText}>{t('profile.renameSave')}</Text>
+                )}
+              </SoundTouchable>
+            </View>
+            {renameError && <Text style={styles.photoError}>{renameError}</Text>}
+            <Text style={styles.photoHint}>{t('profile.renameHint')}</Text>
+          </View>
+        ) : (
+          <SoundTouchable style={styles.usernameRow} onPress={startRename} accessibilityRole="button">
+            <Text style={styles.username}>{profile.username}</Text>
+            <Icon name="edit" size={16} color={theme.primary} />
+          </SoundTouchable>
+        )}
         <Text style={styles.joined}>
           {t('profile.since', new Date(profile.createdAt).toLocaleDateString(language === 'en' ? 'en-US' : 'ru-RU'))}
         </Text>
@@ -391,7 +456,39 @@ function makeStyles(theme: Theme) {
     container: { paddingHorizontal: 24, paddingTop: 20, paddingBottom: 40 },
     pageTitle: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 16 },
     avatarSection: { alignItems: 'center', marginBottom: 12 },
-    username: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
+    usernameRow: { flexDirection: 'row', alignItems: 'center', gap: 8, marginTop: 12 },
+    username: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text },
+    renameBlock: { alignSelf: 'stretch', marginTop: 14 },
+    renameInput: {
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 10,
+      fontSize: 15,
+      fontFamily: fontFamily('700'),
+      color: theme.text,
+      textAlign: 'center',
+    },
+    renameActions: { flexDirection: 'row', gap: 8, marginTop: 10 },
+    renameCancel: {
+      flex: 1,
+      alignItems: 'center',
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingVertical: 10,
+    },
+    renameCancelText: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    renameSave: {
+      flex: 1,
+      alignItems: 'center',
+      backgroundColor: theme.ink,
+      borderRadius: radius.pill,
+      paddingVertical: 10,
+    },
+    renameSaveText: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.onInk },
     joined: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2 },
     photoButtons: { flexDirection: 'row', flexWrap: 'wrap', justifyContent: 'center', gap: 8, marginTop: 14 },
     photoButton: {

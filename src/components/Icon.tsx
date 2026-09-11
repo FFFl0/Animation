@@ -44,6 +44,7 @@ export type IconName =
   | 'reply'
   | 'trash'
   | 'image'
+  | 'edit'
   | 'chevronRight'
   | 'play'
   | 'pause';
@@ -361,6 +362,13 @@ function renderIcon(name: IconName, common: any, color: string) {
         <>
           <Path d="M9 7 4 12l5 5" {...common} />
           <Path d="M4 12h9a6 6 0 0 1 6 6v1" {...common} />
+        </>
+      );
+    case 'edit':
+      return (
+        <>
+          <Path d="M4 20h4l10-10a2.5 2.5 0 0 0-3.5-3.5L4.5 16.5 4 20z" {...common} />
+          <Line x1="13.5" y1="7.5" x2="17" y2="11" {...common} />
         </>
       );
     case 'trash':

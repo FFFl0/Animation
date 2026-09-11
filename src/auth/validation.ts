@@ -1,8 +1,18 @@
 import { AuthError } from './authError';
 
-export function validateCredentials(username: string, password: string): string {
+export const USERNAME_MAX = 20;
+
+export function validateUsername(username: string): string {
   const trimmed = username.trim();
   if (trimmed.length < 3) throw new AuthError('Имя пользователя должно быть не короче 3 символов', 'usernameTooShort');
+  if (trimmed.length > USERNAME_MAX) {
+    throw new AuthError(`Имя пользователя не длиннее ${USERNAME_MAX} символов`, 'usernameTooLong');
+  }
+  return trimmed;
+}
+
+export function validateCredentials(username: string, password: string): string {
+  const trimmed = validateUsername(username);
   if (password.length < 4) throw new AuthError('Пароль должен быть не короче 4 символов', 'passwordTooShort');
   return trimmed;
 }

@@ -19,6 +19,7 @@ type AuthContextValue = {
   logout: () => Promise<void>;
   deleteAccount: () => Promise<void>;
   updateAvatar: (patch: { avatar?: Avatar; favoriteCharacterId?: string | null }) => Promise<void>;
+  rename: (username: string) => Promise<void>;
   recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
   completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
@@ -99,6 +100,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p);
   };
 
+  const rename = async (username: string) => {
+    if (!profile) return;
+    const p = await Storage.renameAccount(profile.id, username);
+    setProfile(p);
+  };
+
   const recordRoundResult = async (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => {
     if (!profile) return [];
     const keys = [categoryStatsKey(config.categoryId, config.tier)];
@@ -135,6 +142,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       logout,
       deleteAccount,
       updateAvatar,
+      rename,
       recordRoundResult,
       resetPassword,
       completePasswordReset,

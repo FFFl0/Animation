@@ -3,7 +3,7 @@ import * as Crypto from 'expo-crypto';
 import { Account, ModeStat, Profile, Streak } from './types';
 import { makeAvatar } from '../data/avatar';
 import { AuthError } from './authError';
-import { validateCredentials } from './validation';
+import { validateCredentials, validateUsername } from './validation';
 import { todayDateStr } from '../quiz/today';
 
 export { AuthError };
@@ -114,6 +114,24 @@ export async function updateAccount(id: string, patch: Partial<Profile>): Promis
   const index = accounts.findIndex((a) => a.id === id);
   if (index === -1) throw new AuthError('Профиль не найден', 'profileNotFound');
   const updated: Account = { ...accounts[index], ...patch };
+  accounts[index] = updated;
+  await writeAccounts(accounts);
+  return toProfile(updated);
+}
+
+/** Renames the account, keeping the name unique on this device the same
+ * way register() does. Nothing else identifies the account — the session
+ * key holds the id — so the new name takes effect immediately. */
+export async function renameAccount(id: string, username: string): Promise<Profile> {
+  const trimmed = validateUsername(username);
+  const accounts = await readAccounts();
+  const index = accounts.findIndex((a) => a.id === id);
+  if (index === -1) throw new AuthError('Профиль не найден', 'profileNotFound');
+  if (accounts.some((a) => a.id !== id && a.username.toLowerCase() === trimmed.toLowerCase())) {
+    throw new AuthError('Такое имя пользователя уже занято', 'usernameTaken');
+  }
+
+  const updated: Account = { ...accounts[index], username: trimmed };
   accounts[index] = updated;
   await writeAccounts(accounts);
   return toProfile(updated);
