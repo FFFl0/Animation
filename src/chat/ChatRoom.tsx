@@ -1,5 +1,6 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  Keyboard,
   KeyboardAvoidingView,
   Modal,
   Platform,
@@ -19,12 +20,7 @@ import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useT } from '../i18n/strings';
 import MessageBubble, { BubbleMessage, ReactionGroup } from './MessageBubble';
-
-const EMOJI = [
-  '😀', '😂', '😍', '😎', '🤔', '😭', '😡', '😱',
-  '🥳', '😴', '👀', '🙌', '👍', '👎', '🙏', '👋',
-  '❤️', '🔥', '✨', '🎉', '💯', '⚡', '🌸', '😊',
-];
+import EmojiPicker from './EmojiPicker';
 
 /** Offered in the long-press menu and by double-tap (the first one). */
 const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
@@ -160,20 +156,15 @@ export default function ChatRoom<T extends BubbleMessage>({
           </View>
         )}
 
-        {showEmoji && (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.emojiRow}>
-            {EMOJI.map((emoji) => (
-              <SoundTouchable key={emoji} onPress={() => setDraft((prev) => prev + emoji)} style={styles.emojiButton}>
-                <Text style={styles.emojiText}>{emoji}</Text>
-              </SoundTouchable>
-            ))}
-          </ScrollView>
-        )}
-
         <View style={styles.inputRow}>
           <SoundTouchable
             style={styles.emojiToggle}
-            onPress={() => setShowEmoji((v) => !v)}
+            onPress={() =>
+              setShowEmoji((v) => {
+                if (!v) Keyboard.dismiss();
+                return !v;
+              })
+            }
             accessibilityRole="button"
             accessibilityLabel={t('chat.emojiLabel')}
           >
@@ -194,6 +185,8 @@ export default function ChatRoom<T extends BubbleMessage>({
             <Icon name="send" size={17} color={theme.onPrimary} />
           </SoundTouchable>
         </View>
+
+        {showEmoji && <EmojiPicker onPick={(emoji) => setDraft((prev) => prev + emoji)} />}
       </KeyboardAvoidingView>
 
       <Modal visible={!!menuFor} transparent animationType="fade" onRequestClose={() => setMenuFor(null)}>
@@ -276,16 +269,6 @@ function makeStyles(theme: Theme) {
     replyBarText: { flex: 1 },
     replyBarTitle: { fontSize: 11, fontFamily: fontFamily('800'), color: theme.primary },
     replyBarBody: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted },
-    emojiRow: { gap: 6, paddingHorizontal: 16, paddingVertical: 10 },
-    emojiButton: {
-      width: 40,
-      height: 40,
-      borderRadius: radius.md,
-      backgroundColor: theme.card,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    emojiText: { fontSize: 20 },
     inputRow: {
       flexDirection: 'row',
       alignItems: 'flex-end',
