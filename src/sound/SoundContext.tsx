@@ -8,7 +8,7 @@ const MUSIC_KEY = 'animequiz.musicEnabled';
 const SFX_KEY = 'animequiz.sfxEnabled';
 const HAPTICS_KEY = 'animequiz.hapticsEnabled';
 
-export type MusicContext = 'menu' | 'quiz';
+export type MusicContext = 'menu' | 'quiz' | 'silent';
 
 type SoundContextValue = {
   musicEnabled: boolean;
@@ -94,6 +94,12 @@ export function SoundProvider({ children }: { children: ReactNode }) {
     if (!menu || !quiz) return;
 
     if (!musicEnabled || (Platform.OS === 'web' && !unlockedRef.current)) {
+      menu.pause();
+      quiz.pause();
+      return;
+    }
+
+    if (musicContextRef.current === 'silent') {
       menu.pause();
       quiz.pause();
       return;

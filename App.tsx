@@ -117,8 +117,14 @@ function AppShell() {
   }, [profile?.id]);
 
   useEffect(() => {
-    setMusicContext(screen === 'quiz' ? 'quiz' : 'menu');
-  }, [screen, setMusicContext]);
+    if (screen !== 'quiz') {
+      setMusicContext('menu');
+      return;
+    }
+    // Theme clips carry their own soundtrack — two at once is just noise.
+    const playsVideo = roundConfig?.categoryId === 'openings' || roundConfig?.forceType === 'guessSeriesByVideo';
+    setMusicContext(playsVideo ? 'silent' : 'quiz');
+  }, [screen, roundConfig, setMusicContext]);
 
   // Android hardware/gesture back button: without this, RN's default
   // behavior is to close the whole app from any screen. Route it through

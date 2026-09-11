@@ -1,5 +1,7 @@
 import { generateQuiz, seededRng, dateSeed } from '../generateQuiz';
 import { CHARACTERS } from '../../data/characters';
+import { ANIME_SERIES } from '../../data/animeSeries';
+import { OPENING_VIDEOS } from '../../data/openingVideos';
 import { RoundConfig } from '../types';
 
 function baseConfig(overrides: Partial<RoundConfig> = {}): RoundConfig {
@@ -19,6 +21,38 @@ describe('generateQuiz', () => {
       expect(new Set(q.options).size).toBe(4);
       expect(q.correctIndex).toBeGreaterThanOrEqual(0);
       expect(q.correctIndex).toBeLessThan(4);
+    }
+  });
+
+  describe('theme-clip questions', () => {
+    const videoConfig = (count: number) => baseConfig({ categoryId: 'openings', questionCount: count });
+
+    it('asks about a series and names a clip to play', () => {
+      const questions = generateQuiz(videoConfig(10));
+      for (const q of questions) {
+        expect(q.type).toBe('guessSeriesByVideo');
+        expect(q.promptKind).toBe('video');
+        expect(q.seriesId).toBeTruthy();
+        expect(OPENING_VIDEOS[q.seriesId!]).toBeDefined();
+      }
+    });
+
+    it('never repeats a series while unused ones remain', () => {
+      const questions = generateQuiz(videoConfig(ANIME_SERIES.length));
+      expect(new Set(questions.map((q) => q.seriesId)).size).toBe(ANIME_SERIES.length);
+    });
+
+    it('ignores the difficulty tier, which only describes characters', () => {
+      const seen = new Set(
+        generateQuiz(baseConfig({ categoryId: 'openings', questionCount: 20, tier: 'novice' })).map((q) => q.seriesId)
+      );
+      expect(seen.size).toBe(ANIME_SERIES.length);
+    });
+  });
+
+  it('ships a clip for every series', () => {
+    for (const series of ANIME_SERIES) {
+      expect(OPENING_VIDEOS[series.id]).toBeDefined();
     }
   });
 

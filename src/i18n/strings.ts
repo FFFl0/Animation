@@ -94,6 +94,8 @@ const ru: StringDict = {
     promptGuessQuote: (quote: string) => `«${quote}»\n\nКто это сказал?`,
     promptGuessAbility: (ability: string) => `Способность: «${ability}»\n\nКому она принадлежит?`,
     promptGuessFaction: 'К какой фракции принадлежит этот персонаж?',
+    promptGuessSeriesByVideo: 'Из какого аниме эта заставка?',
+    videoMissing: 'Ролик для этого аниме ещё не добавлен',
     promptOpeningTrivia: (series: string) => `Какая песня открывает аниме «${series}»?`,
   },
   result: {
@@ -448,6 +450,8 @@ const en: StringDict = {
     promptGuessQuote: (quote: string) => `"${quote}"\n\nWho said this?`,
     promptGuessAbility: (ability: string) => `Ability: "${ability}"\n\nWho does it belong to?`,
     promptGuessFaction: 'Which faction does this character belong to?',
+    promptGuessSeriesByVideo: 'Which anime is this opening from?',
+    videoMissing: 'No clip added for this anime yet',
     promptOpeningTrivia: (series: string) => `Which song opens the anime "${series}"?`,
   },
   result: {

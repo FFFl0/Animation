@@ -15,6 +15,7 @@ import LivesIndicator from '../components/LivesIndicator';
 import Icon from '../components/Icon';
 import FadeIn from '../components/FadeIn';
 import AnswerOption from '../quiz/AnswerOption';
+import VideoPrompt from '../quiz/VideoPrompt';
 import QuizTimer from '../quiz/QuizTimer';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
@@ -158,7 +159,15 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
               transform: [{ translateY: promptEnter.interpolate({ inputRange: [0, 1], outputRange: [12, 0] }) }],
             }}
           >
-            {question.promptKind !== 'text' && question.character && (
+            {question.promptKind === 'video' && question.seriesId && (
+              <View style={styles.avatarWrap}>
+                {/* Keyed on the question so moving on tears the old player
+                    down instead of reusing it for the next clip. */}
+                <VideoPrompt key={question.id} seriesId={question.seriesId} missingLabel={t('quiz.videoMissing')} />
+              </View>
+            )}
+
+            {question.promptKind !== 'text' && question.promptKind !== 'video' && question.character && (
               <View style={styles.avatarWrap}>
                 <AnimeAvatar
                   avatar={question.character.avatar}

@@ -1,12 +1,12 @@
 import { CHARACTERS, Character, characterName, localizeCharacter } from '../data/characters';
-import { ANIME_SERIES, seriesTitleById } from '../data/animeSeries';
+import { ANIME_SERIES, AnimeSeries, seriesTitleById } from '../data/animeSeries';
 import { OPENINGS } from '../data/openings';
 import { QuestionType, getCategory } from '../data/categories';
 import { RoundConfig } from './types';
 import { Language } from '../i18n/LanguageContext';
 import { getT } from '../i18n/strings';
 
-export type PromptKind = 'avatar' | 'silhouette' | 'eyes' | 'text';
+export type PromptKind = 'avatar' | 'silhouette' | 'eyes' | 'text' | 'video';
 
 export type Question = {
   id: string;
@@ -14,6 +14,9 @@ export type Question = {
   promptKind: PromptKind;
   promptText: string;
   character?: Character;
+  /** Set on question types that ask about a series rather than a character —
+   * the theme clip to play comes from here. */
+  seriesId?: string;
   options: string[];
   correctIndex: number;
 };
@@ -60,12 +63,33 @@ function buildOptions(correct: string, pool: string[], rng: Rng): { options: str
   return { options, correctIndex: options.indexOf(correct) };
 }
 
-function questionFor(type: QuestionType, character: Character, idSuffix: number, rng: Rng, lang: Language): Question {
+/**
+ * What a question is about. Most types ask about a character; the theme-clip
+ * type asks about a series, and the two are drawn from separate cycles so
+ * neither repeats within a round.
+ */
+type Subject = { character: Character; series: AnimeSeries };
+
+function questionFor(type: QuestionType, subject: Subject, idSuffix: number, rng: Rng, lang: Language): Question {
+  const { character, series } = subject;
   const id = `${character.id}-${type}-${idSuffix}`;
   const t = getT(lang);
   const localized = localizeCharacter(character, lang);
 
   switch (type) {
+    case 'guessSeriesByVideo': {
+      const pool = ANIME_SERIES.map((s) => seriesTitleById(s.id, lang));
+      const { options, correctIndex } = buildOptions(seriesTitleById(series.id, lang), pool, rng);
+      return {
+        id: `${series.id}-${type}-${idSuffix}`,
+        type,
+        promptKind: 'video',
+        promptText: t('quiz.promptGuessSeriesByVideo'),
+        seriesId: series.id,
+        options,
+        correctIndex,
+      };
+    }
     case 'guessSeries': {
       const pool = ANIME_SERIES.map((s) => seriesTitleById(s.id, lang));
       const { options, correctIndex } = buildOptions(seriesTitleById(character.seriesId, lang), pool, rng);
@@ -153,15 +177,24 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
   const questions: Question[] = [];
   let cycle = shuffle(pool, rng);
   let cycleIndex = 0;
+  // Series get their own cycle: difficulty tiers describe characters, so a
+  // tier filter says nothing about which openings to play, and drawing the
+  // series from the character just picked would repeat the popular ones.
+  let seriesCycle = shuffle(ANIME_SERIES, rng);
+  let seriesIndex = 0;
 
   for (let i = 0; i < config.questionCount; i++) {
     if (cycleIndex >= cycle.length) {
       cycle = shuffle(pool, rng);
       cycleIndex = 0;
     }
-    const character = cycle[cycleIndex++];
+    if (seriesIndex >= seriesCycle.length) {
+      seriesCycle = shuffle(ANIME_SERIES, rng);
+      seriesIndex = 0;
+    }
     const type = types[Math.floor(rng() * types.length)];
-    questions.push(questionFor(type, character, i, rng, lang));
+    const subject = { character: cycle[cycleIndex++], series: seriesCycle[seriesIndex++] };
+    questions.push(questionFor(type, subject, i, rng, lang));
   }
 
   return questions;
