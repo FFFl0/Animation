@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import { Friendship, getFriendships, isSupabaseConfigured } from '../friends/friendsApi';
 import { ChatGroup, createGroup, listMyGroups } from '../chat/groupApi';
 import AnimeAvatar from '../components/AnimeAvatar';
+import GroupAvatar from '../chat/GroupAvatar';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useT } from '../i18n/strings';
@@ -97,9 +98,7 @@ export default function GroupsScreen({ onBack, onOpenGroup }: Props) {
         <ScrollView contentContainerStyle={styles.list}>
           {groups.map((group) => (
             <SoundTouchable key={group.id} style={styles.row} onPress={() => onOpenGroup(group)} activeOpacity={0.85}>
-              <View style={styles.groupBadge}>
-                <Icon name="users" size={18} color={theme.primary} />
-              </View>
+              <GroupAvatar url={group.avatarUrl} size={40} />
               <View style={styles.rowText}>
                 <Text style={styles.rowName} numberOfLines={1}>{group.name}</Text>
                 {group.ownerId === profile.id && <Text style={styles.rowSub}>{t('groups.yours')}</Text>}
@@ -225,14 +224,6 @@ function makeStyles(theme: Theme) {
       borderRadius: radius.lg,
       paddingHorizontal: 14,
       paddingVertical: 12,
-    },
-    groupBadge: {
-      width: 40,
-      height: 40,
-      borderRadius: 20,
-      backgroundColor: theme.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
     },
     rowText: { flex: 1 },
     rowName: { fontSize: 15, fontFamily: fontFamily('700'), color: theme.text },

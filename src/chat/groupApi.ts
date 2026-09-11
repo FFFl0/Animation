@@ -6,6 +6,8 @@ export type ChatGroup = {
   id: string;
   name: string;
   ownerId: string;
+  /** Public URL of the group's picture, or null for the default badge. */
+  avatarUrl: string | null;
   createdAt: string;
 };
 
@@ -24,7 +26,7 @@ export type GroupReaction = {
   emoji: string;
 };
 
-type GroupRow = { id: string; name: string; owner_id: string; created_at: string };
+type GroupRow = { id: string; name: string; owner_id: string; avatar_url: string | null; created_at: string };
 type MessageRow = {
   id: string;
   group_id: string;
@@ -37,8 +39,16 @@ type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
 const MESSAGE_COLUMNS = 'id, group_id, sender_id, body, created_at, reply_to_id';
 
+const GROUP_COLUMNS = 'id, name, owner_id, avatar_url, created_at';
+
 function toGroup(row: GroupRow): ChatGroup {
-  return { id: row.id, name: row.name, ownerId: row.owner_id, createdAt: row.created_at };
+  return {
+    id: row.id,
+    name: row.name,
+    ownerId: row.owner_id,
+    avatarUrl: row.avatar_url ?? null,
+    createdAt: row.created_at,
+  };
 }
 
 function toMessage(row: MessageRow): GroupMessage {
@@ -58,7 +68,7 @@ export async function listMyGroups(): Promise<ChatGroup[]> {
   if (!isSupabaseConfigured || !supabase) return [];
   const { data, error } = await supabase
     .from('chat_groups')
-    .select('id, name, owner_id, created_at')
+    .select(GROUP_COLUMNS)
     .order('created_at', { ascending: false });
 
   if (error || !data) return [];
@@ -78,7 +88,7 @@ export async function createGroup(name: string, ownerId: string, memberIds: stri
   const { data, error } = await supabase
     .from('chat_groups')
     .insert({ name: trimmed, owner_id: ownerId })
-    .select('id, name, owner_id, created_at')
+    .select(GROUP_COLUMNS)
     .single();
   if (error || !data) return null;
 
@@ -94,6 +104,22 @@ export async function createGroup(name: string, ownerId: string, memberIds: stri
     return null;
   }
   return group;
+}
+
+/** Owner-only, enforced by RLS. Passing null clears the picture back to the
+ * default badge. Returns the updated row so the caller can drop its own copy
+ * of the group in place rather than refetching the list. */
+export async function setGroupAvatar(groupId: string, avatarUrl: string | null): Promise<ChatGroup | null> {
+  if (!supabase) return null;
+  const { data, error } = await supabase
+    .from('chat_groups')
+    .update({ avatar_url: avatarUrl })
+    .eq('id', groupId)
+    .select(GROUP_COLUMNS)
+    .single();
+
+  if (error || !data) return null;
+  return toGroup(data as GroupRow);
 }
 
 export async function getGroupMemberIds(groupId: string): Promise<string[]> {

@@ -440,6 +440,13 @@ create table if not exists public.group_message_reactions (
   primary key (message_id, user_id)
 );
 
+-- The group's picture: a public URL into the same `avatars` bucket as
+-- profile photos. It lives under the owner's own folder (named `group-<id>-…`
+-- so removing a profile photo doesn't take it along), which is why the
+-- existing storage policies already cover it — only the owner can put one
+-- there, and only the owner may change a group anyway.
+alter table public.chat_groups add column if not exists avatar_url text;
+
 create index if not exists group_messages_group_idx on public.group_messages (group_id, created_at);
 create index if not exists chat_group_members_user_idx on public.chat_group_members (user_id);
 
