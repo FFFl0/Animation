@@ -89,11 +89,10 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           {CATEGORIES.map((cat) => (
             <CategoryTile
               key={cat.id}
-              icon={cat.icon}
-              iconColor={cat.color}
-              iconBg={cat.colorBg}
+              id={cat.id}
               title={categoryTitle(cat, language)}
               subtitle={categoryCount(cat.id, t)}
+              startLabel={t('home.start')}
               onPress={() => onOpenCategory(cat.id)}
             />
           ))}
