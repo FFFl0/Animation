@@ -17,12 +17,12 @@ export function ToriiHero({ size = 220, accent, ink }: HeroProps) {
         <Petal x={175} y={55} rotate={35} scale={0.8} color={accent} />
         <Petal x={30} y={150} rotate={70} scale={0.7} color={accent} />
         <Petal x={185} y={165} rotate={-45} scale={0.9} color={accent} />
-        {/* torii gate */}
-        <Rect x="34" y="80" width="14" height="110" rx="2" fill={ink} />
-        <Rect x="172" y="80" width="14" height="110" rx="2" fill={ink} />
-        <Rect x="24" y="66" width="172" height="16" rx="3" fill={ink} />
-        <Rect x="18" y="60" width="184" height="8" rx="3" fill={ink} />
-        <Rect x="44" y="104" width="132" height="12" rx="2" fill={ink} />
+        {/* Torii gate: upswept kasagi over a thinner shimagi, tapered pillars, one nuki. */}
+        <Path d="M8 54 Q110 66 212 54 L212 68 Q110 74 8 68 Z" fill={ink} />
+        <Path d="M20 72 Q110 80 200 72 L200 79 Q110 87 20 79 Z" fill={ink} />
+        <Path d="M36 80 L54 80 L56 198 L32 198 Z" fill={ink} />
+        <Path d="M184 80 L166 80 L164 198 L188 198 Z" fill={ink} />
+        <Rect x="30" y="110" width="160" height="16" rx="2" fill={ink} />
       </Svg>
     </View>
   );
@@ -71,11 +71,11 @@ export function PetalScatter({ size = 200, color, count = 6 }: PetalsProps) {
 export function ToriiIcon({ size = 28, color }: { size?: number; color: string }) {
   return (
     <Svg width={size} height={size} viewBox="0 0 48 48">
-      <Rect x="8" y="16" width="6" height="26" rx="1" fill={color} />
-      <Rect x="34" y="16" width="6" height="26" rx="1" fill={color} />
-      <Rect x="4" y="12" width="40" height="6" rx="1.5" fill={color} />
-      <Rect x="1" y="6" width="46" height="4" rx="2" fill={color} />
-      <Rect x="12" y="24" width="24" height="4.5" rx="1" fill={color} />
+      <Path d="M1 10 Q24 13 47 10 L47 16 Q24 20 1 16 Z" fill={color} />
+      <Path d="M5 18.5 Q24 22 43 18.5 L43 22.5 Q24 26 5 22.5 Z" fill={color} />
+      <Path d="M9 23 L16 23 L17.5 45 L7 45 Z" fill={color} />
+      <Path d="M39 23 L32 23 L30.5 45 L41 45 Z" fill={color} />
+      <Rect x="6" y="30" width="36" height="5" rx="1" fill={color} />
     </Svg>
   );
 }
