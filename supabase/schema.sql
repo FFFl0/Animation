@@ -465,10 +465,15 @@ alter table public.chat_group_members enable row level security;
 alter table public.group_messages enable row level security;
 alter table public.group_message_reactions enable row level security;
 
+-- The owner clause is not redundant with membership: a group is created
+-- before anybody, the owner included, is a member of it. Without it the
+-- INSERT ... RETURNING that creates a group reads back nothing, and so does
+-- the subquery in "Owner adds members" below — so creating a group failed
+-- outright.
 drop policy if exists "See groups you belong to" on public.chat_groups;
 create policy "See groups you belong to"
   on public.chat_groups for select
-  using (public.is_group_member(id, auth.uid()));
+  using (owner_id = auth.uid() or public.is_group_member(id, auth.uid()));
 
 drop policy if exists "Create your own group" on public.chat_groups;
 create policy "Create your own group"
@@ -491,8 +496,9 @@ create policy "See members of your groups"
   on public.chat_group_members for select
   using (public.is_group_member(group_id, auth.uid()));
 
--- Only the owner adds people. Their own first row passes this too, because
--- the group they just created is one they own.
+-- Only the owner adds people. Their own first row passes this too — but only
+-- because the select policy above lets an owner see a group they are not yet
+-- a member of; this subquery is subject to that policy.
 drop policy if exists "Owner adds members" on public.chat_group_members;
 create policy "Owner adds members"
   on public.chat_group_members for insert
