@@ -6,6 +6,10 @@
 (`android` / `ios` / `all`) и профиль. Ссылка на готовый файл появляется
 в Summary запуска.
 
+При `all` запускаются две независимые задачи, по одной на платформу.
+Это не мелочь: iOS без настроенных ключей Apple падает сразу (см. ниже),
+и одной командой на обе платформы он утащил бы за собой Android.
+
 Профили описаны в `eas.json`:
 
 | Профиль | Android | iOS |
@@ -61,8 +65,10 @@ xcrun simctl install booted /путь/к/AnimeQuiz.app
    ```
    EAS сам создаст сертификат и provisioning profile и сохранит их у себя;
    после этого сборки в GitHub Actions пойдут без вопросов. **Без этого
-   шага сборка iOS упадёт**: `--non-interactive` в workflow не умеет
-   спрашивать пароль от Apple ID.
+   шага сборка iOS упадёт** с `Failed to set up credentials. You're in
+   non-interactive mode` — `--non-interactive` в workflow не умеет
+   спрашивать пароль от Apple ID. Android при этом соберётся: задачи
+   независимы.
 3. Дальше:
    - **Ad-hoc** (`preview`): зарегистрируйте UDID устройства
      (`npx eas-cli device:create`), соберите — `.ipa` ставится по ссылке.

@@ -24,6 +24,19 @@ on:
 
 jobs:
   build:
+    # One job per platform instead of one `--platform all` command: iOS needs
+    # Apple credentials that only exist once somebody has run `eas credentials`
+    # interactively, and a single command fails the Android build along with
+    # it. fail-fast off so one platform's problem stays that platform's.
+    strategy:
+      fail-fast: false
+      matrix:
+        platform: >-
+          ${{ github.event.inputs.platform == 'all'
+              && fromJSON('["android","ios"]')
+              || fromJSON(format('["{0}"]', github.event.inputs.platform)) }}
+
+    name: build (${{ matrix.platform }})
     runs-on: ubuntu-latest
     steps:
       - uses: actions/checkout@v4
@@ -47,34 +60,24 @@ jobs:
       - name: Build
         run: |
           npx eas-cli build \
-            --platform ${{ github.event.inputs.platform }} \
+            --platform ${{ matrix.platform }} \
             --profile ${{ github.event.inputs.profile }} \
             --non-interactive --json > build-output.json
 
-      - name: Publish download links to job summary
+      - name: Publish download link to job summary
         if: always()
         run: |
-          echo "## Build result" >> "$GITHUB_STEP_SUMMARY"
+          echo "## ${{ matrix.platform }} — ${{ github.event.inputs.profile }}" >> "$GITHUB_STEP_SUMMARY"
           if [ -s build-output.json ]; then
             node -e "
               const fs = require('fs');
               const parsed = JSON.parse(fs.readFileSync('build-output.json', 'utf8'));
-              // --platform all returns one entry per platform, a single
-              // platform may return a bare object.
-              const builds = Array.isArray(parsed) ? parsed : [parsed];
+              const b = Array.isArray(parsed) ? parsed[0] : parsed;
               const write = (line) => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
-              if (builds.length === 0) {
-                write('\nNo build info captured — check the log above.');
-              }
-              for (const b of builds) {
-                const platform = (b.platform || '?').toLowerCase();
-                const url = b.artifacts && b.artifacts.buildUrl;
-                if (url) {
-                  write('\n**' + platform + ' ready:** [Download](' + url + ')');
-                } else {
-                  write('\n**' + platform + '** — status: ' + b.status + '. See the log above or your expo.dev dashboard.');
-                }
-              }
+              const url = b && b.artifacts && b.artifacts.buildUrl;
+              if (url) write('\n**Ready:** [Download](' + url + ')');
+              else if (b) write('\nStatus: ' + b.status + '. See the log above or your expo.dev dashboard.');
+              else write('\nNo build info captured — check the log above.');
             "
           else
             echo "Build output was empty — check the log above for the error." >> "$GITHUB_STEP_SUMMARY"
@@ -84,6 +87,6 @@ jobs:
         if: always()
         uses: actions/upload-artifact@v4
         with:
-          name: eas-build-output
+          name: eas-build-output-${{ matrix.platform }}
           path: build-output.json
           if-no-files-found: ignore
