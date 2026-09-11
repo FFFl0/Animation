@@ -172,6 +172,30 @@ export async function login(username: string, password: string): Promise<Profile
   return resolveOrCreateProfile(client, data.user.id, data.user.email);
 }
 
+/**
+ * Removes the account for good. The work happens in the `delete-account`
+ * Edge Function because deleting an auth user needs the service_role key;
+ * everything else cascades from that row. The local session is dropped
+ * either way, so a failure can't leave someone signed into an account they
+ * just asked to delete.
+ */
+export async function deleteAccount(_id: string): Promise<void> {
+  if (!supabase) throw new AuthError('Нет подключения', 'deleteAccountFailed');
+
+  const { data } = await supabase.auth.getSession();
+  const token = data.session?.access_token;
+  if (!token) throw new AuthError('Нужно войти заново', 'deleteAccountFailed');
+
+  const { error } = await supabase.functions.invoke('delete-account', {
+    headers: { Authorization: `Bearer ${token}` },
+  });
+
+  await AsyncStorage.removeItem(PROFILE_CACHE_KEY);
+  await supabase.auth.signOut();
+
+  if (error) throw new AuthError('Не удалось удалить аккаунт', 'deleteAccountFailed');
+}
+
 export async function logout(): Promise<void> {
   await supabase!.auth.signOut();
   await AsyncStorage.removeItem(PROFILE_CACHE_KEY);

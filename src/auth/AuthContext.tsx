@@ -16,6 +16,7 @@ type AuthContextValue = {
   register: (username: string, password: string, recoveryEmail?: string) => Promise<void>;
   login: (username: string, password: string) => Promise<void>;
   logout: () => Promise<void>;
+  deleteAccount: () => Promise<void>;
   updateAvatar: (patch: { avatar?: Avatar; favoriteCharacterId?: string | null }) => Promise<void>;
   recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
@@ -47,6 +48,12 @@ export function AuthProvider({ children }: { children: ReactNode }) {
   const register = async (username: string, password: string, recoveryEmail?: string) => {
     const p = await Storage.register(username, password, recoveryEmail);
     setProfile(p);
+  };
+
+  const deleteAccount = async () => {
+    if (!profile) return;
+    await Storage.deleteAccount(profile.id);
+    setProfile(null);
   };
 
   const resetPassword = (username: string) => Storage.requestPasswordReset(username);
@@ -122,6 +129,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       register,
       login,
       logout,
+      deleteAccount,
       updateAvatar,
       recordRoundResult,
       resetPassword,

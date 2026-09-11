@@ -14,7 +14,8 @@ export type AuthErrorCode =
   | 'googleStartFailed'
   | 'googleCancelled'
   | 'googleCompleteFailed'
-  | 'googleUserFetchFailed';
+  | 'googleUserFetchFailed'
+  | 'deleteAccountFailed';
 
 export class AuthError extends Error {
   code?: AuthErrorCode;

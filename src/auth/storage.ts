@@ -93,6 +93,14 @@ export async function logout(): Promise<void> {
   await AsyncStorage.removeItem(SESSION_KEY);
 }
 
+/** For a device-only account there is nothing to ask a server: drop the
+ * record and the session with it. */
+export async function deleteAccount(id: string): Promise<void> {
+  const accounts = await readAccounts();
+  await writeAccounts(accounts.filter((a) => a.id !== id));
+  await AsyncStorage.removeItem(SESSION_KEY);
+}
+
 export async function getSessionProfile(): Promise<Profile | null> {
   const id = await AsyncStorage.getItem(SESSION_KEY);
   if (!id) return null;

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { Image, ImageSourcePropType, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, ImageSourcePropType, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -27,7 +27,7 @@ type Props = {
 };
 
 export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
-  const { profile, logout, updateAvatar } = useAuth();
+  const { profile, logout, deleteAccount, updateAvatar } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
   const { language, setLanguage } = useLanguage();
@@ -36,6 +36,9 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
   const [search, setSearch] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false);
   const [photoError, setPhotoError] = useState<string | null>(null);
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [deleting, setDeleting] = useState(false);
+  const [deleteError, setDeleteError] = useState<string | null>(null);
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -92,6 +95,20 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
       setPhotoError(t('profile.photoFailed'));
     }
     setPhotoBusy(false);
+  };
+
+  const handleDeleteAccount = async () => {
+    if (deleting) return;
+    setDeleting(true);
+    setDeleteError(null);
+    try {
+      await deleteAccount();
+      // No navigation to do: losing the profile drops the whole app back to
+      // the welcome screen on its own.
+    } catch {
+      setDeleteError(t('profile.deleteFailed'));
+      setDeleting(false);
+    }
   };
 
   const handleRemovePhoto = async () => {
@@ -277,6 +294,34 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
       <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
         <Text style={styles.logoutText}>{t('profile.logout')}</Text>
       </SoundTouchable>
+
+      {confirmDelete ? (
+        <View style={styles.dangerBlock}>
+          <Text style={styles.dangerTitle}>{t('profile.deleteTitle')}</Text>
+          <Text style={styles.dangerText}>{t('profile.deleteWarning')}</Text>
+          {deleteError && <Text style={styles.dangerError}>{deleteError}</Text>}
+          <View style={styles.dangerActions}>
+            <SoundTouchable
+              style={styles.dangerCancel}
+              onPress={() => setConfirmDelete(false)}
+              disabled={deleting}
+            >
+              <Text style={styles.dangerCancelText}>{t('groups.cancel')}</Text>
+            </SoundTouchable>
+            <SoundTouchable style={styles.dangerConfirm} onPress={handleDeleteAccount} disabled={deleting}>
+              {deleting ? (
+                <ActivityIndicator color="#FFFFFF" />
+              ) : (
+                <Text style={styles.dangerConfirmText}>{t('profile.deleteConfirm')}</Text>
+              )}
+            </SoundTouchable>
+          </View>
+        </View>
+      ) : (
+        <SoundTouchable style={styles.deleteLink} onPress={() => setConfirmDelete(true)} activeOpacity={0.85}>
+          <Text style={styles.deleteLinkText}>{t('profile.deleteTitle')}</Text>
+        </SoundTouchable>
+      )}
     </ScrollView>
   );
 }
@@ -436,6 +481,38 @@ function makeStyles(theme: Theme) {
       borderColor: theme.border,
     },
     logoutText: { color: theme.danger, fontFamily: fontFamily('700'), fontSize: 15 },
+    deleteLink: { marginTop: 14, alignItems: 'center', paddingVertical: 12 },
+    deleteLinkText: { color: theme.textMuted, fontFamily: fontFamily('600'), fontSize: 13, textDecorationLine: 'underline' },
+    dangerBlock: {
+      marginTop: 16,
+      borderWidth: 1.5,
+      borderColor: theme.danger,
+      borderRadius: radius.lg,
+      padding: 16,
+    },
+    dangerTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.danger, marginBottom: 6 },
+    dangerText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, lineHeight: 19 },
+    dangerError: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.danger, marginTop: 10 },
+    dangerActions: { flexDirection: 'row', gap: 10, marginTop: 14 },
+    dangerCancel: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 12,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+    },
+    dangerCancelText: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    dangerConfirm: {
+      flex: 1,
+      alignItems: 'center',
+      justifyContent: 'center',
+      minHeight: 44,
+      paddingVertical: 12,
+      borderRadius: radius.pill,
+      backgroundColor: theme.danger,
+    },
+    dangerConfirmText: { fontSize: 14, fontFamily: fontFamily('700'), color: '#FFFFFF' },
     reminderError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 8 },
   });
 }

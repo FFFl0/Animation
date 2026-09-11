@@ -11,6 +11,7 @@ const impl = isSupabaseConfigured ? Remote : Local;
 export const register = impl.register;
 export const login = impl.login;
 export const logout = impl.logout;
+export const deleteAccount = impl.deleteAccount;
 export const getSessionProfile = impl.getSessionProfile;
 export const updateAccount = impl.updateAccount;
 export const subscribeProfile = isSupabaseConfigured ? Remote.subscribeProfile : Local.subscribeProfile;
