@@ -623,3 +623,111 @@ create policy "Drop your own push token"
   using (auth.uid() = user_id);
 
 create index if not exists push_tokens_user_idx on public.push_tokens (user_id);
+
+-- ============================================================
+-- Tournaments. A 32-seat knockout bracket that live players share:
+-- whoever joins inside the lobby window takes a seat, bots fill the rest.
+--
+-- Reads go through RLS (anyone signed in may watch a bracket they are in),
+-- but every write is done by the `tournament` Edge Function with the
+-- service role. That is deliberate: seats, pairings and winners must not be
+-- writable by a client, or a player could seat themselves into the final.
+-- ============================================================
+
+create table if not exists public.tournaments (
+  id uuid primary key default gen_random_uuid(),
+  -- lobby -> running -> finished
+  status text not null default 'lobby',
+  seed bigint not null,
+  round int not null default 0,
+  champion_seat int,
+  -- when the lobby closes and the bracket is seeded
+  starts_at timestamptz not null,
+  created_at timestamptz not null default now(),
+  finished_at timestamptz
+);
+
+create table if not exists public.tournament_seats (
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  seat int not null,
+  -- null for a bot
+  user_id uuid references auth.users(id) on delete set null,
+  name text not null,
+  skill real not null default 0,
+  primary key (tournament_id, seat)
+);
+
+create table if not exists public.tournament_matches (
+  tournament_id uuid not null references public.tournaments(id) on delete cascade,
+  round int not null,
+  idx int not null,
+  seat_a int,
+  seat_b int,
+  score_a int,
+  score_b int,
+  -- when each side handed its score in; a drawn match between two people
+  -- goes to whoever answered first
+  submitted_a timestamptz,
+  submitted_b timestamptz,
+  winner_seat int,
+  -- once both seats are known, how long the humans have to submit a score
+  deadline timestamptz,
+  primary key (tournament_id, round, idx)
+);
+
+alter table public.tournaments enable row level security;
+alter table public.tournament_seats enable row level security;
+alter table public.tournament_matches enable row level security;
+
+-- Same recursion trap as group membership: a policy on the seats table that
+-- queries the seats table loops forever. A SECURITY DEFINER function breaks
+-- the cycle.
+create or replace function public.is_tournament_entrant(tid uuid, uid uuid)
+returns boolean
+language sql
+security definer
+set search_path = public
+stable
+as $$
+  select exists (
+    select 1 from public.tournament_seats
+    where tournament_id = tid and user_id = uid
+  );
+$$;
+
+revoke all on function public.is_tournament_entrant(uuid, uuid) from public;
+grant execute on function public.is_tournament_entrant(uuid, uuid) to authenticated;
+
+-- A lobby is readable by anyone signed in, or there would be nothing to join;
+-- once it is running only its own entrants can watch it.
+drop policy if exists "See a lobby or your own tournament" on public.tournaments;
+create policy "See a lobby or your own tournament"
+  on public.tournaments for select
+  using (status = 'lobby' or public.is_tournament_entrant(id, auth.uid()));
+
+drop policy if exists "See seats of your tournament" on public.tournament_seats;
+create policy "See seats of your tournament"
+  on public.tournament_seats for select
+  using (public.is_tournament_entrant(tournament_id, auth.uid()));
+
+drop policy if exists "See matches of your tournament" on public.tournament_matches;
+create policy "See matches of your tournament"
+  on public.tournament_matches for select
+  using (public.is_tournament_entrant(tournament_id, auth.uid()));
+
+-- No insert/update/delete policies anywhere on purpose: the service role
+-- used by the Edge Function bypasses RLS, and nobody else may write.
+
+create index if not exists tournaments_open_idx on public.tournaments (status, starts_at);
+create index if not exists tournament_seats_user_idx on public.tournament_seats (user_id);
+
+-- Lets the lobby screen see other people arriving without polling.
+do $$ begin
+  alter publication supabase_realtime add table public.tournaments;
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter publication supabase_realtime add table public.tournament_seats;
+exception when duplicate_object then null;
+end $$;

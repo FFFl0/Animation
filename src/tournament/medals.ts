@@ -15,6 +15,12 @@ export type TournamentRecord = {
    * out in the first, TOURNAMENT_ROUNDS means winning the whole thing.
    */
   bestRound: number;
+  /**
+   * Which run was banked last. An online bracket is re-read every few
+   * seconds, so without this the same medal would be counted again on every
+   * refresh once the run is over.
+   */
+  lastRunId?: string;
 };
 
 export const EMPTY_RECORD: TournamentRecord = { runs: 0, gold: 0, silver: 0, bronze: 0, bestRound: 0 };
@@ -37,10 +43,12 @@ export function medalFor(bracket: Bracket): MedalKind | null {
   }
 }
 
-/** Folds a finished run into the player's record. Only ever called once per run. */
-export function applyRun(record: TournamentRecord, bracket: Bracket): TournamentRecord {
+/** Folds a finished run into the record, ignoring a run already banked. */
+export function applyRun(record: TournamentRecord, bracket: Bracket, runId: string): TournamentRecord {
+  if (record.lastRunId === runId) return record;
   const medal = medalFor(bracket);
   return {
+    lastRunId: runId,
     runs: record.runs + 1,
     gold: record.gold + (medal === 'gold' ? 1 : 0),
     silver: record.silver + (medal === 'silver' ? 1 : 0),

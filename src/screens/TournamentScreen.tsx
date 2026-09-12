@@ -28,6 +28,16 @@ import {
 } from '../tournament/bracket';
 import { buildSeats } from '../tournament/bots';
 import { clearTournament, loadTournament, saveTournament } from '../tournament/tournamentStorage';
+import {
+  ServerState,
+  canPlayOnline,
+  fetchTournament,
+  joinTournament,
+  lobbySecondsLeft,
+  resumeTournament,
+  submitMatchScore,
+  toBracket,
+} from '../tournament/tournamentApi';
 import { EMPTY_RECORD, TournamentRecord, applyRun, medalFor, roundsReached } from '../tournament/medals';
 import { loadRecord, saveRecord } from '../tournament/medalStorage';
 import MedalShelf from '../components/MedalShelf';
@@ -38,7 +48,10 @@ type Props = {
   onMatchPlayed: (score: number, total: number) => void;
 };
 
-type Phase = 'loading' | 'bracket' | 'playing' | 'roundResult';
+type Phase = 'loading' | 'bracket' | 'playing' | 'roundResult' | 'lobby' | 'waiting';
+
+/** How often the lobby and a match waiting on its opponent re-read the server. */
+const POLL_MS = 3000;
 
 export const TOURNAMENT_MATCH_CONFIG: RoundConfig = {
   categoryId: 'mixed',
@@ -63,56 +76,187 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const [lastRound, setLastRound] = useState<number | null>(null);
   const [quizKey, setQuizKey] = useState(0);
   const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
+  const [online, setOnline] = useState<ServerState | null>(null);
+  const [busy, setBusy] = useState(false);
+  const [offlineNote, setOfflineNote] = useState(false);
+  const [tick, setTick] = useState(0);
+
+  const onlineTournament = online?.tournament ?? null;
 
   useEffect(() => {
     if (!profile) return;
-    loadTournament(profile.id).then((saved) => {
+    loadRecord(profile.id).then(setRecord);
+
+    let cancelled = false;
+    const boot = async () => {
+      if (canPlayOnline) {
+        try {
+          const state = await resumeTournament();
+          if (!cancelled && state.tournament) {
+            setOnline(state);
+            setBracket(toBracket(state));
+            setPhase(state.tournament.status === 'lobby' ? 'lobby' : 'bracket');
+            return;
+          }
+        } catch {
+          // Falls through to whatever is saved on the device.
+        }
+      }
+      const saved = await loadTournament(profile.id);
+      if (cancelled) return;
       setBracket(saved);
       setPhase('bracket');
-    });
-    loadRecord(profile.id).then(setRecord);
+    };
+    boot();
+    return () => {
+      cancelled = true;
+    };
   }, [profile?.id]);
 
+  // Keeps the lobby countdown moving and re-reads the server while there is
+  // something to wait for: other people arriving, or an opponent's score.
+  useEffect(() => {
+    if (phase !== 'lobby' && phase !== 'waiting') return;
+    const id = setInterval(() => setTick((n) => n + 1), 1000);
+    return () => clearInterval(id);
+  }, [phase]);
+
+  useEffect(() => {
+    if ((phase !== 'lobby' && phase !== 'waiting') || !onlineTournament) return;
+    const id = setInterval(() => {
+      refreshOnline().catch(() => {});
+    }, POLL_MS);
+    return () => clearInterval(id);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [phase, onlineTournament?.id]);
+
   if (!profile) return null;
+
+  /** Banks a finished run once — an online bracket is re-read constantly. */
+  const bankIfOver = (next: Bracket, runId: string) => {
+    if (!isMyTournamentOver(next)) return;
+    setRecord((current) => {
+      const updated = applyRun(current, next, runId);
+      if (updated !== current) saveRecord(profile.id, updated);
+      return updated;
+    });
+  };
+
+  const applyOnline = (state: ServerState, nextPhase?: Phase) => {
+    setOnline(state);
+    const mapped = toBracket(state);
+    setBracket(mapped);
+    if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
+    if (nextPhase) {
+      setPhase(nextPhase);
+    } else if (state.tournament?.status === 'lobby') {
+      setPhase('lobby');
+    }
+  };
+
+  const refreshOnline = async () => {
+    if (!onlineTournament) return;
+    const state = await fetchTournament(onlineTournament.id);
+    const mapped = toBracket(state);
+    setOnline(state);
+    setBracket(mapped);
+    if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
+
+    if (state.tournament?.status !== 'lobby' && phase === 'lobby') setPhase('bracket');
+    // The opponent handed their score in, so the round can be shown.
+    if (phase === 'waiting' && mapped) {
+      const decided = mapped.matches.find(
+        (m) => m.round === lastRound && m.winner !== null && (m.seatA === mySeat(mapped) || m.seatB === mySeat(mapped))
+      );
+      if (decided) setPhase('roundResult');
+    }
+  };
 
   const persist = (next: Bracket) => {
     setBracket(next);
     saveTournament(profile.id, next);
   };
 
-  const startTournament = () => {
+  const startLocal = () => {
     const seed = Date.now() >>> 0;
     persist(createBracket(buildSeats(profile.username, [], seed), seed));
+    setOnline(null);
     setLastRound(null);
     setPhase('bracket');
+  };
+
+  const startTournament = async () => {
+    if (busy) return;
     buzz('heavy');
+    setLastRound(null);
+    setOfflineNote(false);
+
+    if (canPlayOnline) {
+      setBusy(true);
+      try {
+        const state = await joinTournament();
+        applyOnline(state, state.tournament?.status === 'lobby' ? 'lobby' : 'bracket');
+        setBusy(false);
+        return;
+      } catch {
+        // The lobby is unreachable — a run against bots is better than none.
+        setOfflineNote(true);
+      }
+      setBusy(false);
+    }
+
+    startLocal();
   };
 
   const abandon = async () => {
     await clearTournament();
     setBracket(null);
+    setOnline(null);
     setLastRound(null);
     setPhase('bracket');
   };
 
-  const finishMatch = (score: number) => {
+  const finishMatch = async (score: number) => {
     if (!bracket) return;
     const played = bracket.round;
-    const next = resolveRound(bracket, score);
-    persist(next);
     onMatchPlayed(score, MATCH_QUESTIONS);
     setLastRound(played);
+
+    if (onlineTournament) {
+      // The server owns the result: it holds the opponent's score, and a
+      // match between two people is only decided once both have handed in.
+      setBusy(true);
+      try {
+        const state = await submitMatchScore(onlineTournament.id, score);
+        const mapped = toBracket(state);
+        setOnline(state);
+        setBracket(mapped);
+        if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
+
+        const me = mapped ? mySeat(mapped) : -1;
+        const mine = mapped?.matches.find((m) => m.round === played && (m.seatA === me || m.seatB === me));
+        if (mine?.winner !== null && mine !== undefined) {
+          setPhase('roundResult');
+          buzz(mine.winner === me ? 'success' : 'error');
+        } else {
+          setPhase('waiting');
+        }
+      } catch {
+        setPhase('bracket');
+      }
+      setBusy(false);
+      return;
+    }
+
+    const next = resolveRound(bracket, score);
+    persist(next);
     setPhase('roundResult');
     buzz(next.myExitRound === played ? 'error' : 'success');
 
     // The run is over the moment the player is out or lifts the trophy; the
     // shelf is updated here rather than on the results screen so leaving
     // early cannot cost somebody a medal they earned.
-    if (isMyTournamentOver(next)) {
-      const updated = applyRun(record, next);
-      setRecord(updated);
-      saveRecord(profile.id, updated);
-    }
+    bankIfOver(next, String(next.seed));
   };
 
   if (phase === 'playing' && bracket) {
@@ -147,8 +291,26 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
         {phase === 'loading' && <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />}
 
         {phase === 'bracket' && !bracket && (
-          <Intro styles={styles} theme={theme} t={t} record={record} onStart={startTournament} />
+          <Intro styles={styles} theme={theme} t={t} record={record} busy={busy} onStart={startTournament} />
         )}
+
+        {phase === 'lobby' && online?.tournament && (
+          <Lobby state={online} styles={styles} theme={theme} t={t} />
+        )}
+
+        {phase === 'waiting' && bracket && lastRound !== null && (
+          <Waiting
+            bracket={bracket}
+            round={lastRound}
+            styles={styles}
+            theme={theme}
+            t={t}
+            busy={busy}
+            onRefresh={() => refreshOnline().catch(() => {})}
+          />
+        )}
+
+        {offlineNote && phase !== 'lobby' && <Text style={styles.offlineNote}>{t('tournament.offlineFallback')}</Text>}
 
         {phase === 'bracket' && bracket && (
           <Standing
@@ -162,6 +324,7 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
               setPhase('playing');
             }}
             onRestart={startTournament}
+            busy={busy}
             onAbandon={abandon}
           />
         )}
@@ -197,12 +360,14 @@ function Intro({
   theme,
   t,
   record,
+  busy,
   onStart,
 }: {
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
   record: TournamentRecord;
+  busy: boolean;
   onStart: () => void;
 }) {
   return (
@@ -230,9 +395,103 @@ function Intro({
         </>
       )}
 
-      <SoundTouchable style={styles.primaryButton} onPress={onStart} activeOpacity={0.88}>
-        <Text style={styles.primaryButtonText}>{t('tournament.start')}</Text>
+      <SoundTouchable style={styles.primaryButton} onPress={onStart} activeOpacity={0.88} disabled={busy}>
+        {busy ? (
+          <ActivityIndicator color={theme.onInk} />
+        ) : (
+          <Text style={styles.primaryButtonText}>{t('tournament.start')}</Text>
+        )}
       </SoundTouchable>
+    </>
+  );
+}
+
+/** The lobby: who has arrived so far, and how long is left before it seals. */
+function Lobby({
+  state,
+  styles,
+  theme,
+  t,
+}: {
+  state: ServerState;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+}) {
+  const players = state.seats.filter((s) => s.isPlayer);
+  const left = state.tournament ? lobbySecondsLeft(state.tournament) : 0;
+
+  return (
+    <>
+      <View style={styles.heroIcon}>
+        <Icon name="users" size={34} color={theme.primary} />
+      </View>
+      <Text style={styles.title}>{t('tournament.lobbyTitle')}</Text>
+      <Text style={styles.lead}>{t('tournament.lobbyLead')}</Text>
+
+      <View style={styles.nextCard}>
+        <Text style={styles.lobbyCountdown}>{left}</Text>
+        <Text style={styles.nextLabel}>{t('tournament.lobbyJoined', players.length, TOURNAMENT_SIZE)}</Text>
+        <View style={styles.lobbyNames}>
+          {players.map((p) => (
+            <View key={p.seat} style={[styles.lobbyChip, p.isMe && styles.lobbyChipMe]}>
+              <Text style={[styles.lobbyChipText, p.isMe && styles.lobbyChipTextMe]} numberOfLines={1}>
+                {p.name}
+              </Text>
+            </View>
+          ))}
+        </View>
+      </View>
+
+      <Text style={styles.lead}>{t('tournament.lobbyFill')}</Text>
+    </>
+  );
+}
+
+/** Between handing a score in and the opponent doing the same. */
+function Waiting({
+  bracket,
+  round,
+  styles,
+  theme,
+  t,
+  busy,
+  onRefresh,
+}: {
+  bracket: Bracket;
+  round: number;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  busy: boolean;
+  onRefresh: () => void;
+}) {
+  const me = mySeat(bracket);
+  const match = bracket.matches.find((m) => m.round === round && (m.seatA === me || m.seatB === me));
+  const rival = match ? seatOf(bracket, opponentSeat(match, me)) : null;
+  const myScore = match ? (match.seatA === me ? match.scoreA : match.scoreB) : null;
+
+  return (
+    <>
+      <View style={styles.heroIcon}>
+        <Icon name="arrowPath" size={34} color={theme.primary} />
+      </View>
+      <Text style={styles.title}>{t('tournament.waitingTitle')}</Text>
+      <Text style={styles.lead}>{t('tournament.waitingLead', rival?.name ?? '—')}</Text>
+
+      <View style={styles.nextCard}>
+        <Text style={styles.nextLabel}>{t('tournament.waitingYourScore')}</Text>
+        <Text style={styles.lobbyCountdown}>{myScore ?? 0}</Text>
+      </View>
+
+      <SoundTouchable style={styles.primaryButton} onPress={onRefresh} activeOpacity={0.88} disabled={busy}>
+        {busy ? (
+          <ActivityIndicator color={theme.onInk} />
+        ) : (
+          <Text style={styles.primaryButtonText}>{t('tournament.waitingRefresh')}</Text>
+        )}
+      </SoundTouchable>
+      <Text style={styles.lead}>{t('tournament.waitingForfeit')}</Text>
     </>
   );
 }
@@ -252,6 +511,7 @@ function Standing({
   onPlay,
   onRestart,
   onAbandon,
+  busy,
 }: {
   bracket: Bracket;
   record: TournamentRecord;
@@ -261,6 +521,7 @@ function Standing({
   onPlay: () => void;
   onRestart: () => void;
   onAbandon: () => void;
+  busy: boolean;
 }) {
   const me = mySeat(bracket);
   const over = isMyTournamentOver(bracket);
@@ -325,8 +586,12 @@ function Standing({
       </View>
 
       {over ? (
-        <SoundTouchable style={styles.primaryButton} onPress={onRestart} activeOpacity={0.88}>
-          <Text style={styles.primaryButtonText}>{t('tournament.again')}</Text>
+        <SoundTouchable style={styles.primaryButton} onPress={onRestart} activeOpacity={0.88} disabled={busy}>
+          {busy ? (
+            <ActivityIndicator color={theme.onInk} />
+          ) : (
+            <Text style={styles.primaryButtonText}>{t('tournament.again')}</Text>
+          )}
         </SoundTouchable>
       ) : (
         <SoundTouchable style={styles.ghostButton} onPress={onAbandon} activeOpacity={0.85}>
@@ -588,6 +853,26 @@ function makeStyles(theme: Theme) {
       marginTop: 16,
     },
     medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
+    lobbyCountdown: { fontSize: 34, fontFamily: fontFamily('800'), color: theme.text, textAlign: 'center', marginBottom: 4 },
+    lobbyNames: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
+    lobbyChip: {
+      backgroundColor: theme.background,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 6,
+    },
+    lobbyChipMe: { backgroundColor: theme.primaryLight, borderColor: theme.primaryLight },
+    lobbyChipText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted, maxWidth: 120 },
+    lobbyChipTextMe: { color: theme.text },
+    offlineNote: {
+      fontSize: 12,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: 16,
+    },
     ghostButton: { alignSelf: 'stretch', paddingVertical: 14, alignItems: 'center', marginTop: 14 },
     ghostButtonText: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('700') },
     rivalBadge: {

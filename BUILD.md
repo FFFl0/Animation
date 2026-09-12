@@ -22,6 +22,33 @@
 зашиты в `env` профилей — это публичный anon-ключ, он и должен попадать
 в клиент. Токен Expo лежит в секрете репозитория `EXPO_TOKEN`.
 
+## Supabase
+
+Серверная часть живёт в `supabase/`. Всё в ней ставится вручную, один раз
+(и после каждой правки схемы или функций):
+
+1. **Схема.** SQL Editor → вставить целиком `supabase/schema.sql` → Run.
+   Файл идемпотентный, прогонять можно сколько угодно раз в любом
+   состоянии базы.
+2. **Edge Functions.** По одной команде на каждую:
+
+   ```
+   supabase functions deploy auth-helper
+   supabase functions deploy delete-account
+   supabase functions deploy send-push
+   supabase functions deploy tournament
+   ```
+
+| Функция | Зачем |
+| --- | --- |
+| `auth-helper` | вход по имени пользователя, не раскрывая клиенту почту аккаунта |
+| `delete-account` | удаление аккаунта (нужен service role) |
+| `send-push` | пуши о заявках в друзья и вызовах на бой |
+| `tournament` | сетка турнира: лобби, посев, сведение матчей |
+
+Без задеплоенной `tournament` турнир не падает — он играется с ботами
+на устройстве.
+
 ## Отчёты об ошибках (Sentry)
 
 Отчёты о падениях выключены, пока не задан `EXPO_PUBLIC_SENTRY_DSN`. Без

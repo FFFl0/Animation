@@ -46,14 +46,14 @@ describe('roundsReached', () => {
 
 describe('applyRun', () => {
   it('counts the run and the medal it earned', () => {
-    const after = applyRun(EMPTY_RECORD, runWon());
-    expect(after).toEqual({ runs: 1, gold: 1, silver: 0, bronze: 0, bestRound: TOURNAMENT_ROUNDS });
+    const after = applyRun(EMPTY_RECORD, runWon(), 'a');
+    expect(after).toEqual({ lastRunId: 'a', runs: 1, gold: 1, silver: 0, bronze: 0, bestRound: TOURNAMENT_ROUNDS });
   });
 
   it('accumulates across runs and keeps the best result', () => {
-    let record = applyRun(EMPTY_RECORD, runWon());
-    record = applyRun(record, runOut(0));
-    record = applyRun(record, runOut(TOURNAMENT_ROUNDS - 2));
+    let record = applyRun(EMPTY_RECORD, runWon(), 'a');
+    record = applyRun(record, runOut(0), 'b');
+    record = applyRun(record, runOut(TOURNAMENT_ROUNDS - 2), 'c');
 
     expect(record.runs).toBe(3);
     expect(record.gold).toBe(1);
@@ -63,8 +63,14 @@ describe('applyRun', () => {
     expect(record.bestRound).toBe(TOURNAMENT_ROUNDS);
   });
 
+  it('ignores a run that was already banked', () => {
+    const once = applyRun(EMPTY_RECORD, runWon(), 'same');
+    expect(applyRun(once, runWon(), 'same')).toBe(once);
+    expect(applyRun(once, runWon(), 'other').runs).toBe(2);
+  });
+
   it('records a medal-less run without awarding anything', () => {
-    const record = applyRun(EMPTY_RECORD, runOut(1));
+    const record = applyRun(EMPTY_RECORD, runOut(1), 'x');
     expect(record.runs).toBe(1);
     expect(totalMedals(record)).toBe(0);
     expect(record.bestRound).toBe(1);
