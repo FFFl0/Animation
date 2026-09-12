@@ -6,12 +6,12 @@ import { CategoryId } from './categories';
 // dynamic resolver. Replacing a file under assets/categories keeps working
 // without touching this file — see that folder's README.
 export const CATEGORY_BACKGROUNDS: Record<CategoryId, ImageSourcePropType> = {
-  anime: require('../../assets/categories/anime.png'),
-  characters: require('../../assets/categories/characters.png'),
-  openings: require('../../assets/categories/openings.png'),
-  quotes: require('../../assets/categories/quotes.png'),
-  battles: require('../../assets/categories/battles.png'),
-  world: require('../../assets/categories/world.png'),
-  hard: require('../../assets/categories/hard.png'),
-  mixed: require('../../assets/categories/mixed.png'),
+  anime: require('../../assets/categories/anime.jpg'),
+  characters: require('../../assets/categories/characters.jpg'),
+  openings: require('../../assets/categories/openings.jpg'),
+  quotes: require('../../assets/categories/quotes.jpg'),
+  battles: require('../../assets/categories/battles.jpg'),
+  world: require('../../assets/categories/world.jpg'),
+  hard: require('../../assets/categories/hard.jpg'),
+  mixed: require('../../assets/categories/mixed.jpg'),
 };
