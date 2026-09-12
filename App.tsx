@@ -33,7 +33,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
-import TournamentScreen from './src/screens/TournamentScreen';
+import TournamentScreen, { TOURNAMENT_MATCH_CONFIG } from './src/screens/TournamentScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
@@ -338,7 +338,17 @@ function AppShell() {
               onOpenTournament={() => setScreen('tournament')}
             />
           )}
-          {screen === 'tournament' && <TournamentScreen onBack={() => setScreen('home')} />}
+          {screen === 'tournament' && (
+            <TournamentScreen
+              onBack={() => setScreen('home')}
+              onMatchPlayed={async (score, total) => {
+                // A tournament match is still seven real questions, so it
+                // feeds stats, XP and achievements like any other round.
+                const unlocked = await recordRoundResult(TOURNAMENT_MATCH_CONFIG, null, score, total);
+                if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
+              }}
+            />
+          )}
 
           {screen === 'battle' && (
             <BattleScreen

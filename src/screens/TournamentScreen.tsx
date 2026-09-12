@@ -28,14 +28,19 @@ import {
 } from '../tournament/bracket';
 import { buildSeats } from '../tournament/bots';
 import { clearTournament, loadTournament, saveTournament } from '../tournament/tournamentStorage';
+import { EMPTY_RECORD, TournamentRecord, applyRun, medalFor, roundsReached } from '../tournament/medals';
+import { loadRecord, saveRecord } from '../tournament/medalStorage';
+import MedalShelf from '../components/MedalShelf';
 
 type Props = {
   onBack: () => void;
+  /** Lets the round count towards stats, XP and achievements like any other quiz. */
+  onMatchPlayed: (score: number, total: number) => void;
 };
 
 type Phase = 'loading' | 'bracket' | 'playing' | 'roundResult';
 
-const MATCH_CONFIG: RoundConfig = {
+export const TOURNAMENT_MATCH_CONFIG: RoundConfig = {
   categoryId: 'mixed',
   questionCount: MATCH_QUESTIONS,
   timerSeconds: 15,
@@ -46,7 +51,7 @@ const MATCH_CONFIG: RoundConfig = {
  * the other fifteen in the round are played out by the bracket engine, so a
  * round always resolves whether or not anybody else is online.
  */
-export default function TournamentScreen({ onBack }: Props) {
+export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { profile } = useAuth();
@@ -57,6 +62,7 @@ export default function TournamentScreen({ onBack }: Props) {
   const [phase, setPhase] = useState<Phase>('loading');
   const [lastRound, setLastRound] = useState<number | null>(null);
   const [quizKey, setQuizKey] = useState(0);
+  const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
 
   useEffect(() => {
     if (!profile) return;
@@ -64,6 +70,7 @@ export default function TournamentScreen({ onBack }: Props) {
       setBracket(saved);
       setPhase('bracket');
     });
+    loadRecord(profile.id).then(setRecord);
   }, [profile?.id]);
 
   if (!profile) return null;
@@ -93,9 +100,19 @@ export default function TournamentScreen({ onBack }: Props) {
     const played = bracket.round;
     const next = resolveRound(bracket, score);
     persist(next);
+    onMatchPlayed(score, MATCH_QUESTIONS);
     setLastRound(played);
     setPhase('roundResult');
     buzz(next.myExitRound === played ? 'error' : 'success');
+
+    // The run is over the moment the player is out or lifts the trophy; the
+    // shelf is updated here rather than on the results screen so leaving
+    // early cannot cost somebody a medal they earned.
+    if (isMyTournamentOver(next)) {
+      const updated = applyRun(record, next);
+      setRecord(updated);
+      saveRecord(profile.id, updated);
+    }
   };
 
   if (phase === 'playing' && bracket) {
@@ -106,7 +123,7 @@ export default function TournamentScreen({ onBack }: Props) {
       <View style={{ flex: 1 }}>
         <QuizScreen
           key={quizKey}
-          config={MATCH_CONFIG}
+          config={TOURNAMENT_MATCH_CONFIG}
           onFinish={(score) => finishMatch(score)}
           onClose={() => setPhase('bracket')}
         />
@@ -129,11 +146,14 @@ export default function TournamentScreen({ onBack }: Props) {
       <ScrollView contentContainerStyle={styles.content}>
         {phase === 'loading' && <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />}
 
-        {phase === 'bracket' && !bracket && <Intro styles={styles} theme={theme} t={t} onStart={startTournament} />}
+        {phase === 'bracket' && !bracket && (
+          <Intro styles={styles} theme={theme} t={t} record={record} onStart={startTournament} />
+        )}
 
         {phase === 'bracket' && bracket && (
           <Standing
             bracket={bracket}
+            record={record}
             styles={styles}
             theme={theme}
             t={t}
@@ -168,7 +188,23 @@ function roundLabel(round: number, t: ReturnType<typeof useT>): string {
   return `1/${TOURNAMENT_SIZE >> round}`;
 }
 
-function Intro({ styles, theme, t, onStart }: { styles: Styles; theme: Theme; t: ReturnType<typeof useT>; onStart: () => void }) {
+function medalLabels(t: ReturnType<typeof useT>) {
+  return { gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') };
+}
+
+function Intro({
+  styles,
+  theme,
+  t,
+  record,
+  onStart,
+}: {
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  record: TournamentRecord;
+  onStart: () => void;
+}) {
   return (
     <>
       <View style={styles.heroIcon}>
@@ -186,6 +222,14 @@ function Intro({ styles, theme, t, onStart }: { styles: Styles; theme: Theme; t:
         ))}
       </View>
 
+      {record.runs > 0 && (
+        <>
+          <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
+          <MedalShelf record={record} labels={medalLabels(t)} />
+          <Text style={styles.recordLine}>{t('tournament.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
+        </>
+      )}
+
       <SoundTouchable style={styles.primaryButton} onPress={onStart} activeOpacity={0.88}>
         <Text style={styles.primaryButtonText}>{t('tournament.start')}</Text>
       </SoundTouchable>
@@ -193,8 +237,15 @@ function Intro({ styles, theme, t, onStart }: { styles: Styles; theme: Theme; t:
   );
 }
 
+/** How far a finished run got, for the record line: rounds survived, not the round played. */
+function roundName(rounds: number, t: ReturnType<typeof useT>): string {
+  if (rounds >= TOURNAMENT_ROUNDS) return t('tournament.bestTitle');
+  return roundLabel(rounds, t);
+}
+
 function Standing({
   bracket,
+  record,
   styles,
   theme,
   t,
@@ -203,6 +254,7 @@ function Standing({
   onAbandon,
 }: {
   bracket: Bracket;
+  record: TournamentRecord;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
@@ -255,6 +307,14 @@ function Standing({
             <Text style={styles.primaryButtonText}>{t('tournament.play', MATCH_QUESTIONS)}</Text>
           </SoundTouchable>
         </View>
+      )}
+
+      {over && (
+        <>
+          <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
+          <MedalShelf record={record} labels={medalLabels(t)} />
+          <Text style={styles.recordLine}>{t('tournament.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
+        </>
       )}
 
       <Text style={styles.sectionTitle}>{t('tournament.path')}</Text>
@@ -345,6 +405,7 @@ function RoundResult({
   const myScore = match.seatA === me ? match.scoreA : match.scoreB;
   const theirScore = match.seatA === me ? match.scoreB : match.scoreA;
   const champion = bracket.championSeat === me;
+  const medal = isMyTournamentOver(bracket) ? medalFor(bracket) : null;
 
   return (
     <>
@@ -366,6 +427,13 @@ function RoundResult({
           <Text style={[styles.scoreValue, { color: won ? theme.text : theme.danger }]}>{theirScore}</Text>
         </View>
       </View>
+
+      {medal && (
+        <View style={styles.medalBanner}>
+          <Icon name="medal" size={18} color={theme.primary} />
+          <Text style={styles.medalBannerText}>{t('tournament.medalEarned', t(`tournament.medal${medal[0].toUpperCase()}${medal.slice(1)}` as 'tournament.medalGold'))}</Text>
+        </View>
+      )}
 
       <Text style={styles.lead}>
         {champion
@@ -502,6 +570,24 @@ function makeStyles(theme: Theme) {
       marginTop: 22,
     },
     primaryButtonText: { color: theme.onInk, fontSize: 15, fontFamily: fontFamily('800') },
+    recordLine: {
+      fontSize: 12,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: 10,
+    },
+    medalBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      backgroundColor: theme.primaryLight,
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 9,
+      marginTop: 16,
+    },
+    medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
     ghostButton: { alignSelf: 'stretch', paddingVertical: 14, alignItems: 'center', marginTop: 14 },
     ghostButtonText: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('700') },
     rivalBadge: {

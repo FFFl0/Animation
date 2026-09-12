@@ -79,6 +79,15 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           </SoundTouchable>
         </View>
 
+        <SoundTouchable style={styles.tournamentCard} onPress={onOpenTournament} activeOpacity={0.88}>
+          <Image source={TOURNAMENT_BANNER} style={styles.cardBackground} resizeMode="cover" />
+          <ImageScrim direction="left" />
+          <View style={styles.battleContent}>
+            <Text style={styles.battleTitle}>{t('home.tournamentTitle')}</Text>
+            <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.tournamentSubtitle')}</Text>
+          </View>
+        </SoundTouchable>
+
         <View style={styles.streakCard}>
           <Icon name="flame" size={26} color={theme.primary} />
           <View>
@@ -108,15 +117,6 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           <View style={styles.battleContent}>
             <Text style={styles.battleTitle}>{t('home.battleTitle')}</Text>
             <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.battleSubtitle')}</Text>
-          </View>
-        </SoundTouchable>
-
-        <SoundTouchable style={styles.tournamentCard} onPress={onOpenTournament} activeOpacity={0.88}>
-          <Image source={TOURNAMENT_BANNER} style={styles.cardBackground} resizeMode="cover" />
-          <ImageScrim direction="left" />
-          <View style={styles.battleContent}>
-            <Text style={styles.battleTitle}>{t('home.tournamentTitle')}</Text>
-            <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.tournamentSubtitle')}</Text>
           </View>
         </SoundTouchable>
 
@@ -188,14 +188,14 @@ function makeStyles(theme: Theme) {
       aspectRatio: 2.6,
       borderRadius: radius.lg,
       overflow: 'hidden',
-      marginBottom: 12,
+      marginBottom: 24,
     },
     tournamentCard: {
       width: '100%',
       aspectRatio: 3.5,
       borderRadius: radius.lg,
       overflow: 'hidden',
-      marginBottom: 24,
+      marginBottom: 12,
     },
     battleContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, maxWidth: '62%' },
     battleTitle: {

@@ -15,6 +15,9 @@ import { pickProfilePhoto } from '../avatar/photoPicker';
 import { deleteAvatarPhoto, uploadAvatarPhoto } from '../avatar/avatarStorage';
 import { PresetAvatarId, PRESET_AVATAR_IDS, PRESET_AVATAR_IMAGES } from '../data/presetAvatars';
 import { levelFromStats } from '../data/level';
+import MedalShelf from '../components/MedalShelf';
+import { EMPTY_RECORD, TournamentRecord, totalMedals } from '../tournament/medals';
+import { loadRecord } from '../tournament/medalStorage';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
@@ -44,6 +47,7 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
   const [draftName, setDraftName] = useState('');
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
+  const [medals, setMedals] = useState<TournamentRecord>(EMPTY_RECORD);
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -70,6 +74,10 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
   useEffect(() => {
     getReminderEnabled().then(setReminderOn);
   }, []);
+
+  useEffect(() => {
+    if (profile) loadRecord(profile.id).then(setMedals);
+  }, [profile?.id]);
 
   const handleToggleReminder = async () => {
     setReminderError(null);
@@ -293,6 +301,13 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
         <Text style={styles.favSummary}>{t('profile.favoriteSummary', characterName(favoriteCharacter, language))}</Text>
       )}
 
+      <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
+      <MedalShelf
+        record={medals}
+        labels={{ gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') }}
+      />
+      {totalMedals(medals) === 0 && <Text style={styles.medalHint}>{t('tournament.profileEmpty')}</Text>}
+
       <Text style={styles.sectionTitle}>{t('profile.themeTitle')}</Text>
       <View style={styles.themeTabs}>
         {THEME_TABS.map((tab) => (
@@ -503,6 +518,7 @@ function makeStyles(theme: Theme) {
     },
     photoButtonText: { color: theme.primary, fontFamily: fontFamily('700'), fontSize: 13 },
     photoHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 10, textAlign: 'center' },
+    medalHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 8, textAlign: 'center' },
     photoError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 6, textAlign: 'center' },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
     searchWrap: {
