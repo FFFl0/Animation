@@ -1,10 +1,10 @@
 import { Image, StyleSheet, Text, View } from 'react-native';
-import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import SoundTouchable from '../sound/SoundTouchable';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { CategoryId } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
+import ImageScrim from './ImageScrim';
 
 type Props = {
   id: CategoryId;
@@ -25,19 +25,7 @@ export default function CategoryTile({ id, title, subtitle, startLabel, onPress 
   return (
     <SoundTouchable style={styles.card} onPress={onPress} activeOpacity={0.88}>
       <Image source={CATEGORY_BACKGROUNDS[id]} style={styles.background} resizeMode="cover" />
-      {/* Darkens the top of the picture, where the name sits, and leaves
-          the middle alone — some of the artwork is bright enough that a flat
-          white title would otherwise disappear into it. */}
-      <Svg style={styles.scrim} width="100%" height="100%">
-        <Defs>
-          <LinearGradient id="catScrim" x1="0" y1="0" x2="0" y2="1">
-            <Stop offset="0" stopColor="#000000" stopOpacity="0.52" />
-            <Stop offset="0.55" stopColor="#000000" stopOpacity="0.16" />
-            <Stop offset="1" stopColor="#000000" stopOpacity="0.28" />
-          </LinearGradient>
-        </Defs>
-        <Rect x="0" y="0" width="100%" height="100%" fill="url(#catScrim)" />
-      </Svg>
+      <ImageScrim />
 
       <View style={styles.content}>
         <Text style={styles.title} numberOfLines={2}>{title}</Text>
@@ -59,7 +47,6 @@ const styles = StyleSheet.create({
     overflow: 'hidden',
   },
   background: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
-  scrim: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
   content: { flex: 1, padding: 14 },
   title: {
     fontSize: 17,

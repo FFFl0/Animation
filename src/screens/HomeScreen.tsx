@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -13,6 +13,8 @@ import { ANIME_SERIES } from '../data/animeSeries';
 import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
+import ImageScrim from '../components/ImageScrim';
+import { BATTLE_BANNER, MODE_BACKGROUNDS } from '../data/modeImages';
 import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -99,12 +101,12 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
         </View>
 
         <SoundTouchable style={styles.battleCard} onPress={onOpenBattle} activeOpacity={0.88}>
-          <View style={styles.battleIconWrap}>
-            <Icon name="swords" size={22} color={theme.onInk} />
-          </View>
-          <View style={{ flex: 1 }}>
+          <Image source={BATTLE_BANNER} style={styles.cardBackground} resizeMode="cover" />
+          {/* the trophy sits in the middle of the banner, so darken the side the text runs down */}
+          <ImageScrim direction="left" />
+          <View style={styles.battleContent}>
             <Text style={styles.battleTitle}>{t('home.battleTitle')}</Text>
-            <Text style={styles.battleSubtitle}>{t('home.battleSubtitle')}</Text>
+            <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.battleSubtitle')}</Text>
           </View>
         </SoundTouchable>
 
@@ -114,13 +116,20 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             const isDailyDone = mode.id === 'daily' && dailyDone;
             return (
               <SoundTouchable key={mode.id} style={styles.modeCard} onPress={() => onStartMode(mode.id)} activeOpacity={0.85}>
-                <View style={styles.modeIconWrap}>
-                  <Icon name={isDailyDone ? 'target' : mode.icon} size={18} color={theme.primary} />
+                <Image source={MODE_BACKGROUNDS[mode.id]} style={styles.cardBackground} resizeMode="cover" />
+                <ImageScrim />
+                {/* the icon is gone from the card, so today's result needs its own mark */}
+                {isDailyDone && (
+                  <View style={styles.modeDoneBadge}>
+                    <Icon name="check" size={13} color={theme.onPrimary} />
+                  </View>
+                )}
+                <View style={styles.modeContent}>
+                  <Text style={styles.modeTitle} numberOfLines={1}>{modeTitle(mode, language)}</Text>
+                  <Text style={styles.modeSubtitle} numberOfLines={2}>
+                    {isDailyDone ? t('home.dailyDone', dailyDone!.score, dailyDone!.total) : modeSubtitle(mode, language)}
+                  </Text>
                 </View>
-                <Text style={styles.modeTitle}>{modeTitle(mode, language)}</Text>
-                <Text style={styles.modeSubtitle}>
-                  {isDailyDone ? t('home.dailyDone', dailyDone!.score, dailyDone!.total) : modeSubtitle(mode, language)}
-                </Text>
               </SoundTouchable>
             );
           })}
@@ -159,25 +168,32 @@ function makeStyles(theme: Theme) {
     streakLabel: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text, opacity: 0.7 },
     streakValue: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 12 },
+    cardBackground: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
     battleCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 14,
-      backgroundColor: theme.ink,
+      aspectRatio: 3.5,
       borderRadius: radius.lg,
-      padding: 16,
+      overflow: 'hidden',
       marginBottom: 24,
     },
-    battleIconWrap: {
-      width: 44,
-      height: 44,
-      borderRadius: 14,
-      backgroundColor: 'rgba(255,255,255,0.15)',
-      alignItems: 'center',
-      justifyContent: 'center',
+    battleContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, maxWidth: '62%' },
+    battleTitle: {
+      fontSize: 16,
+      fontFamily: fontFamily('800'),
+      color: '#FFFFFF',
+      marginBottom: 2,
+      textShadowColor: 'rgba(0,0,0,0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 4,
     },
-    battleTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.onInk, marginBottom: 2 },
-    battleSubtitle: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.onInk, opacity: 0.75 },
+    battleSubtitle: {
+      fontSize: 12,
+      lineHeight: 16,
+      fontFamily: fontFamily('600'),
+      color: 'rgba(255,255,255,0.9)',
+      textShadowColor: 'rgba(0,0,0,0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 4,
+    },
     grid: {
       flexDirection: 'row',
       flexWrap: 'wrap',
@@ -187,23 +203,40 @@ function makeStyles(theme: Theme) {
     },
     modesRow: { gap: 12, paddingRight: 12 },
     modeCard: {
-      width: 150,
-      backgroundColor: theme.card,
+      width: 190,
+      aspectRatio: 1.7,
       borderRadius: radius.lg,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      padding: 14,
+      overflow: 'hidden',
     },
-    modeIconWrap: {
-      width: 34,
-      height: 34,
-      borderRadius: 11,
-      backgroundColor: theme.primaryLight,
+    modeContent: { flex: 1, justifyContent: 'flex-end', padding: 12 },
+    modeDoneBadge: {
+      position: 'absolute',
+      top: 10,
+      right: 10,
+      width: 24,
+      height: 24,
+      borderRadius: 12,
+      backgroundColor: theme.primary,
       alignItems: 'center',
       justifyContent: 'center',
-      marginBottom: 10,
     },
-    modeTitle: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text, marginBottom: 2 },
-    modeSubtitle: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, lineHeight: 15 },
+    modeTitle: {
+      fontSize: 15,
+      fontFamily: fontFamily('800'),
+      color: '#FFFFFF',
+      marginBottom: 2,
+      textShadowColor: 'rgba(0,0,0,0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 4,
+    },
+    modeSubtitle: {
+      fontSize: 11,
+      lineHeight: 15,
+      fontFamily: fontFamily('600'),
+      color: 'rgba(255,255,255,0.9)',
+      textShadowColor: 'rgba(0,0,0,0.5)',
+      textShadowOffset: { width: 0, height: 1 },
+      textShadowRadius: 4,
+    },
   });
 }
