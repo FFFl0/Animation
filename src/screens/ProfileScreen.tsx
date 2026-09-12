@@ -301,12 +301,12 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
         <Text style={styles.favSummary}>{t('profile.favoriteSummary', characterName(favoriteCharacter, language))}</Text>
       )}
 
-      <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
+      <Text style={styles.sectionTitle}>{t('practice.medals')}</Text>
       <MedalShelf
         record={medals}
-        labels={{ gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') }}
+        labels={{ gold: t('practice.medalGold'), silver: t('practice.medalSilver'), bronze: t('practice.medalBronze') }}
       />
-      {totalMedals(medals) === 0 && <Text style={styles.medalHint}>{t('tournament.profileEmpty')}</Text>}
+      {totalMedals(medals) === 0 && <Text style={styles.medalHint}>{t('practice.profileEmpty')}</Text>}
 
       <Text style={styles.sectionTitle}>{t('profile.themeTitle')}</Text>
       <View style={styles.themeTabs}>

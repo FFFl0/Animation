@@ -33,7 +33,8 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
-import TournamentScreen, { TOURNAMENT_MATCH_CONFIG } from './src/screens/TournamentScreen';
+import TournamentScreen, { WEEKLY_MATCH_CONFIG } from './src/screens/TournamentScreen';
+import PracticeTournamentScreen, { PRACTICE_MATCH_CONFIG } from './src/screens/PracticeTournamentScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
@@ -67,6 +68,7 @@ type Screen =
   | 'leaderboard'
   | 'battle'
   | 'tournament'
+  | 'practiceTournament'
   | 'friends'
   | 'friendProfile'
   | 'compare'
@@ -173,6 +175,9 @@ function AppShell() {
         }
         case 'tournament':
           setScreen('home');
+          return true;
+        case 'practiceTournament':
+          setScreen('tournament');
           return true;
         case 'friendProfile':
           setScreen('friends');
@@ -341,10 +346,21 @@ function AppShell() {
           {screen === 'tournament' && (
             <TournamentScreen
               onBack={() => setScreen('home')}
+              onOpenPractice={() => setScreen('practiceTournament')}
               onMatchPlayed={async (score, total) => {
-                // A tournament match is still seven real questions, so it
-                // feeds stats, XP and achievements like any other round.
-                const unlocked = await recordRoundResult(TOURNAMENT_MATCH_CONFIG, null, score, total);
+                // A tournament game is still seven real questions, so it feeds
+                // stats, XP and achievements like any other round.
+                const unlocked = await recordRoundResult(WEEKLY_MATCH_CONFIG, null, score, total);
+                if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
+              }}
+            />
+          )}
+
+          {screen === 'practiceTournament' && (
+            <PracticeTournamentScreen
+              onBack={() => setScreen('tournament')}
+              onMatchPlayed={async (score, total) => {
+                const unlocked = await recordRoundResult(PRACTICE_MATCH_CONFIG, null, score, total);
                 if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
               }}
             />

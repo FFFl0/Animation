@@ -7,711 +7,639 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
-import { useAuth } from '../auth/AuthContext';
 import { useT } from '../i18n/strings';
 import Icon from '../components/Icon';
 import QuizScreen from './QuizScreen';
 import { RoundConfig } from '../quiz/types';
 import {
-  Bracket,
-  MATCH_QUESTIONS,
-  TOURNAMENT_ROUNDS,
-  TOURNAMENT_SIZE,
-  createBracket,
-  isMyTournamentOver,
-  myMatch,
-  mySeat,
-  opponentSeat,
-  resolveRound,
-  seatOf,
-  survivorsAt,
-} from '../tournament/bracket';
-import { buildSeats } from '../tournament/bots';
-import { clearTournament, loadTournament, saveTournament } from '../tournament/tournamentStorage';
+  DeBracket,
+  GAME_QUESTIONS,
+  MATCH_DEFS,
+  MatchId,
+  WINS_PER_MATCH,
+  championSeed,
+  isDecided,
+  isEliminated,
+  lossesOf,
+  participantsOf,
+  playableMatchesFor,
+  winsOf,
+} from '../tournament/doubleElim';
 import {
-  ServerState,
-  canPlayOnline,
-  fetchTournament,
-  joinTournament,
-  lobbySecondsLeft,
-  resumeTournament,
-  submitMatchScore,
-  toBracket,
-} from '../tournament/tournamentApi';
-import { EMPTY_RECORD, TournamentRecord, applyRun, medalFor, roundsReached } from '../tournament/medals';
-import { loadRecord, saveRecord } from '../tournament/medalStorage';
-import MedalShelf from '../components/MedalShelf';
+  WeeklyState,
+  canPlayWeekly,
+  fetchWeekly,
+  hasSubmitted,
+  openGameOf,
+  registerForWeekly,
+  secondsUntil,
+  submitGameScore,
+  toDeBracket,
+  unregisterFromWeekly,
+} from '../tournament/weeklyApi';
 
 type Props = {
   onBack: () => void;
-  /** Lets the round count towards stats, XP and achievements like any other quiz. */
+  onOpenPractice: () => void;
   onMatchPlayed: (score: number, total: number) => void;
 };
 
-type Phase = 'loading' | 'bracket' | 'playing' | 'roundResult' | 'lobby' | 'waiting';
+type Tab = 'bracket' | 'players' | 'matches' | 'rules';
+type Phase = 'loading' | 'offline' | 'view' | 'playing';
 
-/** How often the lobby and a match waiting on its opponent re-read the server. */
-const POLL_MS = 3000;
+const TABS: Tab[] = ['bracket', 'players', 'matches', 'rules'];
 
-export const TOURNAMENT_MATCH_CONFIG: RoundConfig = {
+export const WEEKLY_MATCH_CONFIG: RoundConfig = {
   categoryId: 'mixed',
-  questionCount: MATCH_QUESTIONS,
+  questionCount: GAME_QUESTIONS,
   timerSeconds: 15,
 };
 
+/** Re-reads the bracket while a match is waiting on an opponent. */
+const POLL_MS = 5000;
+
 /**
- * A 32-player single-elimination run. The player's own match is a real quiz;
- * the other fifteen in the round are played out by the bracket engine, so a
- * round always resolves whether or not anybody else is online.
+ * The weekly tournament: sixteen players, double elimination, matches best of
+ * three. Registration runs all week; the bracket is fixed when it starts at
+ * the weekend and the highest rated sixteen who signed up get the seats.
  */
-export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
+export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { profile } = useAuth();
   const { buzz } = useSound();
   const t = useT();
 
-  const [bracket, setBracket] = useState<Bracket | null>(null);
+  const [state, setState] = useState<WeeklyState | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
-  const [lastRound, setLastRound] = useState<number | null>(null);
-  const [quizKey, setQuizKey] = useState(0);
-  const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
-  const [online, setOnline] = useState<ServerState | null>(null);
+  const [tab, setTab] = useState<Tab>('bracket');
   const [busy, setBusy] = useState(false);
-  const [offlineNote, setOfflineNote] = useState(false);
+  const [playing, setPlaying] = useState<MatchId | null>(null);
+  const [quizKey, setQuizKey] = useState(0);
   const [tick, setTick] = useState(0);
 
-  const onlineTournament = online?.tournament ?? null;
+  const bracket = useMemo(() => (state ? toDeBracket(state) : null), [state]);
+  const mySeat = state?.mySeat ?? null;
+  const myMatch = bracket && mySeat !== null ? playableMatchesFor(bracket, mySeat)[0] ?? null : null;
+  const mySide: 'a' | 'b' | null =
+    bracket && myMatch && mySeat !== null ? (participantsOf(bracket, myMatch)[0] === mySeat ? 'a' : 'b') : null;
+  const waiting = !!(state && myMatch && mySide && hasSubmitted(state, myMatch, mySide));
+
+  const load = async () => {
+    const next = await fetchWeekly();
+    setState(next);
+    setPhase('view');
+  };
 
   useEffect(() => {
-    if (!profile) return;
-    loadRecord(profile.id).then(setRecord);
+    if (!canPlayWeekly) {
+      setPhase('offline');
+      return;
+    }
+    load().catch(() => setPhase('offline'));
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, []);
 
-    let cancelled = false;
-    const boot = async () => {
-      if (canPlayOnline) {
-        try {
-          const state = await resumeTournament();
-          if (!cancelled && state.tournament) {
-            setOnline(state);
-            setBracket(toBracket(state));
-            setPhase(state.tournament.status === 'lobby' ? 'lobby' : 'bracket');
-            return;
-          }
-        } catch {
-          // Falls through to whatever is saved on the device.
-        }
-      }
-      const saved = await loadTournament(profile.id);
-      if (cancelled) return;
-      setBracket(saved);
-      setPhase('bracket');
-    };
-    boot();
-    return () => {
-      cancelled = true;
-    };
-  }, [profile?.id]);
-
-  // Keeps the lobby countdown moving and re-reads the server while there is
-  // something to wait for: other people arriving, or an opponent's score.
+  // Keeps the countdown moving, and re-reads the server while a match is
+  // waiting on the other side to hand a score in.
   useEffect(() => {
-    if (phase !== 'lobby' && phase !== 'waiting') return;
     const id = setInterval(() => setTick((n) => n + 1), 1000);
     return () => clearInterval(id);
-  }, [phase]);
+  }, []);
 
   useEffect(() => {
-    if ((phase !== 'lobby' && phase !== 'waiting') || !onlineTournament) return;
+    if (phase !== 'view' || !waiting) return;
     const id = setInterval(() => {
-      refreshOnline().catch(() => {});
+      load().catch(() => {});
     }, POLL_MS);
     return () => clearInterval(id);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, onlineTournament?.id]);
+  }, [phase, waiting]);
 
-  if (!profile) return null;
-
-  /** Banks a finished run once — an online bracket is re-read constantly. */
-  const bankIfOver = (next: Bracket, runId: string) => {
-    if (!isMyTournamentOver(next)) return;
-    setRecord((current) => {
-      const updated = applyRun(current, next, runId);
-      if (updated !== current) saveRecord(profile.id, updated);
-      return updated;
-    });
-  };
-
-  const applyOnline = (state: ServerState, nextPhase?: Phase) => {
-    setOnline(state);
-    const mapped = toBracket(state);
-    setBracket(mapped);
-    if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
-    if (nextPhase) {
-      setPhase(nextPhase);
-    } else if (state.tournament?.status === 'lobby') {
-      setPhase('lobby');
+  const toggleRegistration = async () => {
+    if (busy || !state) return;
+    setBusy(true);
+    buzz('tap');
+    try {
+      setState(state.amRegistered ? await unregisterFromWeekly() : await registerForWeekly());
+    } catch {
+      await load().catch(() => {});
     }
+    setBusy(false);
   };
 
-  const refreshOnline = async () => {
-    if (!onlineTournament) return;
-    const state = await fetchTournament(onlineTournament.id);
-    const mapped = toBracket(state);
-    setOnline(state);
-    setBracket(mapped);
-    if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
-
-    if (state.tournament?.status !== 'lobby' && phase === 'lobby') setPhase('bracket');
-    // The opponent handed their score in, so the round can be shown.
-    if (phase === 'waiting' && mapped) {
-      const decided = mapped.matches.find(
-        (m) => m.round === lastRound && m.winner !== null && (m.seatA === mySeat(mapped) || m.seatB === mySeat(mapped))
-      );
-      if (decided) setPhase('roundResult');
+  const finishGame = async (score: number) => {
+    const match = playing;
+    setPlaying(null);
+    if (!match) return;
+    onMatchPlayed(score, GAME_QUESTIONS);
+    setPhase('view');
+    setBusy(true);
+    try {
+      setState(await submitGameScore(match, score));
+      buzz('success');
+    } catch {
+      await load().catch(() => {});
     }
+    setBusy(false);
   };
 
-  const persist = (next: Bracket) => {
-    setBracket(next);
-    saveTournament(profile.id, next);
-  };
-
-  const startLocal = () => {
-    const seed = Date.now() >>> 0;
-    persist(createBracket(buildSeats(profile.username, [], seed), seed));
-    setOnline(null);
-    setLastRound(null);
-    setPhase('bracket');
-  };
-
-  const startTournament = async () => {
-    if (busy) return;
-    buzz('heavy');
-    setLastRound(null);
-    setOfflineNote(false);
-
-    if (canPlayOnline) {
-      setBusy(true);
-      try {
-        const state = await joinTournament();
-        applyOnline(state, state.tournament?.status === 'lobby' ? 'lobby' : 'bracket');
-        setBusy(false);
-        return;
-      } catch {
-        // The lobby is unreachable — a run against bots is better than none.
-        setOfflineNote(true);
-      }
-      setBusy(false);
-    }
-
-    startLocal();
-  };
-
-  const abandon = async () => {
-    await clearTournament();
-    setBracket(null);
-    setOnline(null);
-    setLastRound(null);
-    setPhase('bracket');
-  };
-
-  const finishMatch = async (score: number) => {
-    if (!bracket) return;
-    const played = bracket.round;
-    onMatchPlayed(score, MATCH_QUESTIONS);
-    setLastRound(played);
-
-    if (onlineTournament) {
-      // The server owns the result: it holds the opponent's score, and a
-      // match between two people is only decided once both have handed in.
-      setBusy(true);
-      try {
-        const state = await submitMatchScore(onlineTournament.id, score);
-        const mapped = toBracket(state);
-        setOnline(state);
-        setBracket(mapped);
-        if (mapped && state.tournament) bankIfOver(mapped, state.tournament.id);
-
-        const me = mapped ? mySeat(mapped) : -1;
-        const mine = mapped?.matches.find((m) => m.round === played && (m.seatA === me || m.seatB === me));
-        if (mine?.winner !== null && mine !== undefined) {
-          setPhase('roundResult');
-          buzz(mine.winner === me ? 'success' : 'error');
-        } else {
-          setPhase('waiting');
-        }
-      } catch {
-        setPhase('bracket');
-      }
-      setBusy(false);
-      return;
-    }
-
-    const next = resolveRound(bracket, score);
-    persist(next);
-    setPhase('roundResult');
-    buzz(next.myExitRound === played ? 'error' : 'success');
-
-    // The run is over the moment the player is out or lifts the trophy; the
-    // shelf is updated here rather than on the results screen so leaving
-    // early cannot cost somebody a medal they earned.
-    bankIfOver(next, String(next.seed));
-  };
-
-  if (phase === 'playing' && bracket) {
-    const me = mySeat(bracket);
-    const match = myMatch(bracket);
-    const rival = match ? seatOf(bracket, opponentSeat(match, me)) : null;
+  if (phase === 'playing' && playing) {
     return (
       <View style={{ flex: 1 }}>
         <QuizScreen
           key={quizKey}
-          config={TOURNAMENT_MATCH_CONFIG}
-          onFinish={(score) => finishMatch(score)}
-          onClose={() => setPhase('bracket')}
+          config={WEEKLY_MATCH_CONFIG}
+          onFinish={(score) => finishGame(score)}
+          onClose={() => {
+            setPlaying(null);
+            setPhase('view');
+          }}
         />
-        <View style={styles.rivalBadge} pointerEvents="none">
-          <Icon name="swords" size={13} color={theme.primary} />
-          <Text style={styles.rivalBadgeText}>
-            {t('tournament.roundName', roundLabel(bracket.round, t))} · {rival?.name ?? '—'}
-          </Text>
-        </View>
       </View>
     );
   }
 
   return (
     <SafeAreaView style={styles.safe}>
-      <SoundTouchable onPress={onBack} style={styles.back} accessibilityRole="button">
-        <Text style={styles.backText}>{`‹ ${t('tournament.back')}`}</Text>
-      </SoundTouchable>
-
-      <ScrollView contentContainerStyle={styles.content}>
-        {phase === 'loading' && <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />}
-
-        {phase === 'bracket' && !bracket && (
-          <Intro styles={styles} theme={theme} t={t} record={record} busy={busy} onStart={startTournament} />
-        )}
-
-        {phase === 'lobby' && online?.tournament && (
-          <Lobby state={online} styles={styles} theme={theme} t={t} />
-        )}
-
-        {phase === 'waiting' && bracket && lastRound !== null && (
-          <Waiting
-            bracket={bracket}
-            round={lastRound}
-            styles={styles}
-            theme={theme}
-            t={t}
-            busy={busy}
-            onRefresh={() => refreshOnline().catch(() => {})}
-          />
-        )}
-
-        {offlineNote && phase !== 'lobby' && <Text style={styles.offlineNote}>{t('tournament.offlineFallback')}</Text>}
-
-        {phase === 'bracket' && bracket && (
-          <Standing
-            bracket={bracket}
-            record={record}
-            styles={styles}
-            theme={theme}
-            t={t}
-            onPlay={() => {
-              setQuizKey((k) => k + 1);
-              setPhase('playing');
-            }}
-            onRestart={startTournament}
-            busy={busy}
-            onAbandon={abandon}
-          />
-        )}
-
-        {phase === 'roundResult' && bracket && lastRound !== null && (
-          <RoundResult
-            bracket={bracket}
-            round={lastRound}
-            styles={styles}
-            theme={theme}
-            t={t}
-            onContinue={() => setPhase('bracket')}
-          />
-        )}
-      </ScrollView>
-    </SafeAreaView>
-  );
-}
-
-/** "1/32", "1/16", "1/8", then the two named rounds. */
-function roundLabel(round: number, t: ReturnType<typeof useT>): string {
-  if (round === TOURNAMENT_ROUNDS - 1) return t('tournament.final');
-  if (round === TOURNAMENT_ROUNDS - 2) return t('tournament.semifinal');
-  return `1/${TOURNAMENT_SIZE >> round}`;
-}
-
-function medalLabels(t: ReturnType<typeof useT>) {
-  return { gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') };
-}
-
-function Intro({
-  styles,
-  theme,
-  t,
-  record,
-  busy,
-  onStart,
-}: {
-  styles: Styles;
-  theme: Theme;
-  t: ReturnType<typeof useT>;
-  record: TournamentRecord;
-  busy: boolean;
-  onStart: () => void;
-}) {
-  return (
-    <>
-      <View style={styles.heroIcon}>
-        <Icon name="trophy" size={34} color={theme.primary} />
-      </View>
-      <Text style={styles.title}>{t('tournament.title')}</Text>
-      <Text style={styles.lead}>{t('tournament.intro')}</Text>
-
-      <View style={styles.rulesCard}>
-        {[t('tournament.rule1'), t('tournament.rule2'), t('tournament.rule3')].map((rule) => (
-          <View key={rule} style={styles.ruleRow}>
-            <Icon name="check" size={15} color={theme.primary} />
-            <Text style={styles.ruleText}>{rule}</Text>
-          </View>
-        ))}
+      <View style={styles.header}>
+        <SoundTouchable onPress={onBack} style={styles.back} accessibilityRole="button">
+          <Text style={styles.backText}>{`‹ ${t('tournament.back')}`}</Text>
+        </SoundTouchable>
+        <Text style={styles.headerTitle}>{t('tournament.title')}</Text>
+        <Text style={styles.headerSubtitle}>{t('tournament.format')}</Text>
       </View>
 
-      {record.runs > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
-          <MedalShelf record={record} labels={medalLabels(t)} />
-          <Text style={styles.recordLine}>{t('tournament.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
-        </>
-      )}
+      {phase === 'loading' && <ActivityIndicator color={theme.primary} style={{ marginTop: 40 }} />}
 
-      <SoundTouchable style={styles.primaryButton} onPress={onStart} activeOpacity={0.88} disabled={busy}>
-        {busy ? (
-          <ActivityIndicator color={theme.onInk} />
-        ) : (
-          <Text style={styles.primaryButtonText}>{t('tournament.start')}</Text>
-        )}
-      </SoundTouchable>
-    </>
-  );
-}
-
-/** The lobby: who has arrived so far, and how long is left before it seals. */
-function Lobby({
-  state,
-  styles,
-  theme,
-  t,
-}: {
-  state: ServerState;
-  styles: Styles;
-  theme: Theme;
-  t: ReturnType<typeof useT>;
-}) {
-  const players = state.seats.filter((s) => s.isPlayer);
-  const left = state.tournament ? lobbySecondsLeft(state.tournament) : 0;
-
-  return (
-    <>
-      <View style={styles.heroIcon}>
-        <Icon name="users" size={34} color={theme.primary} />
-      </View>
-      <Text style={styles.title}>{t('tournament.lobbyTitle')}</Text>
-      <Text style={styles.lead}>{t('tournament.lobbyLead')}</Text>
-
-      <View style={styles.nextCard}>
-        <Text style={styles.lobbyCountdown}>{left}</Text>
-        <Text style={styles.nextLabel}>{t('tournament.lobbyJoined', players.length, TOURNAMENT_SIZE)}</Text>
-        <View style={styles.lobbyNames}>
-          {players.map((p) => (
-            <View key={p.seat} style={[styles.lobbyChip, p.isMe && styles.lobbyChipMe]}>
-              <Text style={[styles.lobbyChipText, p.isMe && styles.lobbyChipTextMe]} numberOfLines={1}>
-                {p.name}
-              </Text>
-            </View>
-          ))}
-        </View>
-      </View>
-
-      <Text style={styles.lead}>{t('tournament.lobbyFill')}</Text>
-    </>
-  );
-}
-
-/** Between handing a score in and the opponent doing the same. */
-function Waiting({
-  bracket,
-  round,
-  styles,
-  theme,
-  t,
-  busy,
-  onRefresh,
-}: {
-  bracket: Bracket;
-  round: number;
-  styles: Styles;
-  theme: Theme;
-  t: ReturnType<typeof useT>;
-  busy: boolean;
-  onRefresh: () => void;
-}) {
-  const me = mySeat(bracket);
-  const match = bracket.matches.find((m) => m.round === round && (m.seatA === me || m.seatB === me));
-  const rival = match ? seatOf(bracket, opponentSeat(match, me)) : null;
-  const myScore = match ? (match.seatA === me ? match.scoreA : match.scoreB) : null;
-
-  return (
-    <>
-      <View style={styles.heroIcon}>
-        <Icon name="arrowPath" size={34} color={theme.primary} />
-      </View>
-      <Text style={styles.title}>{t('tournament.waitingTitle')}</Text>
-      <Text style={styles.lead}>{t('tournament.waitingLead', rival?.name ?? '—')}</Text>
-
-      <View style={styles.nextCard}>
-        <Text style={styles.nextLabel}>{t('tournament.waitingYourScore')}</Text>
-        <Text style={styles.lobbyCountdown}>{myScore ?? 0}</Text>
-      </View>
-
-      <SoundTouchable style={styles.primaryButton} onPress={onRefresh} activeOpacity={0.88} disabled={busy}>
-        {busy ? (
-          <ActivityIndicator color={theme.onInk} />
-        ) : (
-          <Text style={styles.primaryButtonText}>{t('tournament.waitingRefresh')}</Text>
-        )}
-      </SoundTouchable>
-      <Text style={styles.lead}>{t('tournament.waitingForfeit')}</Text>
-    </>
-  );
-}
-
-/** How far a finished run got, for the record line: rounds survived, not the round played. */
-function roundName(rounds: number, t: ReturnType<typeof useT>): string {
-  if (rounds >= TOURNAMENT_ROUNDS) return t('tournament.bestTitle');
-  return roundLabel(rounds, t);
-}
-
-function Standing({
-  bracket,
-  record,
-  styles,
-  theme,
-  t,
-  onPlay,
-  onRestart,
-  onAbandon,
-  busy,
-}: {
-  bracket: Bracket;
-  record: TournamentRecord;
-  styles: Styles;
-  theme: Theme;
-  t: ReturnType<typeof useT>;
-  onPlay: () => void;
-  onRestart: () => void;
-  onAbandon: () => void;
-  busy: boolean;
-}) {
-  const me = mySeat(bracket);
-  const over = isMyTournamentOver(bracket);
-  const champion = seatOf(bracket, bracket.championSeat);
-  const iWon = bracket.championSeat === me;
-  const match = myMatch(bracket);
-  const rival = match ? seatOf(bracket, opponentSeat(match, me)) : null;
-
-  return (
-    <>
-      <View style={styles.heroIcon}>
-        <Icon name={iWon ? 'crown' : 'trophy'} size={34} color={theme.primary} />
-      </View>
-      <Text style={styles.title}>{t('tournament.title')}</Text>
-
-      {over ? (
-        <Text style={styles.lead}>
-          {iWon
-            ? t('tournament.youWon')
-            : bracket.myExitRound !== null
-              ? t('tournament.youLost', roundLabel(bracket.myExitRound, t))
-              : t('tournament.finished')}
-          {champion && !iWon ? `\n${t('tournament.champion', champion.name)}` : ''}
-        </Text>
-      ) : (
-        <Text style={styles.lead}>{t('tournament.alive', survivorsAt(bracket, bracket.round))}</Text>
-      )}
-
-      {!over && rival && (
-        <View style={styles.nextCard}>
-          <Text style={styles.nextLabel}>{t('tournament.nextMatch', roundLabel(bracket.round, t))}</Text>
-          <View style={styles.rivalRow}>
-            <View style={styles.rivalAvatar}>
-              <Text style={styles.rivalInitial}>{rival.name.slice(0, 1).toUpperCase()}</Text>
-            </View>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.rivalName}>{rival.name}</Text>
-              <Text style={styles.rivalKind}>
-                {rival.kind === 'bot' ? t('tournament.opponentBot') : t('tournament.opponentPlayer')}
-              </Text>
-            </View>
-          </View>
-          <SoundTouchable style={styles.primaryButton} onPress={onPlay} activeOpacity={0.88}>
-            <Text style={styles.primaryButtonText}>{t('tournament.play', MATCH_QUESTIONS)}</Text>
+      {phase === 'offline' && (
+        <View style={styles.offlineWrap}>
+          <Icon name="globe" size={32} color={theme.textMuted} />
+          <Text style={styles.offlineTitle}>{t('tournament.offlineTitle')}</Text>
+          <Text style={styles.offlineText}>{t('tournament.offlineText')}</Text>
+          <SoundTouchable style={styles.primaryButton} onPress={onOpenPractice} activeOpacity={0.88}>
+            <Text style={styles.primaryButtonText}>{t('tournament.toPractice')}</Text>
           </SoundTouchable>
         </View>
       )}
 
-      {over && (
+      {phase === 'view' && state && (
         <>
-          <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
-          <MedalShelf record={record} labels={medalLabels(t)} />
-          <Text style={styles.recordLine}>{t('tournament.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
+          <View style={styles.tabs}>
+            {TABS.map((key) => (
+              <SoundTouchable
+                key={key}
+                style={[styles.tab, tab === key && styles.tabActive]}
+                onPress={() => setTab(key)}
+              >
+                <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{t(`tournament.tab.${key}`)}</Text>
+              </SoundTouchable>
+            ))}
+          </View>
+
+          <ScrollView contentContainerStyle={styles.content}>
+            {state.tournament.status === 'registration' ? (
+              <Registration
+                state={state}
+                styles={styles}
+                theme={theme}
+                t={t}
+                busy={busy}
+                onToggle={toggleRegistration}
+              />
+            ) : (
+              <MyStanding
+                state={state}
+                bracket={bracket}
+                myMatch={myMatch}
+                waiting={waiting}
+                styles={styles}
+                theme={theme}
+                t={t}
+                busy={busy}
+                onPlay={() => {
+                  setQuizKey((k) => k + 1);
+                  setPhase('playing');
+                  setPlaying(myMatch);
+                }}
+                onRefresh={() => load().catch(() => {})}
+              />
+            )}
+
+            {tab === 'bracket' && bracket && <BracketView bracket={bracket} state={state} styles={styles} theme={theme} t={t} />}
+            {tab === 'players' && <Players state={state} styles={styles} theme={theme} t={t} bracket={bracket} />}
+            {tab === 'matches' && bracket && <Matches bracket={bracket} state={state} styles={styles} t={t} theme={theme} />}
+            {tab === 'rules' && <Rules styles={styles} theme={theme} t={t} />}
+
+            <SoundTouchable style={styles.practiceLink} onPress={onOpenPractice} activeOpacity={0.85}>
+              <Icon name="target" size={15} color={theme.primary} />
+              <Text style={styles.practiceLinkText}>{t('tournament.practiceLink')}</Text>
+              <Icon name="chevronRight" size={14} color={theme.textMuted} />
+            </SoundTouchable>
+          </ScrollView>
         </>
       )}
-
-      <Text style={styles.sectionTitle}>{t('tournament.path')}</Text>
-      <View style={styles.pathCard}>
-        {Array.from({ length: TOURNAMENT_ROUNDS }, (_, round) => (
-          <PathRow key={round} bracket={bracket} round={round} styles={styles} theme={theme} t={t} />
-        ))}
-      </View>
-
-      {over ? (
-        <SoundTouchable style={styles.primaryButton} onPress={onRestart} activeOpacity={0.88} disabled={busy}>
-          {busy ? (
-            <ActivityIndicator color={theme.onInk} />
-          ) : (
-            <Text style={styles.primaryButtonText}>{t('tournament.again')}</Text>
-          )}
-        </SoundTouchable>
-      ) : (
-        <SoundTouchable style={styles.ghostButton} onPress={onAbandon} activeOpacity={0.85}>
-          <Text style={styles.ghostButtonText}>{t('tournament.abandon')}</Text>
-        </SoundTouchable>
-      )}
-    </>
+    </SafeAreaView>
   );
 }
 
-/** One line of the player's run: who they met that round and how it went. */
-function PathRow({
-  bracket,
-  round,
+function formatCountdown(seconds: number): string {
+  const d = Math.floor(seconds / 86400);
+  const h = Math.floor((seconds % 86400) / 3600);
+  const m = Math.floor((seconds % 3600) / 60);
+  const s = seconds % 60;
+  if (d > 0) return `${d}д ${h}ч`;
+  if (h > 0) return `${h}ч ${m}м`;
+  return `${m}м ${s}с`;
+}
+
+function Registration({
+  state,
   styles,
   theme,
   t,
+  busy,
+  onToggle,
 }: {
-  bracket: Bracket;
-  round: number;
+  state: WeeklyState;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
+  busy: boolean;
+  onToggle: () => void;
 }) {
-  const me = mySeat(bracket);
-  const match = bracket.matches.find((m) => m.round === round && (m.seatA === me || m.seatB === me));
-  const rival = match ? seatOf(bracket, opponentSeat(match, me)) : null;
-  const decided = match?.winner !== null && match?.winner !== undefined;
-  const won = decided && match!.winner === me;
-  const myScore = match ? (match.seatA === me ? match.scoreA : match.scoreB) : null;
-  const theirScore = match ? (match.seatA === me ? match.scoreB : match.scoreA) : null;
+  const left = secondsUntil(state.tournament.startsAt);
+  const overflow = state.registeredCount > state.size;
 
   return (
-    <View style={[styles.pathRow, round > 0 && styles.pathRowDivided]}>
-      <View style={[styles.pathBadge, decided && (won ? styles.pathBadgeWon : styles.pathBadgeLost)]}>
-        {decided ? (
-          <Icon name={won ? 'check' : 'close'} size={13} color={won ? theme.success : theme.danger} />
+    <View style={styles.card}>
+      <Text style={styles.cardLabel}>{t('tournament.startsIn')}</Text>
+      <Text style={styles.countdown}>{formatCountdown(left)}</Text>
+      <Text style={styles.cardText}>{t('tournament.registeredCount', state.registeredCount, state.size)}</Text>
+      {overflow && <Text style={styles.warnText}>{t('tournament.ratingCut', state.size)}</Text>}
+
+      <SoundTouchable
+        style={[styles.primaryButton, state.amRegistered && styles.ghostOutline]}
+        onPress={onToggle}
+        activeOpacity={0.88}
+        disabled={busy}
+      >
+        {busy ? (
+          <ActivityIndicator color={state.amRegistered ? theme.text : theme.onInk} />
         ) : (
-          <Text style={styles.pathBadgeText}>{round + 1}</Text>
+          <Text style={[styles.primaryButtonText, state.amRegistered && styles.ghostOutlineText]}>
+            {state.amRegistered ? t('tournament.unregister') : t('tournament.register')}
+          </Text>
         )}
-      </View>
-      <View style={{ flex: 1 }}>
-        <Text style={styles.pathTitle}>{roundLabel(round, t)}</Text>
-        <Text style={styles.pathSubtitle} numberOfLines={1}>
-          {rival ? rival.name : bracket.myExitRound !== null && round > bracket.myExitRound ? t('tournament.outAlready') : t('tournament.pending')}
+      </SoundTouchable>
+      {state.amRegistered && <Text style={styles.cardText}>{t('tournament.registeredHint')}</Text>}
+    </View>
+  );
+}
+
+/** The player's own situation: their open match, or why they have none. */
+function MyStanding({
+  state,
+  bracket,
+  myMatch,
+  waiting,
+  styles,
+  theme,
+  t,
+  busy,
+  onPlay,
+  onRefresh,
+}: {
+  state: WeeklyState;
+  bracket: DeBracket | null;
+  myMatch: MatchId | null;
+  waiting: boolean;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  busy: boolean;
+  onPlay: () => void;
+  onRefresh: () => void;
+}) {
+  const seat = state.mySeat;
+  const finished = state.tournament.status === 'finished';
+  const champion = bracket ? championSeed(bracket) : null;
+
+  if (seat === null) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.notPlaying')}</Text>
+        <Text style={styles.cardText}>
+          {finished && champion !== null && bracket
+            ? t('tournament.championIs', bracket.entrants[champion].name)
+            : t('tournament.watchOnly')}
         </Text>
       </View>
-      {decided && (
-        <Text style={[styles.pathScore, { color: won ? theme.success : theme.danger }]}>
-          {myScore}:{theirScore}
+    );
+  }
+
+  if (!bracket) return null;
+
+  if (champion === seat) {
+    return (
+      <View style={styles.card}>
+        <Icon name="crown" size={28} color={theme.primary} />
+        <Text style={styles.cardLabel}>{t('tournament.youChampion')}</Text>
+      </View>
+    );
+  }
+
+  if (isEliminated(bracket, seat)) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.youOut')}</Text>
+        <Text style={styles.cardText}>
+          {champion !== null ? t('tournament.championIs', bracket.entrants[champion].name) : t('tournament.youOutHint')}
         </Text>
+      </View>
+    );
+  }
+
+  if (!myMatch) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.waitingBracket')}</Text>
+        <Text style={styles.cardText}>{t('tournament.waitingBracketHint')}</Text>
+        <SoundTouchable style={styles.ghostOutline} onPress={onRefresh} activeOpacity={0.85} disabled={busy}>
+          <Text style={styles.ghostOutlineText}>{t('tournament.refresh')}</Text>
+        </SoundTouchable>
+      </View>
+    );
+  }
+
+  const [a, b] = participantsOf(bracket, myMatch);
+  const rivalSeed = a === seat ? b! : a!;
+  const rival = bracket.entrants[rivalSeed];
+  const [winsA, winsB] = winsOf(bracket, myMatch);
+  const myWins = a === seat ? winsA : winsB;
+  const theirWins = a === seat ? winsB : winsA;
+  const open = openGameOf(state, myMatch);
+
+  return (
+    <View style={styles.card}>
+      <Text style={styles.cardLabel}>{t('tournament.yourMatch', matchName(myMatch, t))}</Text>
+      <View style={styles.rivalRow}>
+        <View style={styles.rivalAvatar}>
+          <Text style={styles.rivalInitial}>{rival.name.slice(0, 1).toUpperCase()}</Text>
+        </View>
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rivalName}>{rival.name}</Text>
+          <Text style={styles.rivalKind}>
+            {rival.userId === null ? t('tournament.bot') : t('tournament.player')} · {t('tournament.rating', rival.rating)}
+          </Text>
+        </View>
+        <Text style={styles.seriesScore}>
+          {myWins}:{theirWins}
+        </Text>
+      </View>
+
+      {waiting ? (
+        <>
+          <Text style={styles.cardText}>{t('tournament.waitingRival', rival.name)}</Text>
+          {open?.deadline && (
+            <Text style={styles.cardText}>{t('tournament.deadlineIn', formatCountdown(secondsUntil(open.deadline)))}</Text>
+          )}
+          <SoundTouchable style={styles.ghostOutline} onPress={onRefresh} activeOpacity={0.85} disabled={busy}>
+            {busy ? (
+              <ActivityIndicator color={theme.text} />
+            ) : (
+              <Text style={styles.ghostOutlineText}>{t('tournament.refresh')}</Text>
+            )}
+          </SoundTouchable>
+        </>
+      ) : (
+        <>
+          <Text style={styles.cardText}>
+            {t('tournament.gameOf', (open?.game_no ?? 1), WINS_PER_MATCH * 2 - 1, GAME_QUESTIONS)}
+          </Text>
+          <SoundTouchable style={styles.primaryButton} onPress={onPlay} activeOpacity={0.88} disabled={busy}>
+            {busy ? (
+              <ActivityIndicator color={theme.onInk} />
+            ) : (
+              <Text style={styles.primaryButtonText}>{t('tournament.playGame')}</Text>
+            )}
+          </SoundTouchable>
+        </>
       )}
     </View>
   );
 }
 
-function RoundResult({
+/** "1/8", "Финал нижней сетки", "Гранд-финал" — a round a player can recognise. */
+function matchName(id: MatchId, t: ReturnType<typeof useT>): string {
+  const def = MATCH_DEFS.find((d) => d.id === id)!;
+  if (def.bracket === 'gf') return t('tournament.grandFinal');
+  if (def.bracket === 'wb') return t(`tournament.wbRound.${def.round}`);
+  return t(`tournament.lbRound.${def.round}`);
+}
+
+function BracketView({
   bracket,
-  round,
+  state,
   styles,
   theme,
   t,
-  onContinue,
 }: {
-  bracket: Bracket;
-  round: number;
+  bracket: DeBracket;
+  state: WeeklyState;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
-  onContinue: () => void;
 }) {
-  const me = mySeat(bracket);
-  const match = bracket.matches.find((m) => m.round === round && (m.seatA === me || m.seatB === me))!;
-  const rival = seatOf(bracket, opponentSeat(match, me))!;
-  const won = match.winner === me;
-  const myScore = match.seatA === me ? match.scoreA : match.scoreB;
-  const theirScore = match.seatA === me ? match.scoreB : match.scoreA;
-  const champion = bracket.championSeat === me;
-  const medal = isMyTournamentOver(bracket) ? medalFor(bracket) : null;
+  const rounds = [
+    { bracket: 'wb' as const, title: t('tournament.upperTitle'), hint: t('tournament.upperHint'), count: 4 },
+    { bracket: 'lb' as const, title: t('tournament.lowerTitle'), hint: t('tournament.lowerHint'), count: 6 },
+  ];
 
   return (
     <>
-      <View style={styles.heroIcon}>
-        <Icon name={champion ? 'crown' : won ? 'check' : 'close'} size={34} color={won ? theme.primary : theme.danger} />
+      {rounds.map((section) => (
+        <View key={section.bracket}>
+          <Text style={styles.sectionTitle}>{section.title}</Text>
+          <Text style={styles.sectionHint}>{section.hint}</Text>
+          {Array.from({ length: section.count }, (_, round) => (
+            <View key={round} style={styles.roundBlock}>
+              <Text style={styles.roundLabel}>
+                {section.bracket === 'wb' ? t(`tournament.wbRound.${round}`) : t(`tournament.lbRound.${round}`)}
+              </Text>
+              {MATCH_DEFS.filter((d) => d.bracket === section.bracket && d.round === round).map((def) => (
+                <MatchRow key={def.id} id={def.id} bracket={bracket} state={state} styles={styles} theme={theme} t={t} />
+              ))}
+            </View>
+          ))}
+        </View>
+      ))}
+
+      <Text style={styles.sectionTitle}>{t('tournament.grandFinal')}</Text>
+      <View style={styles.roundBlock}>
+        <MatchRow id="gf" bracket={bracket} state={state} styles={styles} theme={theme} t={t} highlight />
       </View>
-      <Text style={styles.title}>
-        {champion ? t('tournament.youWon') : won ? t('tournament.matchWon') : t('tournament.matchLost')}
-      </Text>
-
-      <View style={styles.scoreCard}>
-        <View style={styles.scoreSide}>
-          <Text style={styles.scoreName}>{t('tournament.you')}</Text>
-          <Text style={[styles.scoreValue, { color: won ? theme.success : theme.text }]}>{myScore}</Text>
-        </View>
-        <Text style={styles.scoreDash}>:</Text>
-        <View style={styles.scoreSide}>
-          <Text style={styles.scoreName} numberOfLines={1}>{rival.name}</Text>
-          <Text style={[styles.scoreValue, { color: won ? theme.text : theme.danger }]}>{theirScore}</Text>
-        </View>
-      </View>
-
-      {medal && (
-        <View style={styles.medalBanner}>
-          <Icon name="medal" size={18} color={theme.primary} />
-          <Text style={styles.medalBannerText}>{t('tournament.medalEarned', t(`tournament.medal${medal[0].toUpperCase()}${medal.slice(1)}` as 'tournament.medalGold'))}</Text>
-        </View>
-      )}
-
-      <Text style={styles.lead}>
-        {champion
-          ? t('tournament.championLead')
-          : won
-            ? t('tournament.advanced', roundLabel(bracket.round, t), survivorsAt(bracket, bracket.round))
-            : t('tournament.eliminated', roundLabel(round, t))}
-      </Text>
-
-      <SoundTouchable style={styles.primaryButton} onPress={onContinue} activeOpacity={0.88}>
-        <Text style={styles.primaryButtonText}>{t('tournament.toBracket')}</Text>
-      </SoundTouchable>
     </>
+  );
+}
+
+function MatchRow({
+  id,
+  bracket,
+  state,
+  styles,
+  theme,
+  t,
+  highlight,
+}: {
+  id: MatchId;
+  bracket: DeBracket;
+  state: WeeklyState;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  highlight?: boolean;
+}) {
+  const [a, b] = participantsOf(bracket, id);
+  const [winsA, winsB] = winsOf(bracket, id);
+  const done = isDecided(bracket, id);
+  const mine = state.mySeat !== null && (a === state.mySeat || b === state.mySeat);
+
+  const Side = ({ seed, wins, other }: { seed: number | null; wins: number; other: number }) => {
+    const entrant = seed === null ? null : bracket.entrants[seed];
+    const won = done && wins > other;
+    return (
+      <View style={styles.matchSide}>
+        <Text
+          style={[styles.matchName, !entrant && styles.matchNamePending, won && styles.matchNameWon]}
+          numberOfLines={1}
+        >
+          {entrant ? entrant.name : '—'}
+        </Text>
+        <Text style={[styles.matchScore, won && styles.matchNameWon]}>{entrant ? wins : ''}</Text>
+      </View>
+    );
+  };
+
+  return (
+    <View style={[styles.matchCard, mine && styles.matchCardMine, highlight && styles.matchCardFinal]}>
+      <Side seed={a} wins={winsA} other={winsB} />
+      <View style={styles.matchDivider} />
+      <Side seed={b} wins={winsB} other={winsA} />
+    </View>
+  );
+}
+
+function Players({
+  state,
+  bracket,
+  styles,
+  theme,
+  t,
+}: {
+  state: WeeklyState;
+  bracket: DeBracket | null;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+}) {
+  if (!state.entrants.length) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardText}>{t('tournament.noEntrantsYet')}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.listCard}>
+      {state.entrants.map((entrant, i) => {
+        const losses = bracket ? lossesOf(bracket, entrant.seed) : 0;
+        const out = losses >= 2;
+        return (
+          <View key={entrant.seed} style={[styles.listRow, i > 0 && styles.listRowDivided]}>
+            <Text style={styles.listSeed}>{entrant.seed + 1}</Text>
+            <View style={{ flex: 1 }}>
+              <Text style={[styles.listName, entrant.isMe && styles.listNameMe, out && styles.listNameOut]} numberOfLines={1}>
+                {entrant.name}
+              </Text>
+              <Text style={styles.listMeta}>
+                {entrant.isBot ? t('tournament.bot') : t('tournament.player')} · {t('tournament.rating', entrant.rating)}
+              </Text>
+            </View>
+            <Text style={[styles.listLosses, out && styles.listNameOut]}>
+              {out ? t('tournament.outShort') : t('tournament.lossesShort', losses)}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function Matches({
+  bracket,
+  state,
+  styles,
+  t,
+  theme,
+}: {
+  bracket: DeBracket;
+  state: WeeklyState;
+  styles: Styles;
+  t: ReturnType<typeof useT>;
+  theme: Theme;
+}) {
+  const played = MATCH_DEFS.filter((d) => isDecided(bracket, d.id)).reverse();
+  if (!played.length) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardText}>{t('tournament.noMatchesYet')}</Text>
+      </View>
+    );
+  }
+
+  return (
+    <View style={styles.listCard}>
+      {played.map((def, i) => {
+        const [a, b] = participantsOf(bracket, def.id);
+        const [winsA, winsB] = winsOf(bracket, def.id);
+        return (
+          <View key={def.id} style={[styles.listRow, i > 0 && styles.listRowDivided]}>
+            <View style={{ flex: 1 }}>
+              <Text style={styles.listName} numberOfLines={1}>
+                {bracket.entrants[a!].name} — {bracket.entrants[b!].name}
+              </Text>
+              <Text style={styles.listMeta}>{matchName(def.id, t)}</Text>
+            </View>
+            <Text style={styles.listLosses}>
+              {winsA}:{winsB}
+            </Text>
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+function Rules({ styles, theme, t }: { styles: Styles; theme: Theme; t: ReturnType<typeof useT> }) {
+  const rules = [
+    t('tournament.rule.weekly'),
+    t('tournament.rule.register'),
+    t('tournament.rule.rating'),
+    t('tournament.rule.double'),
+    t('tournament.rule.series'),
+    t('tournament.rule.deadline'),
+    t('tournament.rule.bots'),
+  ];
+  return (
+    <View style={styles.listCard}>
+      {rules.map((rule, i) => (
+        <View key={rule} style={[styles.listRow, i > 0 && styles.listRowDivided]}>
+          <Icon name="check" size={15} color={theme.primary} />
+          <Text style={styles.ruleText}>{rule}</Text>
+        </View>
+      ))}
+    </View>
   );
 }
 
@@ -720,175 +648,154 @@ type Styles = ReturnType<typeof makeStyles>;
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
-    back: { paddingHorizontal: 24, paddingTop: 12, paddingBottom: 4 },
+    header: { paddingHorizontal: 20, paddingTop: 10, paddingBottom: 6 },
+    back: { alignSelf: 'flex-start', paddingVertical: 4 },
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
-    content: { paddingHorizontal: 24, paddingTop: 8, paddingBottom: 40, alignItems: 'center' },
-    heroIcon: {
-      width: 68,
-      height: 68,
-      borderRadius: 24,
-      backgroundColor: theme.primaryLight,
+    headerTitle: { fontSize: 24, fontFamily: fontFamily('800'), color: theme.text, marginTop: 4 },
+    headerSubtitle: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
+    tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingBottom: 10 },
+    tab: {
+      flex: 1,
       alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 12,
+      paddingVertical: 8,
+      borderRadius: radius.pill,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
     },
-    title: { fontSize: 23, fontFamily: fontFamily('800'), color: theme.text, textAlign: 'center' },
-    lead: {
-      fontSize: 13,
-      lineHeight: 19,
+    tabActive: { backgroundColor: theme.primary, borderColor: theme.primary },
+    tabText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
+    tabTextActive: { color: theme.onPrimary },
+    content: { paddingHorizontal: 20, paddingBottom: 40 },
+    card: {
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.lg,
+      padding: 16,
+      alignItems: 'center',
+      marginBottom: 20,
+    },
+    cardLabel: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, textAlign: 'center' },
+    cardText: {
+      fontSize: 12,
+      lineHeight: 17,
       fontFamily: fontFamily('500'),
       color: theme.textMuted,
       textAlign: 'center',
-      marginTop: 8,
+      marginTop: 6,
     },
-    rulesCard: {
-      alignSelf: 'stretch',
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.lg,
-      padding: 16,
-      gap: 12,
-      marginTop: 20,
+    warnText: {
+      fontSize: 12,
+      fontFamily: fontFamily('600'),
+      color: theme.primary,
+      textAlign: 'center',
+      marginTop: 6,
     },
-    ruleRow: { flexDirection: 'row', alignItems: 'flex-start', gap: 10 },
-    ruleText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: fontFamily('600'), color: theme.text },
-    nextCard: {
-      alignSelf: 'stretch',
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.lg,
-      padding: 16,
-      marginTop: 20,
-    },
-    nextLabel: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted, letterSpacing: 1 },
-    rivalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 12, marginBottom: 16 },
+    countdown: { fontSize: 30, fontFamily: fontFamily('800'), color: theme.text, marginTop: 4 },
+    rivalRow: { flexDirection: 'row', alignItems: 'center', gap: 12, alignSelf: 'stretch', marginTop: 12 },
     rivalAvatar: {
-      width: 44,
-      height: 44,
-      borderRadius: 22,
+      width: 40,
+      height: 40,
+      borderRadius: 20,
       backgroundColor: theme.primaryLight,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    rivalInitial: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.primary },
-    rivalName: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text },
-    rivalKind: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
-    sectionTitle: {
-      alignSelf: 'flex-start',
-      fontSize: 15,
-      fontFamily: fontFamily('800'),
-      color: theme.text,
-      marginTop: 26,
-      marginBottom: 10,
-    },
-    pathCard: {
+    rivalInitial: { fontSize: 17, fontFamily: fontFamily('800'), color: theme.primary },
+    rivalName: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text },
+    rivalKind: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
+    seriesScore: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
+    primaryButton: {
       alignSelf: 'stretch',
+      backgroundColor: theme.ink,
+      borderRadius: radius.pill,
+      paddingVertical: 14,
+      alignItems: 'center',
+      marginTop: 16,
+    },
+    primaryButtonText: { color: theme.onInk, fontSize: 14, fontFamily: fontFamily('800') },
+    ghostOutline: {
+      alignSelf: 'stretch',
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      borderRadius: radius.pill,
+      paddingVertical: 13,
+      alignItems: 'center',
+      marginTop: 14,
+    },
+    ghostOutlineText: { color: theme.text, fontSize: 14, fontFamily: fontFamily('700') },
+    sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
+    sectionHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2, marginBottom: 10 },
+    roundBlock: { marginBottom: 14 },
+    roundLabel: {
+      alignSelf: 'flex-start',
+      fontSize: 11,
+      fontFamily: fontFamily('700'),
+      color: theme.primary,
+      backgroundColor: theme.primaryLight,
+      borderRadius: radius.pill,
+      paddingHorizontal: 10,
+      paddingVertical: 3,
+      marginBottom: 8,
+      overflow: 'hidden',
+    },
+    matchCard: {
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.md ?? 12,
+      paddingHorizontal: 12,
+      paddingVertical: 8,
+      marginBottom: 6,
+    },
+    matchCardMine: { borderColor: theme.primary },
+    matchCardFinal: { backgroundColor: theme.primaryLight, borderColor: theme.primaryLight },
+    matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 3 },
+    matchDivider: { height: 1, backgroundColor: theme.border },
+    matchName: { flex: 1, fontSize: 13, fontFamily: fontFamily('600'), color: theme.text },
+    matchNamePending: { color: theme.textMuted },
+    matchNameWon: { fontFamily: fontFamily('800'), color: theme.text },
+    matchScore: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 12, textAlign: 'right' },
+    listCard: {
       backgroundColor: theme.card,
       borderWidth: 1.5,
       borderColor: theme.border,
       borderRadius: radius.lg,
       paddingHorizontal: 14,
+      marginBottom: 8,
     },
-    pathRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
-    pathRowDivided: { borderTopWidth: 1, borderTopColor: theme.border },
-    pathBadge: {
-      width: 28,
-      height: 28,
-      borderRadius: 14,
-      backgroundColor: theme.background,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      alignItems: 'center',
-      justifyContent: 'center',
-    },
-    pathBadgeWon: { backgroundColor: theme.successBg, borderColor: theme.successBg },
-    pathBadgeLost: { backgroundColor: theme.dangerBg, borderColor: theme.dangerBg },
-    pathBadgeText: { fontSize: 12, fontFamily: fontFamily('800'), color: theme.textMuted },
-    pathTitle: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
-    pathSubtitle: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
-    pathScore: { fontSize: 14, fontFamily: fontFamily('800') },
-    scoreCard: {
-      alignSelf: 'stretch',
+    listRow: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 11 },
+    listRowDivided: { borderTopWidth: 1, borderTopColor: theme.border },
+    listSeed: { width: 20, fontSize: 12, fontFamily: fontFamily('800'), color: theme.textMuted, textAlign: 'center' },
+    listName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    listNameMe: { color: theme.primary },
+    listNameOut: { color: theme.textMuted, textDecorationLine: 'line-through' },
+    listMeta: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
+    listLosses: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
+    ruleText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: fontFamily('600'), color: theme.text },
+    practiceLink: {
       flexDirection: 'row',
       alignItems: 'center',
-      justifyContent: 'center',
-      gap: 16,
+      gap: 10,
       backgroundColor: theme.card,
       borderWidth: 1.5,
       borderColor: theme.border,
       borderRadius: radius.lg,
-      padding: 18,
-      marginTop: 20,
-    },
-    scoreSide: { flex: 1, alignItems: 'center' },
-    scoreName: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted },
-    scoreValue: { fontSize: 32, fontFamily: fontFamily('800'), marginTop: 2 },
-    scoreDash: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.textMuted },
-    primaryButton: {
-      alignSelf: 'stretch',
-      backgroundColor: theme.ink,
-      borderRadius: radius.pill,
-      paddingVertical: 15,
-      alignItems: 'center',
-      marginTop: 22,
-    },
-    primaryButtonText: { color: theme.onInk, fontSize: 15, fontFamily: fontFamily('800') },
-    recordLine: {
-      fontSize: 12,
-      fontFamily: fontFamily('600'),
-      color: theme.textMuted,
-      textAlign: 'center',
-      marginTop: 10,
-    },
-    medalBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      backgroundColor: theme.primaryLight,
-      borderRadius: radius.pill,
       paddingHorizontal: 16,
-      paddingVertical: 9,
+      paddingVertical: 14,
       marginTop: 16,
     },
-    medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
-    lobbyCountdown: { fontSize: 34, fontFamily: fontFamily('800'), color: theme.text, textAlign: 'center', marginBottom: 4 },
-    lobbyNames: { flexDirection: 'row', flexWrap: 'wrap', gap: 8, marginTop: 12 },
-    lobbyChip: {
-      backgroundColor: theme.background,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    lobbyChipMe: { backgroundColor: theme.primaryLight, borderColor: theme.primaryLight },
-    lobbyChipText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted, maxWidth: 120 },
-    lobbyChipTextMe: { color: theme.text },
-    offlineNote: {
-      fontSize: 12,
-      fontFamily: fontFamily('600'),
+    practiceLinkText: { flex: 1, fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    offlineWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 6 },
+    offlineTitle: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.text, marginTop: 8, textAlign: 'center' },
+    offlineText: {
+      fontSize: 13,
+      lineHeight: 18,
+      fontFamily: fontFamily('500'),
       color: theme.textMuted,
       textAlign: 'center',
-      marginTop: 16,
     },
-    ghostButton: { alignSelf: 'stretch', paddingVertical: 14, alignItems: 'center', marginTop: 14 },
-    ghostButtonText: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('700') },
-    rivalBadge: {
-      position: 'absolute',
-      top: 8,
-      alignSelf: 'center',
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 6,
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.pill,
-      paddingHorizontal: 12,
-      paddingVertical: 6,
-    },
-    rivalBadgeText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.text },
   });
 }
