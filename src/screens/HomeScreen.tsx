@@ -197,7 +197,15 @@ function makeStyles(theme: Theme) {
       overflow: 'hidden',
       marginBottom: 12,
     },
-    battleContent: { flex: 1, justifyContent: 'center', paddingHorizontal: 16, maxWidth: '62%' },
+    battleContent: {
+      flex: 1,
+      justifyContent: 'center',
+      paddingHorizontal: 16,
+      // Sits a touch below the middle: centred, the text collided with the
+      // brightest part of the artwork behind it.
+      paddingTop: 20,
+      maxWidth: '62%',
+    },
     battleTitle: {
       fontSize: 16,
       fontFamily: fontFamily('800'),
