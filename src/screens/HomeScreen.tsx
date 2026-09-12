@@ -170,6 +170,11 @@ function makeStyles(theme: Theme) {
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 12 },
     cardBackground: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
     battleCard: {
+      // Explicit width, not just the default stretch: with only an
+      // aspectRatio set, Yoga sizes the card from the ratio instead of
+      // filling the row, and on Android the banner came out narrower than
+      // the category grid above it.
+      width: '100%',
       aspectRatio: 3.5,
       borderRadius: radius.lg,
       overflow: 'hidden',
