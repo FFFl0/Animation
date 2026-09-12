@@ -17,3 +17,4 @@ export const MODE_BACKGROUNDS: Record<ModeId, ImageSourcePropType> = {
 };
 
 export const BATTLE_BANNER: ImageSourcePropType = require('../../assets/home/fan-battle.jpg');
+export const TOURNAMENT_BANNER: ImageSourcePropType = require('../../assets/home/tournament.jpg');

@@ -33,6 +33,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import TournamentScreen from './src/screens/TournamentScreen';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
@@ -65,6 +66,7 @@ type Screen =
   | 'profile'
   | 'leaderboard'
   | 'battle'
+  | 'tournament'
   | 'friends'
   | 'friendProfile'
   | 'compare'
@@ -169,6 +171,9 @@ function AppShell() {
           setScreen(cameFromFriendProfile ? 'friendProfile' : 'home');
           return true;
         }
+        case 'tournament':
+          setScreen('home');
+          return true;
         case 'friendProfile':
           setScreen('friends');
           return true;
@@ -330,8 +335,11 @@ function AppShell() {
               onStartMode={startMode}
               onOpenSettings={() => setScreen('profile')}
               onOpenBattle={() => setScreen('battle')}
+              onOpenTournament={() => setScreen('tournament')}
             />
           )}
+          {screen === 'tournament' && <TournamentScreen onBack={() => setScreen('home')} />}
+
           {screen === 'battle' && (
             <BattleScreen
               onBack={() => {

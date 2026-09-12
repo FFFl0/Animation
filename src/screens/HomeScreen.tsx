@@ -14,7 +14,7 @@ import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
-import { BATTLE_BANNER, MODE_BACKGROUNDS } from '../data/modeImages';
+import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -25,6 +25,7 @@ type Props = {
   onStartMode: (id: ModeId) => void;
   onOpenSettings: () => void;
   onOpenBattle: () => void;
+  onOpenTournament: () => void;
 };
 
 function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
@@ -48,7 +49,7 @@ function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
   }
 }
 
-export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle }: Props) {
+export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle, onOpenTournament }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -107,6 +108,15 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           <View style={styles.battleContent}>
             <Text style={styles.battleTitle}>{t('home.battleTitle')}</Text>
             <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.battleSubtitle')}</Text>
+          </View>
+        </SoundTouchable>
+
+        <SoundTouchable style={styles.tournamentCard} onPress={onOpenTournament} activeOpacity={0.88}>
+          <Image source={TOURNAMENT_BANNER} style={styles.cardBackground} resizeMode="cover" />
+          <ImageScrim direction="left" />
+          <View style={styles.battleContent}>
+            <Text style={styles.battleTitle}>{t('home.tournamentTitle')}</Text>
+            <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.tournamentSubtitle')}</Text>
           </View>
         </SoundTouchable>
 
@@ -176,6 +186,13 @@ function makeStyles(theme: Theme) {
       // the category grid above it.
       width: '100%',
       aspectRatio: 2.6,
+      borderRadius: radius.lg,
+      overflow: 'hidden',
+      marginBottom: 12,
+    },
+    tournamentCard: {
+      width: '100%',
+      aspectRatio: 3.5,
       borderRadius: radius.lg,
       overflow: 'hidden',
       marginBottom: 24,
