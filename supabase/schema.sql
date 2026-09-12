@@ -625,109 +625,118 @@ create policy "Drop your own push token"
 create index if not exists push_tokens_user_idx on public.push_tokens (user_id);
 
 -- ============================================================
--- Tournaments. A 32-seat knockout bracket that live players share:
--- whoever joins inside the lobby window takes a seat, bots fill the rest.
+-- Weekly tournament: 16 players, double elimination, matches best of three.
 --
--- Reads go through RLS (anyone signed in may watch a bracket they are in),
--- but every write is done by the `tournament` Edge Function with the
--- service role. That is deliberate: seats, pairings and winners must not be
--- writable by a client, or a player could seat themselves into the final.
+-- Registration runs all week and closes when the tournament starts at the
+-- weekend. If more than 16 have signed up, the highest rated get in —
+-- rating being the same leaderboard score the app already shows. Seats
+-- nobody claimed are filled with bots so a small week still runs.
+--
+-- Reads go through RLS; every write is done by the `tournament` Edge
+-- Function with the service role. The tables carry no insert or update
+-- policy at all, deliberately: seeds, pairings and game results decide who
+-- advances, so a client able to write them could seat itself into the final.
+--
+-- Replaces the earlier instant 32-seat lobby, which is now a practice mode
+-- played against bots on the device with no server state at all. Dropped
+-- rather than left behind: they never held a finished tournament, and a dead
+-- table with live policies is worse than no table.
 -- ============================================================
 
-create table if not exists public.tournaments (
+drop table if exists public.tournament_matches cascade;
+drop table if exists public.tournament_seats cascade;
+drop table if exists public.tournaments cascade;
+drop function if exists public.is_tournament_entrant(uuid, uuid);
+
+create table if not exists public.weekly_tournaments (
   id uuid primary key default gen_random_uuid(),
-  -- lobby -> running -> finished
-  status text not null default 'lobby',
-  seed bigint not null,
-  round int not null default 0,
-  champion_seat int,
-  -- when the lobby closes and the bracket is seeded
+  -- the Monday registration opened on: one tournament per week, and a
+  -- natural key that makes a duplicate impossible
+  week_start date not null unique,
+  -- registration -> running -> finished
+  status text not null default 'registration',
   starts_at timestamptz not null,
+  champion_user_id uuid references auth.users(id) on delete set null,
   created_at timestamptz not null default now(),
   finished_at timestamptz
 );
 
-create table if not exists public.tournament_seats (
-  tournament_id uuid not null references public.tournaments(id) on delete cascade,
-  seat int not null,
-  -- null for a bot
+create table if not exists public.tournament_registrations (
+  tournament_id uuid not null references public.weekly_tournaments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  registered_at timestamptz not null default now(),
+  primary key (tournament_id, user_id)
+);
+
+-- The bracket's 16 seats, fixed once the tournament starts. Rating is the
+-- snapshot it was seeded on, so the bracket does not reshuffle when somebody
+-- plays a quiz mid-tournament.
+create table if not exists public.tournament_entrants (
+  tournament_id uuid not null references public.weekly_tournaments(id) on delete cascade,
+  seed int not null,
   user_id uuid references auth.users(id) on delete set null,
   name text not null,
-  skill real not null default 0,
-  primary key (tournament_id, seat)
+  rating int not null default 0,
+  primary key (tournament_id, seed)
 );
 
-create table if not exists public.tournament_matches (
-  tournament_id uuid not null references public.tournaments(id) on delete cascade,
-  round int not null,
-  idx int not null,
-  seat_a int,
-  seat_b int,
+-- One row per game of a match. The row appears when the first player hands a
+-- score in and is decided once both have, or once the deadline passes.
+-- match_id is the bracket's own id: wb0-0, lb3-1, gf.
+create table if not exists public.tournament_games (
+  tournament_id uuid not null references public.weekly_tournaments(id) on delete cascade,
+  match_id text not null,
+  game_no int not null,
   score_a int,
   score_b int,
-  -- when each side handed its score in; a drawn match between two people
-  -- goes to whoever answered first
   submitted_a timestamptz,
   submitted_b timestamptz,
-  winner_seat int,
-  -- once both seats are known, how long the humans have to submit a score
+  -- 'a' or 'b'; null while the game is still open
+  winner text,
   deadline timestamptz,
-  primary key (tournament_id, round, idx)
+  primary key (tournament_id, match_id, game_no)
 );
 
-alter table public.tournaments enable row level security;
-alter table public.tournament_seats enable row level security;
-alter table public.tournament_matches enable row level security;
+alter table public.weekly_tournaments enable row level security;
+alter table public.tournament_registrations enable row level security;
+alter table public.tournament_entrants enable row level security;
+alter table public.tournament_games enable row level security;
 
--- Same recursion trap as group membership: a policy on the seats table that
--- queries the seats table loops forever. A SECURITY DEFINER function breaks
--- the cycle.
-create or replace function public.is_tournament_entrant(tid uuid, uid uuid)
-returns boolean
-language sql
-security definer
-set search_path = public
-stable
-as $$
-  select exists (
-    select 1 from public.tournament_seats
-    where tournament_id = tid and user_id = uid
-  );
-$$;
+-- A tournament is public reading: the bracket is worth watching even if you
+-- are not in it, and it holds nothing but usernames and scores.
+drop policy if exists "Anyone signed in can watch a tournament" on public.weekly_tournaments;
+create policy "Anyone signed in can watch a tournament"
+  on public.weekly_tournaments for select
+  using (auth.uid() is not null);
 
-revoke all on function public.is_tournament_entrant(uuid, uuid) from public;
-grant execute on function public.is_tournament_entrant(uuid, uuid) to authenticated;
+drop policy if exists "Anyone signed in can see the entrants" on public.tournament_entrants;
+create policy "Anyone signed in can see the entrants"
+  on public.tournament_entrants for select
+  using (auth.uid() is not null);
 
--- A lobby is readable by anyone signed in, or there would be nothing to join;
--- once it is running only its own entrants can watch it.
-drop policy if exists "See a lobby or your own tournament" on public.tournaments;
-create policy "See a lobby or your own tournament"
-  on public.tournaments for select
-  using (status = 'lobby' or public.is_tournament_entrant(id, auth.uid()));
+drop policy if exists "Anyone signed in can see the games" on public.tournament_games;
+create policy "Anyone signed in can see the games"
+  on public.tournament_games for select
+  using (auth.uid() is not null);
 
-drop policy if exists "See seats of your tournament" on public.tournament_seats;
-create policy "See seats of your tournament"
-  on public.tournament_seats for select
-  using (public.is_tournament_entrant(tournament_id, auth.uid()));
+-- Registrations are a headcount, so the count is public but who signed up is
+-- only ever your own row.
+drop policy if exists "See your own registration" on public.tournament_registrations;
+create policy "See your own registration"
+  on public.tournament_registrations for select
+  using (auth.uid() = user_id);
 
-drop policy if exists "See matches of your tournament" on public.tournament_matches;
-create policy "See matches of your tournament"
-  on public.tournament_matches for select
-  using (public.is_tournament_entrant(tournament_id, auth.uid()));
+create index if not exists weekly_tournaments_status_idx on public.weekly_tournaments (status, starts_at);
+create index if not exists tournament_registrations_user_idx on public.tournament_registrations (user_id);
+create index if not exists tournament_entrants_user_idx on public.tournament_entrants (user_id);
 
--- No insert/update/delete policies anywhere on purpose: the service role
--- used by the Edge Function bypasses RLS, and nobody else may write.
-
-create index if not exists tournaments_open_idx on public.tournaments (status, starts_at);
-create index if not exists tournament_seats_user_idx on public.tournament_seats (user_id);
-
--- Lets the lobby screen see other people arriving without polling.
+-- Lets the bracket update itself while somebody is watching it.
 do $$ begin
-  alter publication supabase_realtime add table public.tournaments;
+  alter publication supabase_realtime add table public.weekly_tournaments;
 exception when duplicate_object then null;
 end $$;
 
 do $$ begin
-  alter publication supabase_realtime add table public.tournament_seats;
+  alter publication supabase_realtime add table public.tournament_games;
 exception when duplicate_object then null;
 end $$;

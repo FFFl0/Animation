@@ -1,10 +1,17 @@
-// Supabase Edge Function: the shared 32-player tournament bracket.
+// Supabase Edge Function: the weekly 16-player double-elimination tournament.
 //
-// Every write to a bracket happens here with the service role, never from a
-// client: seats, pairings and winners decide who advances, so a client that
-// could write them could seat itself into the final. Deploy with:
-//   supabase functions deploy tournament
-// SUPABASE_URL and SUPABASE_SERVICE_ROLE_KEY are provided by the runtime.
+// Registration runs all week and closes when the tournament starts at the
+// weekend; if more than sixteen have signed up, the highest rated get in.
+// Every write happens here with the service role, never from a client: seeds,
+// pairings and game results decide who advances.
+//
+// The bracket rules below mirror src/tournament/doubleElim.ts, which is the
+// readable source of truth for them and is the one covered by tests. Keep the
+// two in step: the feed table and the resolve logic must match exactly.
+//
+// Deploy with: supabase functions deploy tournament
+// SUPABASE_URL, SUPABASE_ANON_KEY and SUPABASE_SERVICE_ROLE_KEY come from the
+// runtime.
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 
@@ -13,21 +20,19 @@ const corsHeaders = {
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const SIZE = 32;
-const ROUNDS = 5;
-const MATCH_QUESTIONS = 7;
-/** How long a lobby stays open before the bracket is sealed and seeded. */
-const LOBBY_SECONDS = 20;
-/** How long a match waits for a person to hand in a score before they forfeit. */
-const MATCH_DEADLINE_SECONDS = 180;
+const SIZE = 16;
+const WINS_PER_MATCH = 2;
+const GAME_QUESTIONS = 7;
+/** Day of the week the tournament starts on, 0 = Sunday. */
+const START_WEEKDAY = 6;
+const START_HOUR_UTC = 15;
+/** How long a player has to hand in a score before the game is decided without them. */
+const GAME_DEADLINE_MINUTES = 90;
 
 const BOT_NAMES = [
   'Kenshin', 'SakuraFan', 'ShonenKing', 'OtakuNo1', 'RamenLover', 'BlueExorcist',
   'NekoChan', 'ZeroTwo', 'SenpaiX', 'MangaAddict', 'TitanSlayer', 'HokageDream',
   'StrawHatJoe', 'CursedEnergy', 'DemonBlade', 'PlusUltra', 'SoulReaper', 'AlchemyFan',
-  'PirateQueen', 'NinjaWay', 'SharinganX', 'MoonPrism', 'GhoulEater', 'SpiritGun',
-  'IsekaiTruck', 'WaifuHunter', 'SakuraStorm', 'TokyoDrifter', 'LevelUpSolo', 'ChainsawGuy',
-  'QuirkLess', 'BlackClover', 'HunterExam', 'DeathNoteL', 'SteinsFan', 'EvaPilot01',
 ];
 
 function json(body: unknown, status = 200): Response {
@@ -37,7 +42,168 @@ function json(body: unknown, status = 200): Response {
   });
 }
 
-/** mulberry32, the same generator the app uses, so bots behave the same on both sides. */
+// ---------------------------------------------------------------- bracket
+
+type Slot = { from: 'seed'; seed: number } | { from: 'winner' | 'loser'; match: string };
+type MatchDef = { id: string; bracket: 'wb' | 'lb' | 'gf'; round: number; a: Slot; b: Slot };
+
+const SEED_ORDER = [0, 15, 7, 8, 4, 11, 3, 12, 2, 13, 5, 10, 6, 9, 1, 14];
+
+function buildDefs(): MatchDef[] {
+  const wb = (r: number, i: number) => `wb${r}-${i}`;
+  const lb = (r: number, i: number) => `lb${r}-${i}`;
+  const defs: MatchDef[] = [];
+
+  for (let i = 0; i < 8; i++) {
+    defs.push({
+      id: wb(0, i), bracket: 'wb', round: 0,
+      a: { from: 'seed', seed: SEED_ORDER[i * 2] },
+      b: { from: 'seed', seed: SEED_ORDER[i * 2 + 1] },
+    });
+  }
+  for (let round = 1; round <= 3; round++) {
+    for (let i = 0; i < 8 >> round; i++) {
+      defs.push({
+        id: wb(round, i), bracket: 'wb', round,
+        a: { from: 'winner', match: wb(round - 1, i * 2) },
+        b: { from: 'winner', match: wb(round - 1, i * 2 + 1) },
+      });
+    }
+  }
+  for (let i = 0; i < 4; i++) {
+    defs.push({
+      id: lb(0, i), bracket: 'lb', round: 0,
+      a: { from: 'loser', match: wb(0, i * 2) },
+      b: { from: 'loser', match: wb(0, i * 2 + 1) },
+    });
+  }
+  for (let i = 0; i < 4; i++) {
+    defs.push({
+      id: lb(1, i), bracket: 'lb', round: 1,
+      a: { from: 'winner', match: lb(0, i) },
+      b: { from: 'loser', match: wb(1, 3 - i) },
+    });
+  }
+  for (let i = 0; i < 2; i++) {
+    defs.push({
+      id: lb(2, i), bracket: 'lb', round: 2,
+      a: { from: 'winner', match: lb(1, i * 2) },
+      b: { from: 'winner', match: lb(1, i * 2 + 1) },
+    });
+  }
+  for (let i = 0; i < 2; i++) {
+    defs.push({
+      id: lb(3, i), bracket: 'lb', round: 3,
+      a: { from: 'winner', match: lb(2, i) },
+      b: { from: 'loser', match: wb(2, 1 - i) },
+    });
+  }
+  defs.push({ id: lb(4, 0), bracket: 'lb', round: 4, a: { from: 'winner', match: lb(3, 0) }, b: { from: 'winner', match: lb(3, 1) } });
+  defs.push({ id: lb(5, 0), bracket: 'lb', round: 5, a: { from: 'winner', match: lb(4, 0) }, b: { from: 'loser', match: wb(3, 0) } });
+  defs.push({ id: 'gf', bracket: 'gf', round: 0, a: { from: 'winner', match: wb(3, 0) }, b: { from: 'winner', match: lb(5, 0) } });
+  return defs;
+}
+
+const MATCH_DEFS = buildDefs();
+const DEF_BY_ID = new Map(MATCH_DEFS.map((d) => [d.id, d]));
+
+type GameRow = {
+  match_id: string;
+  game_no: number;
+  score_a: number | null;
+  score_b: number | null;
+  submitted_a: string | null;
+  submitted_b: string | null;
+  winner: 'a' | 'b' | null;
+  deadline: string | null;
+};
+
+/** Reads the bracket out of the game rows, exactly as the client engine does. */
+class Bracket {
+  private byMatch = new Map<string, GameRow[]>();
+
+  constructor(rows: GameRow[]) {
+    for (const row of rows) {
+      const list = this.byMatch.get(row.match_id) ?? [];
+      list.push(row);
+      this.byMatch.set(row.match_id, list);
+    }
+    for (const list of this.byMatch.values()) list.sort((x, y) => x.game_no - y.game_no);
+  }
+
+  games(id: string): GameRow[] {
+    return this.byMatch.get(id) ?? [];
+  }
+
+  wins(id: string): [number, number] {
+    const decided = this.games(id).filter((g) => g.winner !== null);
+    return [decided.filter((g) => g.winner === 'a').length, decided.filter((g) => g.winner === 'b').length];
+  }
+
+  decidedSide(id: string): 'a' | 'b' | null {
+    const [a, b] = this.wins(id);
+    if (a >= WINS_PER_MATCH) return 'a';
+    if (b >= WINS_PER_MATCH) return 'b';
+    return null;
+  }
+
+  resolveSlot(slot: Slot): number | null {
+    if (slot.from === 'seed') return slot.seed;
+    const side = this.decidedSide(slot.match);
+    if (!side) return null;
+    const def = DEF_BY_ID.get(slot.match)!;
+    const winner = side === 'a' ? def.a : def.b;
+    const loser = side === 'a' ? def.b : def.a;
+    return this.resolveSlot(slot.from === 'winner' ? winner : loser);
+  }
+
+  participants(id: string): [number | null, number | null] {
+    const def = DEF_BY_ID.get(id)!;
+    return [this.resolveSlot(def.a), this.resolveSlot(def.b)];
+  }
+
+  isPlayable(id: string): boolean {
+    const [a, b] = this.participants(id);
+    return a !== null && b !== null && this.decidedSide(id) === null;
+  }
+
+  /** The game currently being played in a match, if any. */
+  openGame(id: string): GameRow | null {
+    return this.games(id).find((g) => g.winner === null) ?? null;
+  }
+
+  nextGameNo(id: string): number {
+    return this.games(id).length + 1;
+  }
+}
+
+// ---------------------------------------------------------------- schedule
+
+/** Midnight UTC on the Monday of the week the given moment falls in. */
+function weekStart(now: Date): string {
+  const day = now.getUTCDay();
+  const monday = new Date(Date.UTC(now.getUTCFullYear(), now.getUTCMonth(), now.getUTCDate()));
+  monday.setUTCDate(monday.getUTCDate() - ((day + 6) % 7));
+  return monday.toISOString().slice(0, 10);
+}
+
+/** When the tournament of a given week starts: the weekend, at a fixed hour. */
+function startsAt(weekStartDate: string): string {
+  const monday = new Date(`${weekStartDate}T00:00:00Z`);
+  monday.setUTCDate(monday.getUTCDate() + ((START_WEEKDAY + 6) % 7));
+  monday.setUTCHours(START_HOUR_UTC, 0, 0, 0);
+  return monday.toISOString();
+}
+
+function rollBotScore(rating: number, rng: () => number): number {
+  // A bot's rating stands in for its skill: the pool spans 200..1000.
+  const skill = Math.max(0, Math.min(1, (rating - 200) / 800));
+  const p = 0.32 + 0.58 * skill;
+  let score = 0;
+  for (let i = 0; i < GAME_QUESTIONS; i++) if (rng() < p) score++;
+  return score;
+}
+
 function seededRng(seed: number): () => number {
   let a = seed | 0;
   return () => {
@@ -48,64 +214,83 @@ function seededRng(seed: number): () => number {
   };
 }
 
-function rollBotScore(skill: number, rng: () => number): number {
-  const p = 0.32 + 0.58 * Math.max(0, Math.min(1, skill));
-  let score = 0;
-  for (let i = 0; i < MATCH_QUESTIONS; i++) if (rng() < p) score++;
-  return score;
-}
+// ---------------------------------------------------------------- lifecycle
 
-function matchesInRound(round: number): number {
-  return (SIZE >> round) / 2;
-}
-
-type SeatRow = { tournament_id: string; seat: number; user_id: string | null; name: string; skill: number };
-type MatchRow = {
-  tournament_id: string;
-  round: number;
-  idx: number;
-  seat_a: number | null;
-  seat_b: number | null;
-  score_a: number | null;
-  score_b: number | null;
-  submitted_a: string | null;
-  submitted_b: string | null;
-  winner_seat: number | null;
-  deadline: string | null;
-};
 type TournamentRow = {
   id: string;
+  week_start: string;
   status: string;
-  seed: number;
-  round: number;
-  champion_seat: number | null;
   starts_at: string;
+  champion_user_id: string | null;
 };
 
+/** The tournament for this week, opening registration for it if it is new. */
+async function ensureWeek(admin: SupabaseClient): Promise<TournamentRow> {
+  const week = weekStart(new Date());
+  const { data: existing } = await admin
+    .from('weekly_tournaments')
+    .select('*')
+    .eq('week_start', week)
+    .maybeSingle();
+  if (existing) return existing as TournamentRow;
+
+  const { data: created } = await admin
+    .from('weekly_tournaments')
+    .insert({ week_start: week, starts_at: startsAt(week) })
+    .select('*')
+    .maybeSingle();
+  if (created) return created as TournamentRow;
+
+  // Somebody else opened it in between, which is fine.
+  const { data: raced } = await admin
+    .from('weekly_tournaments')
+    .select('*')
+    .eq('week_start', week)
+    .single();
+  return raced as TournamentRow;
+}
+
+type Entrant = { seed: number; user_id: string | null; name: string; rating: number };
+
 /**
- * Seals a lobby: bots take the seats nobody claimed, everyone is shuffled
- * into the bracket, and the first round is drawn.
+ * Closes registration and fixes the bracket: the highest rated sixteen who
+ * signed up take the seats, and bots fill whatever is left so a quiet week
+ * still runs. Seeded by rating, so the top seed meets the bottom one.
  */
 async function seedBracket(admin: SupabaseClient, tournament: TournamentRow): Promise<void> {
-  // Claim the seeding first: two players arriving at zero at the same moment
-  // would otherwise both delete and re-seat everybody.
   const { data: claimed } = await admin
-    .from('tournaments')
+    .from('weekly_tournaments')
     .update({ status: 'seeding' })
     .eq('id', tournament.id)
-    .eq('status', 'lobby')
+    .eq('status', 'registration')
     .select('id');
   if (!claimed?.length) return;
 
-  const { data: joined } = await admin
-    .from('tournament_seats')
-    .select('*')
+  const { data: signups } = await admin
+    .from('tournament_registrations')
+    .select('user_id, registered_at')
     .eq('tournament_id', tournament.id)
-    .order('seat');
+    .order('registered_at');
 
-  const humans = (joined ?? []) as SeatRow[];
-  const rng = seededRng(Number(tournament.seed) | 0);
+  const ids = ((signups ?? []) as { user_id: string }[]).map((r) => r.user_id);
+  let rated: { user_id: string; name: string; rating: number }[] = [];
+  if (ids.length) {
+    const { data: rows } = await admin
+      .from('leaderboard')
+      .select('id, username, total_score')
+      .in('id', ids);
+    rated = ((rows ?? []) as { id: string; username: string; total_score: number }[]).map((r) => ({
+      user_id: r.id,
+      name: r.username,
+      rating: r.total_score ?? 0,
+    }));
+  }
 
+  // Highest rating first; an earlier signup breaks a tie.
+  rated.sort((x, y) => y.rating - x.rating || ids.indexOf(x.user_id) - ids.indexOf(y.user_id));
+  const humans = rated.slice(0, SIZE);
+
+  const rng = seededRng(Date.parse(tournament.starts_at) | 0);
   const names = [...BOT_NAMES];
   for (let i = names.length - 1; i > 0; i--) {
     const j = Math.floor(rng() * (i + 1));
@@ -113,201 +298,186 @@ async function seedBracket(admin: SupabaseClient, tournament: TournamentRow): Pr
   }
 
   const botCount = SIZE - humans.length;
-  const pool: { user_id: string | null; name: string; skill: number }[] = [
-    ...humans.map((h) => ({ user_id: h.user_id, name: h.name, skill: 0 })),
-    ...Array.from({ length: botCount }, (_, i) => ({
-      user_id: null,
-      name: names[i % names.length],
-      skill: botCount <= 1 ? 0.5 : 0.28 + (i / (botCount - 1)) * 0.62,
-    })),
-  ];
-  for (let i = pool.length - 1; i > 0; i--) {
-    const j = Math.floor(rng() * (i + 1));
-    [pool[i], pool[j]] = [pool[j], pool[i]];
-  }
+  const bots = Array.from({ length: botCount }, (_, i) => ({
+    user_id: null,
+    name: names[i % names.length],
+    rating: Math.round(200 + rng() * 600),
+  }));
 
-  await admin.from('tournament_seats').delete().eq('tournament_id', tournament.id);
-  await admin.from('tournament_seats').insert(
-    pool.map((entry, seat) => ({ tournament_id: tournament.id, seat, ...entry }))
-  );
+  const pool = [...humans, ...bots].sort((x, y) => y.rating - x.rating);
+  const entrants: Entrant[] = pool.map((entry, seed) => ({ seed, ...entry }));
 
-  const deadline = new Date(Date.now() + MATCH_DEADLINE_SECONDS * 1000).toISOString();
-  await admin.from('tournament_matches').upsert(
-    Array.from({ length: matchesInRound(0) }, (_, idx) => ({
-      tournament_id: tournament.id,
-      round: 0,
-      idx,
-      seat_a: idx * 2,
-      seat_b: idx * 2 + 1,
-      deadline,
-    })),
-    { onConflict: 'tournament_id,round,idx', ignoreDuplicates: true }
-  );
-
-  await admin.from('tournaments').update({ status: 'running', round: 0 }).eq('id', tournament.id);
+  await admin
+    .from('tournament_entrants')
+    .upsert(
+      entrants.map((e) => ({ tournament_id: tournament.id, ...e })),
+      { onConflict: 'tournament_id,seed', ignoreDuplicates: true }
+    );
+  await admin.from('weekly_tournaments').update({ status: 'running' }).eq('id', tournament.id);
 }
 
-/**
- * Picks a bracket back up if seeding was claimed but never finished — the
- * seats are written before the status flips, so a run cut short between the
- * two would otherwise sit in 'seeding' forever.
- */
-async function recoverSeeding(admin: SupabaseClient, tournamentId: string): Promise<void> {
-  const { data } = await admin.from('tournaments').select('status').eq('id', tournamentId).single();
+/** Picks a bracket back up if seeding was claimed but never finished. */
+async function recoverSeeding(admin: SupabaseClient, id: string): Promise<void> {
+  const { data } = await admin.from('weekly_tournaments').select('status').eq('id', id).single();
   if (data?.status !== 'seeding') return;
-
   const { count } = await admin
-    .from('tournament_seats')
-    .select('seat', { count: 'exact', head: true })
-    .eq('tournament_id', tournamentId);
-
-  if ((count ?? 0) === SIZE) {
-    await admin.from('tournaments').update({ status: 'running' }).eq('id', tournamentId).eq('status', 'seeding');
-  } else {
-    // Nothing was written, so let the lobby be sealed again from scratch.
-    await admin.from('tournaments').update({ status: 'lobby' }).eq('id', tournamentId).eq('status', 'seeding');
-  }
+    .from('tournament_entrants')
+    .select('seed', { count: 'exact', head: true })
+    .eq('tournament_id', id);
+  await admin
+    .from('weekly_tournaments')
+    .update({ status: (count ?? 0) === SIZE ? 'running' : 'registration' })
+    .eq('id', id)
+    .eq('status', 'seeding');
 }
 
 /**
- * Decides whatever can be decided right now and moves the bracket on:
- * bot-only matches resolve at once, matches past their deadline resolve with
- * a forfeit for whoever never handed a score in, and a round whose matches
- * are all decided draws the next one.
+ * Decides whatever can be decided and opens whatever is next: a game both
+ * sides have handed in, a game past its deadline, a bot's game (rolled on the
+ * spot), and the first game of every match that just became playable.
  */
-async function settle(admin: SupabaseClient, tournamentId: string): Promise<void> {
-  for (let guard = 0; guard < ROUNDS + 1; guard++) {
-    const { data: tRow } = await admin.from('tournaments').select('*').eq('id', tournamentId).single();
-    const tournament = tRow as TournamentRow;
-    if (!tournament || tournament.status !== 'running') return;
+async function settle(admin: SupabaseClient, tournament: TournamentRow): Promise<void> {
+  const { data: entrantRows } = await admin
+    .from('tournament_entrants')
+    .select('seed, user_id, name, rating')
+    .eq('tournament_id', tournament.id);
+  const entrants = new Map<number, Entrant>(((entrantRows ?? []) as Entrant[]).map((e) => [e.seed, e]));
+  if (entrants.size !== SIZE) return;
 
-    const { data: seatRows } = await admin.from('tournament_seats').select('*').eq('tournament_id', tournamentId);
-    const seats = new Map((seatRows as SeatRow[]).map((s) => [s.seat, s]));
-
-    const { data: matchRows } = await admin
-      .from('tournament_matches')
-      .select('*')
-      .eq('tournament_id', tournamentId)
-      .eq('round', tournament.round);
-    const matches = (matchRows ?? []) as MatchRow[];
-    if (!matches.length) return;
-
-    const rng = seededRng((Number(tournament.seed) | 0) + tournament.round * 7919);
+  for (let pass = 0; pass < 40; pass++) {
+    const { data: gameRows } = await admin
+      .from('tournament_games')
+      .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
+      .eq('tournament_id', tournament.id);
+    const bracket = new Bracket((gameRows ?? []) as GameRow[]);
     const now = Date.now();
     let changed = false;
 
-    for (const match of matches) {
-      if (match.winner_seat !== null) continue;
-      const a = seats.get(match.seat_a!);
-      const b = seats.get(match.seat_b!);
-      if (!a || !b) continue;
+    for (const def of MATCH_DEFS) {
+      if (!bracket.isPlayable(def.id)) continue;
+      const [seatA, seatB] = bracket.participants(def.id);
+      const a = entrants.get(seatA!)!;
+      const b = entrants.get(seatB!)!;
+      const open = bracket.openGame(def.id);
 
-      const expired = match.deadline ? Date.parse(match.deadline) <= now : false;
-      const aReady = a.user_id === null || match.score_a !== null || expired;
-      const bReady = b.user_id === null || match.score_b !== null || expired;
-      if (!aReady || !bReady) continue;
+      if (!open) {
+        // Nothing in flight: open the next game of the match.
+        await admin.from('tournament_games').upsert(
+          {
+            tournament_id: tournament.id,
+            match_id: def.id,
+            game_no: bracket.nextGameNo(def.id),
+            deadline: new Date(now + GAME_DEADLINE_MINUTES * 60000).toISOString(),
+          },
+          { onConflict: 'tournament_id,match_id,game_no', ignoreDuplicates: true }
+        );
+        changed = true;
+        continue;
+      }
 
-      // A bot rolls its score now; a person who never showed up forfeits.
-      const scoreA = a.user_id === null ? rollBotScore(a.skill, rng) : match.score_a ?? 0;
-      const scoreB = b.user_id === null ? rollBotScore(b.skill, rng) : match.score_b ?? 0;
+      const rng = seededRng((Date.parse(tournament.starts_at) | 0) + open.game_no * 7919 + def.id.length);
+      const expired = open.deadline ? Date.parse(open.deadline) <= now : false;
+      const scoreA = a.user_id === null ? rollBotScore(a.rating, rng) : open.score_a;
+      const scoreB = b.user_id === null ? rollBotScore(b.rating, rng) : open.score_b;
 
-      let winner: number;
-      if (scoreA !== scoreB) {
-        winner = scoreA > scoreB ? match.seat_a! : match.seat_b!;
-      } else if (a.user_id && b.user_id) {
-        // two people drew: the one who answered first takes it
-        const ta = match.submitted_a ? Date.parse(match.submitted_a) : Infinity;
-        const tb = match.submitted_b ? Date.parse(match.submitted_b) : Infinity;
-        winner = ta <= tb ? match.seat_a! : match.seat_b!;
-      } else if (a.user_id || b.user_id) {
-        // a person drawing with a bot goes through
-        winner = a.user_id ? match.seat_a! : match.seat_b!;
-      } else if (a.skill !== b.skill) {
-        winner = a.skill > b.skill ? match.seat_a! : match.seat_b!;
+      const aIn = a.user_id === null || scoreA !== null;
+      const bIn = b.user_id === null || scoreB !== null;
+      if (!expired && (!aIn || !bIn)) continue;
+
+      const finalA = scoreA ?? 0;
+      const finalB = scoreB ?? 0;
+      let winner: 'a' | 'b';
+      if (finalA !== finalB) {
+        winner = finalA > finalB ? 'a' : 'b';
+      } else if (open.submitted_a && open.submitted_b) {
+        // A drawn game goes to whoever answered first.
+        winner = Date.parse(open.submitted_a) <= Date.parse(open.submitted_b) ? 'a' : 'b';
+      } else if (open.submitted_a || open.submitted_b) {
+        // One of them never showed up.
+        winner = open.submitted_a ? 'a' : 'b';
       } else {
-        winner = rng() < 0.5 ? match.seat_a! : match.seat_b!;
+        // Neither did: the better seed goes through.
+        winner = seatA! < seatB! ? 'a' : 'b';
       }
 
       await admin
-        .from('tournament_matches')
-        .update({ score_a: scoreA, score_b: scoreB, winner_seat: winner })
-        .eq('tournament_id', tournamentId)
-        .eq('round', match.round)
-        .eq('idx', match.idx);
-
-      match.score_a = scoreA;
-      match.score_b = scoreB;
-      match.winner_seat = winner;
+        .from('tournament_games')
+        .update({ score_a: finalA, score_b: finalB, winner })
+        .eq('tournament_id', tournament.id)
+        .eq('match_id', def.id)
+        .eq('game_no', open.game_no)
+        .is('winner', null);
       changed = true;
     }
 
-    if (matches.some((m) => m.winner_seat === null)) return;
+    if (!changed) break;
+  }
 
-    const nextRound = tournament.round + 1;
-    if (nextRound >= ROUNDS) {
-      await admin
-        .from('tournaments')
-        .update({
-          status: 'finished',
-          round: nextRound,
-          champion_seat: matches[0].winner_seat,
-          finished_at: new Date().toISOString(),
-        })
-        .eq('id', tournamentId);
-      return;
-    }
-
-    const byIdx = new Map(matches.map((m) => [m.idx, m]));
-    const deadline = new Date(Date.now() + MATCH_DEADLINE_SECONDS * 1000).toISOString();
-    // Two people can finish their matches at once and both find the round
-    // complete, so drawing the next one has to tolerate being done twice.
-    await admin.from('tournament_matches').upsert(
-      Array.from({ length: matchesInRound(nextRound) }, (_, idx) => ({
-        tournament_id: tournamentId,
-        round: nextRound,
-        idx,
-        seat_a: byIdx.get(idx * 2)!.winner_seat,
-        seat_b: byIdx.get(idx * 2 + 1)!.winner_seat,
-        deadline,
-      })),
-      { onConflict: 'tournament_id,round,idx', ignoreDuplicates: true }
-    );
-    await admin.from('tournaments').update({ round: nextRound }).eq('id', tournamentId);
-
-    if (!changed && guard > 0) return;
+  const { data: finalRows } = await admin
+    .from('tournament_games')
+    .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
+    .eq('tournament_id', tournament.id);
+  const bracket = new Bracket((finalRows ?? []) as GameRow[]);
+  const side = bracket.decidedSide('gf');
+  if (side) {
+    const [a, b] = bracket.participants('gf');
+    const championSeed = side === 'a' ? a! : b!;
+    await admin
+      .from('weekly_tournaments')
+      .update({
+        status: 'finished',
+        champion_user_id: entrants.get(championSeed)?.user_id ?? null,
+        finished_at: new Date().toISOString(),
+      })
+      .eq('id', tournament.id)
+      .neq('status', 'finished');
   }
 }
 
-/** Everything the app needs to draw the bracket from the caller's point of view. */
-async function readState(admin: SupabaseClient, tournamentId: string, userId: string) {
-  const { data: tournament } = await admin.from('tournaments').select('*').eq('id', tournamentId).single();
-  const { data: seats } = await admin
-    .from('tournament_seats')
-    .select('seat, user_id, name, skill')
-    .eq('tournament_id', tournamentId)
-    .order('seat');
-  const { data: matches } = await admin
-    .from('tournament_matches')
-    .select('round, idx, seat_a, seat_b, score_a, score_b, winner_seat, deadline')
-    .eq('tournament_id', tournamentId)
-    .order('round')
-    .order('idx');
+async function readState(admin: SupabaseClient, tournament: TournamentRow, userId: string) {
+  const [{ data: entrants }, { data: games }, { count: registered }, { data: mine }] = await Promise.all([
+    admin.from('tournament_entrants').select('seed, user_id, name, rating').eq('tournament_id', tournament.id).order('seed'),
+    admin
+      .from('tournament_games')
+      .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
+      .eq('tournament_id', tournament.id),
+    admin
+      .from('tournament_registrations')
+      .select('user_id', { count: 'exact', head: true })
+      .eq('tournament_id', tournament.id),
+    admin
+      .from('tournament_registrations')
+      .select('registered_at')
+      .eq('tournament_id', tournament.id)
+      .eq('user_id', userId)
+      .maybeSingle(),
+  ]);
 
-  const mySeat = (seats ?? []).find((s: { user_id: string | null }) => s.user_id === userId)?.seat ?? null;
+  const entrantList = (entrants ?? []) as Entrant[];
+  const mySeat = entrantList.find((e) => e.user_id === userId)?.seed ?? null;
   return {
-    tournament,
-    // user ids never leave the function; the app only needs to know which
-    // seat is the caller's and which seats are people rather than bots
-    seats: (seats ?? []).map((s: SeatRow) => ({
-      seat: s.seat,
-      name: s.name,
-      skill: s.skill,
-      isPlayer: s.user_id !== null,
-      isMe: s.user_id === userId,
+    tournament: {
+      id: tournament.id,
+      weekStart: tournament.week_start,
+      status: tournament.status,
+      startsAt: tournament.starts_at,
+      championUserId: tournament.champion_user_id,
+    },
+    // user ids stay inside the function apart from the caller's own seat
+    entrants: entrantList.map((e) => ({
+      seed: e.seed,
+      name: e.name,
+      rating: e.rating,
+      isBot: e.user_id === null,
+      isMe: e.user_id === userId,
     })),
-    matches: matches ?? [],
+    games: games ?? [],
+    registeredCount: registered ?? 0,
+    amRegistered: !!mine,
     mySeat,
-    lobbySeconds: LOBBY_SECONDS,
+    size: SIZE,
+    winsPerMatch: WINS_PER_MATCH,
+    gameQuestions: GAME_QUESTIONS,
   };
 }
 
@@ -315,158 +485,105 @@ Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
   const admin = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_SERVICE_ROLE_KEY')!);
+  const asCaller = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
+    global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
+  });
 
   // The caller is whoever the bearer token says, never whoever the body says.
-  const authHeader = req.headers.get('Authorization') ?? '';
-  const asCaller = createClient(Deno.env.get('SUPABASE_URL')!, Deno.env.get('SUPABASE_ANON_KEY')!, {
-    global: { headers: { Authorization: authHeader } },
-  });
   const { data: userData } = await asCaller.auth.getUser();
   const user = userData?.user;
   if (!user) return json({ error: 'not signed in' }, 401);
 
-  let payload: { action?: string; tournamentId?: string; score?: number };
+  let payload: { action?: string; matchId?: string; score?: number };
   try {
     payload = await req.json();
   } catch {
     return json({ error: 'invalid request body' }, 400);
   }
 
-  const { data: profile } = await admin.from('profiles').select('username').eq('id', user.id).maybeSingle();
-  const username = profile?.username ?? 'player';
+  let tournament = await ensureWeek(admin);
 
-  /** The tournament the caller is already in, if any. */
-  async function currentTournamentId(): Promise<string | null> {
-    const { data } = await admin
-      .from('tournament_seats')
-      .select('tournament_id, tournaments!inner(status)')
-      .eq('user_id', user.id)
-      .neq('tournaments.status', 'finished')
-      .limit(1);
-    return data?.length ? (data[0].tournament_id as string) : null;
+  if (tournament.status === 'registration' && Date.parse(tournament.starts_at) <= Date.now()) {
+    await seedBracket(admin, tournament);
   }
+  await recoverSeeding(admin, tournament.id);
 
-  // Opening the screen must not enrol anybody, so resuming is its own action.
-  if (payload.action === 'resume') {
-    const id = await currentTournamentId();
-    if (!id) return json({ tournament: null });
+  const { data: refreshed } = await admin.from('weekly_tournaments').select('*').eq('id', tournament.id).single();
+  tournament = refreshed as TournamentRow;
 
-    const { data: tRow } = await admin.from('tournaments').select('*').eq('id', id).single();
-    const tournament = tRow as TournamentRow;
-    if (tournament?.status === 'lobby' && Date.parse(tournament.starts_at) <= Date.now()) {
-      await seedBracket(admin, tournament);
-    }
-    await recoverSeeding(admin, id);
-    await settle(admin, id);
-    return json(await readState(admin, id, user.id));
-  }
+  if (payload.action === 'register' || payload.action === 'unregister') {
+    if (tournament.status !== 'registration') return json({ error: 'registration is closed' }, 409);
 
-  if (payload.action === 'join') {
-    const existing = await currentTournamentId();
-    if (existing) {
-      await settle(admin, existing);
-      return json(await readState(admin, existing, user.id));
-    }
-
-    const nowIso = new Date().toISOString();
-    const { data: openLobbies } = await admin
-      .from('tournaments')
-      .select('id, starts_at')
-      .eq('status', 'lobby')
-      .gt('starts_at', nowIso)
-      .order('starts_at')
-      .limit(1);
-
-    let tournamentId: string;
-    if (openLobbies?.length) {
-      tournamentId = openLobbies[0].id as string;
+    if (payload.action === 'register') {
+      await admin
+        .from('tournament_registrations')
+        .upsert({ tournament_id: tournament.id, user_id: user.id }, { onConflict: 'tournament_id,user_id', ignoreDuplicates: true });
     } else {
-      const { data: created, error } = await admin
-        .from('tournaments')
-        .insert({
-          seed: Math.floor(Math.random() * 2 ** 31),
-          starts_at: new Date(Date.now() + LOBBY_SECONDS * 1000).toISOString(),
-        })
-        .select('id')
-        .single();
-      if (error || !created) return json({ error: 'could not open a tournament' }, 500);
-      tournamentId = created.id as string;
+      await admin
+        .from('tournament_registrations')
+        .delete()
+        .eq('tournament_id', tournament.id)
+        .eq('user_id', user.id);
     }
-
-    const { count } = await admin
-      .from('tournament_seats')
-      .select('seat', { count: 'exact', head: true })
-      .eq('tournament_id', tournamentId);
-    if ((count ?? 0) >= SIZE) return json({ error: 'tournament is full' }, 409);
-
-    await admin.from('tournament_seats').insert({
-      tournament_id: tournamentId,
-      seat: count ?? 0,
-      user_id: user.id,
-      name: username,
-    });
-
-    return json(await readState(admin, tournamentId, user.id));
+    return json(await readState(admin, tournament, user.id));
   }
 
-  if (payload.action === 'state' || payload.action === 'submit') {
-    const tournamentId = payload.tournamentId;
-    if (!tournamentId) return json({ error: 'tournamentId required' }, 400);
+  if (payload.action === 'submit') {
+    if (tournament.status !== 'running') return json({ error: 'no tournament is running' }, 409);
 
-    const { data: seat } = await admin
-      .from('tournament_seats')
-      .select('seat')
-      .eq('tournament_id', tournamentId)
-      .eq('user_id', user.id)
-      .maybeSingle();
-    if (!seat) return json({ error: 'not your tournament' }, 403);
-
-    const { data: tRow } = await admin.from('tournaments').select('*').eq('id', tournamentId).single();
-    const tournament = tRow as TournamentRow;
-    if (!tournament) return json({ error: 'no such tournament' }, 404);
-
-    if (tournament.status === 'lobby' && Date.parse(tournament.starts_at) <= Date.now()) {
-      await seedBracket(admin, tournament);
-    }
-    await recoverSeeding(admin, tournamentId);
-
-    if (payload.action === 'submit') {
-      const score = payload.score;
-      if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > MATCH_QUESTIONS) {
-        return json({ error: 'bad score' }, 400);
-      }
-
-      const { data: fresh } = await admin.from('tournaments').select('round, status').eq('id', tournamentId).single();
-      const { data: match } = await admin
-        .from('tournament_matches')
-        .select('*')
-        .eq('tournament_id', tournamentId)
-        .eq('round', fresh!.round)
-        .or(`seat_a.eq.${seat.seat},seat_b.eq.${seat.seat}`)
-        .maybeSingle();
-
-      if (match && (match as MatchRow).winner_seat === null) {
-        const row = match as MatchRow;
-        const mine = row.seat_a === seat.seat ? 'a' : 'b';
-        // Only ever the first submission: a second one would be a replay of
-        // the same match with a better score.
-        if ((mine === 'a' ? row.score_a : row.score_b) === null) {
-          await admin
-            .from('tournament_matches')
-            .update(
-              mine === 'a'
-                ? { score_a: score, submitted_a: new Date().toISOString() }
-                : { score_b: score, submitted_b: new Date().toISOString() }
-            )
-            .eq('tournament_id', tournamentId)
-            .eq('round', row.round)
-            .eq('idx', row.idx);
-        }
-      }
+    const score = payload.score;
+    const matchId = payload.matchId;
+    if (!matchId || !DEF_BY_ID.has(matchId)) return json({ error: 'unknown match' }, 400);
+    if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > GAME_QUESTIONS) {
+      return json({ error: 'bad score' }, 400);
     }
 
-    await settle(admin, tournamentId);
-    return json(await readState(admin, tournamentId, user.id));
+    const { data: entrantRows } = await admin
+      .from('tournament_entrants')
+      .select('seed, user_id')
+      .eq('tournament_id', tournament.id);
+    const mySeat = ((entrantRows ?? []) as { seed: number; user_id: string | null }[]).find((e) => e.user_id === user.id)?.seed;
+    if (mySeat === undefined) return json({ error: 'not in this tournament' }, 403);
+
+    const { data: gameRows } = await admin
+      .from('tournament_games')
+      .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
+      .eq('tournament_id', tournament.id);
+    const bracket = new Bracket((gameRows ?? []) as GameRow[]);
+
+    if (!bracket.isPlayable(matchId)) return json({ error: 'match is not open' }, 409);
+    const [seatA, seatB] = bracket.participants(matchId);
+    const side = seatA === mySeat ? 'a' : seatB === mySeat ? 'b' : null;
+    if (!side) return json({ error: 'not your match' }, 403);
+
+    const open = bracket.openGame(matchId);
+    if (!open) return json({ error: 'no game to play' }, 409);
+    // Only ever the first submission: a second would be a replay of the same
+    // game with a better score.
+    const already = side === 'a' ? open.score_a : open.score_b;
+    if (already === null) {
+      await admin
+        .from('tournament_games')
+        .update(
+          side === 'a'
+            ? { score_a: score, submitted_a: new Date().toISOString() }
+            : { score_b: score, submitted_b: new Date().toISOString() }
+        )
+        .eq('tournament_id', tournament.id)
+        .eq('match_id', matchId)
+        .eq('game_no', open.game_no)
+        .is('winner', null);
+    }
+
+    await settle(admin, tournament);
+    const { data: after } = await admin.from('weekly_tournaments').select('*').eq('id', tournament.id).single();
+    return json(await readState(admin, after as TournamentRow, user.id));
+  }
+
+  if (payload.action === 'state') {
+    if (tournament.status === 'running') await settle(admin, tournament);
+    const { data: after } = await admin.from('weekly_tournaments').select('*').eq('id', tournament.id).single();
+    return json(await readState(admin, after as TournamentRow, user.id));
   }
 
   return json({ error: 'unknown action' }, 400);
