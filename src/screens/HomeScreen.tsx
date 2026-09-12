@@ -175,7 +175,7 @@ function makeStyles(theme: Theme) {
       // filling the row, and on Android the banner came out narrower than
       // the category grid above it.
       width: '100%',
-      aspectRatio: 3.5,
+      aspectRatio: 2.6,
       borderRadius: radius.lg,
       overflow: 'hidden',
       marginBottom: 24,
