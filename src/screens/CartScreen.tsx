@@ -11,10 +11,10 @@ import { useT } from '../i18n/strings';
 import { useLanguage } from '../i18n/LanguageContext';
 import Icon from '../components/Icon';
 import { SHOP_IMAGES } from '../shop/shopImages';
-import { formatRub } from '../shop/economy';
-import { cartCurrency, cartItems, cartTotalPoints, cartTotalRub } from '../shop/cart';
+import { formatRub, pointsPrice } from '../shop/economy';
+import { cartItems, cartTotalPoints, cartTotalRub } from '../shop/cart';
 import { Delivery, deliveryProblems } from '../shop/orders';
-import { useShop } from '../shop/ShopContext';
+import { Currency, useShop } from '../shop/ShopContext';
 import { itemTitle } from './ShopScreen';
 
 type Props = {
@@ -37,15 +37,15 @@ export default function CartScreen({ onBack, onOrdered }: Props) {
   const [busy, setBusy] = useState(false);
 
   const lines = cartItems(cart);
-  const inPoints = cartCurrency(cart) === 'points';
   const totalRub = cartTotalRub(cart);
   const totalPoints = cartTotalPoints(cart);
+  const shortOnPoints = balance < totalPoints;
   const field = (key: keyof Delivery) => (value: string) => {
     setDelivery((current) => ({ ...current, [key]: value }));
     setMissing((current) => current.filter((k) => k !== key));
   };
 
-  const checkout = async () => {
+  const checkout = async (currency: Currency) => {
     const problems = deliveryProblems(delivery);
     if (problems.length) {
       setMissing(problems);
@@ -55,7 +55,7 @@ export default function CartScreen({ onBack, onOrdered }: Props) {
     }
     setBusy(true);
     setError(null);
-    const result = await placeOrder(delivery);
+    const result = await placeOrder(delivery, currency);
     setBusy(false);
     if (result.ok) {
       buzz('success');
@@ -93,9 +93,7 @@ export default function CartScreen({ onBack, onOrdered }: Props) {
                     </Text>
                     {line.size && <Text style={styles.rowMeta}>{t('shop.sizeIs', line.size)}</Text>}
                     <Text style={styles.rowPrice}>
-                      {item.pricePoints !== undefined
-                        ? t('shop.pointsPrice', item.pricePoints)
-                        : formatRub(item.priceRub ?? 0)}
+                      {pointsPrice(item.priceRub)} · {formatRub(item.priceRub)}
                     </Text>
                   </View>
                   <View style={styles.stepper}>
@@ -119,16 +117,13 @@ export default function CartScreen({ onBack, onOrdered }: Props) {
 
             <View style={styles.totalRow}>
               <Text style={styles.totalLabel}>{t('shop.total')}</Text>
-              {inPoints ? (
-                <View style={styles.totalPointsRow}>
-                  <Icon name="medal" size={17} color={theme.primary} />
-                  <Text style={styles.totalPoints}>{totalPoints}</Text>
-                </View>
-              ) : (
-                <Text style={styles.totalValue}>{formatRub(totalRub)}</Text>
-              )}
+              <View style={styles.totalPointsRow}>
+                <Icon name="gem" size={17} color={theme.primary} />
+                <Text style={styles.totalPoints}>{totalPoints}</Text>
+                <Text style={styles.totalValue}>· {formatRub(totalRub)}</Text>
+              </View>
             </View>
-            {inPoints && <Text style={styles.balanceNote}>{t('shop.balance', balance)}</Text>}
+            <Text style={styles.balanceNote}>{t('shop.balance', balance)}</Text>
 
             <Text style={styles.sectionTitle}>{t('shop.delivery')}</Text>
             <Field label={t('shop.name')} value={delivery.name} onChange={field('name')} bad={missing.includes('name')} styles={styles} theme={theme} />
@@ -155,14 +150,28 @@ export default function CartScreen({ onBack, onOrdered }: Props) {
 
             {error && <Text style={styles.error}>{error}</Text>}
 
-            <SoundTouchable style={[styles.primaryButton, busy && styles.buttonDisabled]} onPress={checkout} disabled={busy} activeOpacity={0.88}>
+            {/* the currency is picked once, here, rather than per item */}
+            <SoundTouchable
+              style={[styles.primaryButton, (busy || shortOnPoints) && styles.buttonDisabled]}
+              onPress={() => checkout('points')}
+              disabled={busy || shortOnPoints}
+              activeOpacity={0.88}
+            >
               {busy ? (
                 <ActivityIndicator color={theme.onPrimary} />
               ) : (
-                <Text style={styles.primaryButtonText}>{t(inPoints ? 'shop.placeOrderPoints' : 'shop.placeOrder')}</Text>
+                <Text style={styles.primaryButtonText}>{t('shop.placeOrderPoints', totalPoints)}</Text>
               )}
             </SoundTouchable>
-            <Text style={styles.footNote}>{t(inPoints ? 'shop.pointsFootnote' : 'shop.paymentFootnote')}</Text>
+            <SoundTouchable
+              style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+              onPress={() => checkout('rub')}
+              disabled={busy}
+              activeOpacity={0.88}
+            >
+              <Text style={styles.secondaryButtonText}>{t('shop.placeOrder', formatRub(totalRub))}</Text>
+            </SoundTouchable>
+            <Text style={styles.footNote}>{t('shop.checkoutFootnote')}</Text>
           </>
         )}
       </ScrollView>
@@ -269,6 +278,16 @@ function makeStyles(theme: Theme) {
       marginTop: 20,
     },
     primaryButtonText: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.onPrimary },
+    secondaryButton: {
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    secondaryButtonText: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text },
     buttonDisabled: { opacity: 0.6 },
     footNote: { fontSize: 11, lineHeight: 16, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 10, textAlign: 'center' },
   });

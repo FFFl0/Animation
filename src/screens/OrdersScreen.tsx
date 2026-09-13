@@ -10,6 +10,7 @@ import { useT } from '../i18n/strings';
 import { useLanguage } from '../i18n/LanguageContext';
 import Icon from '../components/Icon';
 import { shopItem } from '../shop/catalogue';
+import { CONSUMABLE_IDS } from '../shop/consumables';
 import { formatRub } from '../shop/economy';
 import { useShop } from '../shop/ShopContext';
 import { itemTitle } from './ShopScreen';
@@ -24,12 +25,14 @@ export default function OrdersScreen({ onBack, onOpenItem }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
   const { language } = useLanguage();
-  const { orders, owned } = useShop();
+  const { orders, owned, counts } = useShop();
 
   const ownedItems = owned.flatMap((id) => {
     const item = shopItem(id);
     return item ? [item] : [];
   });
+
+  const stock = CONSUMABLE_IDS.filter((id) => (counts[id] ?? 0) > 0);
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -55,6 +58,23 @@ export default function OrdersScreen({ onBack, onOpenItem }: Props) {
                   </Text>
                   <Icon name="chevronRight" size={14} color={theme.textMuted} />
                 </SoundTouchable>
+              ))}
+            </View>
+          </>
+        )}
+
+        {stock.length > 0 && (
+          <>
+            <Text style={styles.sectionTitle}>{t('shop.stockTitle')}</Text>
+            <View style={styles.listCard}>
+              {stock.map((id, i) => (
+                <View key={id} style={[styles.row, i > 0 && styles.rowDivided]}>
+                  <Icon name="gem" size={17} color={theme.primary} />
+                  <Text style={styles.rowTitle} numberOfLines={1}>
+                    {t(`shop.consumable.${id}`)}
+                  </Text>
+                  <Text style={styles.rowCount}>{counts[id]}</Text>
+                </View>
               ))}
             </View>
           </>
@@ -116,6 +136,7 @@ function makeStyles(theme: Theme) {
     row: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 14 },
     rowDivided: { borderTopWidth: 1, borderTopColor: theme.border },
     rowTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
+    rowCount: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.primary },
     card: {
       backgroundColor: theme.card,
       borderWidth: 1.5,

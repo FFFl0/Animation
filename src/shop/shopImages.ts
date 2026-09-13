@@ -11,7 +11,4 @@ export const SHOP_IMAGES: Record<string, ImageSourcePropType> = {
   'merch-poster': require('../../assets/shop/merch-poster.jpg'),
   'merch-stickers': require('../../assets/shop/merch-stickers.jpg'),
   'merch-figure': require('../../assets/shop/merch-figure.jpg'),
-  'reward-stickers': require('../../assets/shop/reward-stickers.jpg'),
-  'reward-mug': require('../../assets/shop/reward-mug.jpg'),
-  'reward-hoodie': require('../../assets/shop/reward-hoodie.jpg'),
 };

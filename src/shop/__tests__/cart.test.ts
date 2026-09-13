@@ -1,19 +1,10 @@
-import {
-  MAX_PER_LINE,
-  addToCart,
-  cartCount,
-  cartCurrency,
-  cartItems,
-  cartTotalPoints,
-  cartTotalRub,
-  setQuantity,
-  wouldMixCurrencies,
-} from '../cart';
+import { MAX_PER_LINE, addToCart, cartCount, cartItems, cartTotalPoints, cartTotalRub, setQuantity } from '../cart';
 import { shopItem } from '../catalogue';
+import { pointsPrice } from '../economy';
 
 const tee = shopItem('merch-tee')!;
 const mug = shopItem('merch-mug')!;
-const rewardMug = shopItem('reward-mug')!;
+const frame = shopItem('frame-aurora')!;
 
 describe('addToCart', () => {
   it('adds a line, then counts up the one already there', () => {
@@ -52,37 +43,18 @@ describe('totals', () => {
     let lines = addToCart([], tee.id, 'M');
     lines = addToCart(lines, tee.id, 'M');
     lines = addToCart(lines, mug.id);
-    expect(cartTotalRub(lines)).toBe(tee.priceRub! * 2 + mug.priceRub!);
-    expect(cartTotalPoints(lines)).toBe(0);
+    expect(cartTotalRub(lines)).toBe(tee.priceRub * 2 + mug.priceRub);
   });
 
-  it('totals a medal cart in points', () => {
-    const lines = addToCart([], rewardMug.id);
-    expect(cartTotalPoints(lines)).toBe(rewardMug.pricePoints);
-    expect(cartTotalRub(lines)).toBe(0);
+  it('prices the same basket both ways, because either is allowed', () => {
+    const lines = addToCart(addToCart([], mug.id), frame.id);
+    expect(cartTotalRub(lines)).toBe(mug.priceRub + frame.priceRub);
+    expect(cartTotalPoints(lines)).toBe(pointsPrice(mug.priceRub) + pointsPrice(frame.priceRub));
   });
 
   it('ignores a line whose item has left the catalogue', () => {
     const lines = [{ itemId: 'gone-forever', quantity: 3 }];
     expect(cartItems(lines)).toEqual([]);
     expect(cartTotalRub(lines)).toBe(0);
-  });
-});
-
-describe('currency', () => {
-  it('is nothing for an empty cart', () => {
-    expect(cartCurrency([])).toBeNull();
-    expect(wouldMixCurrencies([], rewardMug)).toBe(false);
-  });
-
-  it('spots a basket that would end up part roubles and part medals', () => {
-    const roubles = addToCart([], tee.id, 'M');
-    expect(cartCurrency(roubles)).toBe('rub');
-    expect(wouldMixCurrencies(roubles, rewardMug)).toBe(true);
-    expect(wouldMixCurrencies(roubles, mug)).toBe(false);
-
-    const points = addToCart([], rewardMug.id);
-    expect(cartCurrency(points)).toBe('points');
-    expect(wouldMixCurrencies(points, tee)).toBe(true);
   });
 });

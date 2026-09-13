@@ -5,6 +5,8 @@ import { Avatar, HairStyle } from '../data/avatar';
 import { AVATAR_IMAGES } from '../data/avatarImages';
 import { FRAME_IMAGES } from '../data/cosmeticImages';
 import AnimatedFrame from './AnimatedFrame';
+import AnimatedAvatarPicture from './AnimatedAvatar';
+import { isAnimatedAvatarId } from '../shop/animatedAvatars';
 import { PRESET_AVATAR_IMAGES, isPresetAvatarId } from '../data/presetAvatars';
 import { fontFamily } from '../theme/fonts';
 
@@ -76,6 +78,12 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
     // Roster characters keep their pre-rendered portrait; a player shows
     // whatever picture they added — uploaded or one of the ready-made ones —
     // and an initial until they pick something.
+    // A bought portrait beats the photo: it is the one somebody paid for.
+    const bought = !characterId && isAnimatedAvatarId(avatar.animatedAvatarId) ? avatar.animatedAvatarId : undefined;
+    if (bought) {
+      return withFrame(<AnimatedAvatarPicture id={bought} size={size} />, avatar, size);
+    }
+
     const preset = !characterId && isPresetAvatarId(avatar.presetId) ? PRESET_AVATAR_IMAGES[avatar.presetId] : undefined;
     const source = characterId ? AVATAR_IMAGES[characterId] : preset;
     const photo = characterId || preset ? undefined : avatar.photoUri;

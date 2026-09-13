@@ -11,9 +11,9 @@ import { useT } from '../i18n/strings';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useAuth } from '../auth/AuthContext';
 import Icon from '../components/Icon';
-import { APPAREL_SIZES, ApparelSize, needsDelivery, shopItem } from '../shop/catalogue';
-import { formatRub } from '../shop/economy';
-import { useShop } from '../shop/ShopContext';
+import { APPAREL_SIZES, ApparelSize, isStackable, needsDelivery, shopItem } from '../shop/catalogue';
+import { formatRub, pointsPrice } from '../shop/economy';
+import { Currency, useShop } from '../shop/ShopContext';
 import { ItemPreview, itemDescription, itemTitle } from './ShopScreen';
 
 type Props = {
@@ -29,7 +29,7 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   const { language } = useLanguage();
   const { buzz } = useSound();
   const { profile, updateAvatar } = useAuth();
-  const { balance, ownsItem, buyDigital, addToCart } = useShop();
+  const { balance, ownsItem, countOf, buyDigital, addToCart } = useShop();
   const [size, setSize] = useState<ApparelSize>('M');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -37,18 +37,21 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   const item = shopItem(itemId);
   if (!item || !profile) return null;
 
-  const owned = ownsItem(item.id);
+  const stacks = isStackable(item);
+  const owned = !stacks && ownsItem(item.id);
   const physical = needsDelivery(item);
-  const inPoints = item.pricePoints !== undefined;
-  const missing = Math.max(0, (item.pricePoints ?? 0) - balance);
+  const points = pointsPrice(item.priceRub);
   // an owned item has nothing left to be short of
-  const short = inPoints && !owned && missing > 0;
-  const equipped = item.grant.kind === 'animatedFrame' && profile.avatar.animatedFrameId === item.grant.frameId;
+  const missing = owned ? 0 : Math.max(0, points - balance);
+  const inStock = item.grant.kind === 'consumable' ? countOf(item.grant.consumable) : 0;
+  const equipped =
+    (item.grant.kind === 'animatedFrame' && profile.avatar.animatedFrameId === item.grant.frameId) ||
+    (item.grant.kind === 'animatedAvatar' && profile.avatar.animatedAvatarId === item.grant.avatarId);
 
-  const buy = async () => {
+  const buy = async (currency: Currency) => {
     setBusy(true);
     setMessage(null);
-    const result = await buyDigital(item);
+    const result = await buyDigital(item, currency);
     setBusy(false);
     if (result.ok) {
       buzz('success');
@@ -60,14 +63,12 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   };
 
   const equip = () => {
-    if (item.grant.kind !== 'animatedFrame') return;
     buzz('tap');
-    updateAvatar({
-      avatar: {
-        ...profile.avatar,
-        animatedFrameId: equipped ? undefined : item.grant.frameId,
-      },
-    });
+    if (item.grant.kind === 'animatedFrame') {
+      updateAvatar({ avatar: { ...profile.avatar, animatedFrameId: equipped ? undefined : item.grant.frameId } });
+    } else if (item.grant.kind === 'animatedAvatar') {
+      updateAvatar({ avatar: { ...profile.avatar, animatedAvatarId: equipped ? undefined : item.grant.avatarId } });
+    }
   };
 
   return (
@@ -92,21 +93,16 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
         <Text style={styles.description}>{itemDescription(item, language)}</Text>
 
         <View style={styles.priceCard}>
-          {inPoints ? (
-            <>
-              <View style={styles.priceRow}>
-                <Icon name="medal" size={20} color={theme.primary} />
-                <Text style={styles.pricePoints}>{t('shop.pointsPrice', item.pricePoints ?? 0)}</Text>
-              </View>
-              <Text style={styles.priceNote}>{t('shop.balance', balance)}</Text>
-              {short && <Text style={styles.shortNote}>{t('shop.shortBy', missing)}</Text>}
-            </>
-          ) : (
-            <>
-              <Text style={styles.priceRub}>{formatRub(item.priceRub ?? 0)}</Text>
-              <Text style={styles.priceNote}>{t(physical ? 'shop.deliveryNote' : 'shop.digitalNote')}</Text>
-            </>
-          )}
+          <View style={styles.priceRow}>
+            <Icon name="gem" size={20} color={theme.primary} />
+            <Text style={styles.pricePoints}>{t('shop.pointsPrice', points)}</Text>
+            <Text style={styles.priceOr}>{t('shop.or')}</Text>
+            <Text style={styles.priceRub}>{formatRub(item.priceRub)}</Text>
+          </View>
+          <Text style={styles.priceNote}>{t(physical ? 'shop.deliveryNote' : 'shop.digitalNote')}</Text>
+          <Text style={styles.priceNote}>{t('shop.balance', balance)}</Text>
+          {missing > 0 && <Text style={styles.shortNote}>{t('shop.shortBy', missing)}</Text>}
+          {inStock > 0 && <Text style={styles.priceNote}>{t('shop.inStock', inStock)}</Text>}
         </View>
 
         {item.sizes && (
@@ -128,7 +124,7 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
 
         {message && <Text style={styles.message}>{message}</Text>}
 
-        {owned && !physical ? (
+        {owned ? (
           <>
             <View style={styles.ownedBanner}>
               <Icon name="check" size={16} color={theme.success} />
@@ -153,14 +149,24 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
             <Text style={styles.primaryButtonText}>{t('shop.addToCart')}</Text>
           </SoundTouchable>
         ) : (
-          <SoundTouchable
-            style={[styles.primaryButton, (busy || short) && styles.buttonDisabled]}
-            onPress={buy}
-            activeOpacity={0.88}
-            disabled={busy || short}
-          >
-            <Text style={styles.primaryButtonText}>{t(inPoints ? 'shop.buyForPoints' : 'shop.buyForRub')}</Text>
-          </SoundTouchable>
+          <>
+            <SoundTouchable
+              style={[styles.primaryButton, (busy || missing > 0) && styles.buttonDisabled]}
+              onPress={() => buy('points')}
+              activeOpacity={0.88}
+              disabled={busy || missing > 0}
+            >
+              <Text style={styles.primaryButtonText}>{t('shop.buyForPoints', points)}</Text>
+            </SoundTouchable>
+            <SoundTouchable
+              style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+              onPress={() => buy('rub')}
+              activeOpacity={0.88}
+              disabled={busy}
+            >
+              <Text style={styles.secondaryButtonText}>{t('shop.buyForRub', formatRub(item.priceRub))}</Text>
+            </SoundTouchable>
+          </>
         )}
 
         {physical && <Text style={styles.footNote}>{t('shop.physicalFootnote')}</Text>}
@@ -196,7 +202,8 @@ function makeStyles(theme: Theme) {
       marginTop: 16,
       gap: 4,
     },
-    priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    priceRow: { flexDirection: 'row', alignItems: 'center', gap: 8, flexWrap: 'wrap' },
+    priceOr: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted },
     pricePoints: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.primary },
     priceRub: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
     priceNote: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted },
@@ -235,6 +242,16 @@ function makeStyles(theme: Theme) {
       marginTop: 16,
     },
     primaryButtonText: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.onPrimary },
+    secondaryButton: {
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      paddingVertical: 16,
+      alignItems: 'center',
+      marginTop: 10,
+    },
+    secondaryButtonText: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text },
     buttonDisabled: { opacity: 0.5 },
     ghostOutline: { backgroundColor: 'transparent', borderWidth: 1.5, borderColor: theme.border },
     ghostOutlineText: { color: theme.text },

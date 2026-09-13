@@ -17,6 +17,9 @@ export type OrderLine = {
 
 export type OrderStatus = 'awaitingPayment' | 'paid' | 'shipped';
 
+/** How the order was paid for — or would be, once payment is connected. */
+export type PaidWith = 'rub' | 'points';
+
 export type Order = {
   id: string;
   createdAt: string;
@@ -26,6 +29,7 @@ export type Order = {
   /** Medal points, 0 for an order paid with money. */
   totalPoints: number;
   delivery: Delivery;
+  paidWith: PaidWith;
   status: OrderStatus;
 };
 

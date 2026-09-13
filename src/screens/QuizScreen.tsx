@@ -20,6 +20,7 @@ import QuoteAudio from '../quiz/QuoteAudio';
 import QuizTimer from '../quiz/QuizTimer';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import { useShop } from '../shop/ShopContext';
 
 type Props = {
   config: RoundConfig;
@@ -27,14 +28,17 @@ type Props = {
   onClose: () => void;
   /** Fired right when an answer registers — lets a battle room broadcast live progress. */
   onAnswer?: (correct: boolean, answeredCount: number, score: number) => void;
+  /** Off for a tournament game or a battle: a bought hint against another
+   * player is not a hint, it is an advantage nobody agreed to. */
+  allowItems?: boolean;
 };
 
 const useNative = Platform.OS !== 'web';
 
-export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Props) {
+export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowItems = true }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
-  const { playCorrect, playWrong } = useSound();
+  const { playCorrect, playWrong, buzz } = useSound();
   const { language } = useLanguage();
   const t = useT();
   const questions = useMemo<Question[]>(() => generateQuiz(config, language), [config, language]);
@@ -44,6 +48,11 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
   const [selected, setSelected] = useState<number | null>(null);
   const [lives, setLives] = useState(config.lives ?? 0);
   const [timeLeft, setTimeLeft] = useState(config.timerSeconds ?? 0);
+  /** Wrong options taken off the board by a 50/50, for this question only. */
+  const [hidden, setHidden] = useState<number[]>([]);
+  /** Skipped questions come out of the total, so a skip is not a wrong answer. */
+  const [skipped, setSkipped] = useState(0);
+  const { countOf, spendConsumable } = useShop();
   const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const promptEnter = useRef(new Animated.Value(1)).current;
 
@@ -106,12 +115,61 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
   const handleNext = () => {
     const outOfLives = hasLives && lives <= 0;
     if (isLast || outOfLives) {
-      onFinish(score, index + 1);
+      onFinish(score, index + 1 - skipped);
       return;
     }
     setIndex((i) => i + 1);
     setSelected(null);
+    setHidden([]);
   };
+
+  const useHint = () => {
+    if (selected !== null || hidden.length || !spendConsumable('hint5050')) return;
+    buzz('tap');
+    const wrong = question.options
+      .map((_, i) => i)
+      .filter((i) => i !== question.correctIndex)
+      .sort(() => Math.random() - 0.5);
+    setHidden(wrong.slice(0, 2));
+  };
+
+  const useSkip = () => {
+    if (selected !== null || !spendConsumable('skipQuestion')) return;
+    buzz('tap');
+    if (isLast) {
+      onFinish(score, index - skipped);
+      return;
+    }
+    setSkipped((n) => n + 1);
+    setIndex((i) => i + 1);
+    setHidden([]);
+  };
+
+  const hints = countOf('hint5050');
+  const skips = countOf('skipQuestion');
+  const canUseItems = allowItems && selected === null;
+  const itemsRow =
+    canUseItems && hints + skips > 0 ? (
+      <View style={styles.itemsRow}>
+        {hints > 0 && (
+          <SoundTouchable
+            style={[styles.itemButton, hidden.length > 0 && styles.itemButtonSpent]}
+            onPress={useHint}
+            disabled={hidden.length > 0}
+            activeOpacity={0.85}
+          >
+            <Icon name="sparkles" size={14} color={theme.primary} />
+            <Text style={styles.itemButtonText}>{t('quiz.hint5050', hints)}</Text>
+          </SoundTouchable>
+        )}
+        {skips > 0 && (
+          <SoundTouchable style={styles.itemButton} onPress={useSkip} activeOpacity={0.85}>
+            <Icon name="shuffle" size={14} color={theme.primary} />
+            <Text style={styles.itemButtonText}>{t('quiz.skipQuestion', skips)}</Text>
+          </SoundTouchable>
+        )}
+      </View>
+    ) : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -188,11 +246,14 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
             )}
           </Animated.View>
 
+          {itemsRow}
+
           <View style={styles.options}>
             {question.options.map((option, i) => {
               const isCorrect = i === question.correctIndex;
               const isSelected = i === selected;
               const showState = selected !== null;
+              const isHidden = hidden.includes(i);
 
               let style = styles.option;
               // The right answer is revealed either way — getting it wrong
@@ -207,9 +268,9 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer }: Prop
                   index={i}
                   questionKey={questionKey}
                   state={showState && isCorrect ? 'correct' : showState && isSelected ? 'wrong' : 'idle'}
-                  disabled={showState}
+                  disabled={showState || isHidden}
                   onPress={() => handleSelect(i)}
-                  style={style}
+                  style={isHidden ? { ...style, ...styles.optionHidden } : style}
                   textStyle={styles.optionText}
                 />
               );
@@ -265,6 +326,21 @@ function makeStyles(theme: Theme) {
       minHeight: 48,
     },
     options: { gap: 12 },
+    optionHidden: { opacity: 0.3 },
+    itemsRow: { flexDirection: 'row', gap: 8, justifyContent: 'center', marginBottom: 12, flexWrap: 'wrap' },
+    itemButton: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+      paddingHorizontal: 14,
+      paddingVertical: 8,
+    },
+    itemButtonSpent: { opacity: 0.45 },
+    itemButtonText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.text },
     option: {
       backgroundColor: theme.card,
       borderWidth: 1.5,

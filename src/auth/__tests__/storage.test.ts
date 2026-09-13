@@ -31,29 +31,51 @@ describe('mergeStat', () => {
 
 describe('bumpStreak', () => {
   const DAY = 86400000;
+  const dayAgo = (n: number) => new Date(Date.now() - n * DAY).toISOString().slice(0, 10);
+  const today = new Date().toISOString().slice(0, 10);
 
   it('starts a new streak on first play', () => {
-    const result = bumpStreak({ count: 0, lastPlayedDate: null });
-    expect(result.count).toBe(1);
-    expect(result.lastPlayedDate).toBe(new Date().toISOString().slice(0, 10));
+    const { streak, freezeUsed } = bumpStreak({ count: 0, lastPlayedDate: null });
+    expect(streak.count).toBe(1);
+    expect(streak.lastPlayedDate).toBe(today);
+    expect(freezeUsed).toBe(false);
   });
 
   it('does not change when already played today', () => {
-    const today = new Date().toISOString().slice(0, 10);
     const streak = { count: 4, lastPlayedDate: today };
-    expect(bumpStreak(streak)).toEqual(streak);
+    expect(bumpStreak(streak).streak).toEqual(streak);
   });
 
   it('increments when the last play was yesterday', () => {
-    const yesterday = new Date(Date.now() - DAY).toISOString().slice(0, 10);
-    const result = bumpStreak({ count: 4, lastPlayedDate: yesterday });
-    expect(result.count).toBe(5);
+    expect(bumpStreak({ count: 4, lastPlayedDate: dayAgo(1) }).streak.count).toBe(5);
   });
 
   it('resets to 1 when a day was missed', () => {
-    const twoDaysAgo = new Date(Date.now() - 2 * DAY).toISOString().slice(0, 10);
-    const result = bumpStreak({ count: 12, lastPlayedDate: twoDaysAgo });
-    expect(result.count).toBe(1);
+    expect(bumpStreak({ count: 12, lastPlayedDate: dayAgo(2) }).streak.count).toBe(1);
+  });
+
+  describe('with a streak freeze offered', () => {
+    it('holds the streak where it was instead of resetting it', () => {
+      const { streak, freezeUsed } = bumpStreak({ count: 12, lastPlayedDate: dayAgo(2) }, true);
+      // a freeze rescues the count, it does not add a day to it
+      expect(streak.count).toBe(12);
+      expect(streak.lastPlayedDate).toBe(today);
+      expect(freezeUsed).toBe(true);
+    });
+
+    it('is not spent when the streak was never in danger', () => {
+      expect(bumpStreak({ count: 4, lastPlayedDate: dayAgo(1) }, true)).toEqual({
+        streak: { count: 5, lastPlayedDate: today },
+        freezeUsed: false,
+      });
+      expect(bumpStreak({ count: 4, lastPlayedDate: today }, true).freezeUsed).toBe(false);
+    });
+
+    it('is not spent on a first-ever round, which has no streak to save', () => {
+      const { streak, freezeUsed } = bumpStreak({ count: 0, lastPlayedDate: null }, true);
+      expect(streak.count).toBe(1);
+      expect(freezeUsed).toBe(false);
+    });
   });
 });
 

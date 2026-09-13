@@ -1,4 +1,5 @@
-import { ApparelSize, ShopItem, isMedalPriced, shopItem } from './catalogue';
+import { ApparelSize, ShopItem, shopItem } from './catalogue';
+import { pointsPrice } from './economy';
 
 export type CartLine = {
   itemId: string;
@@ -43,22 +44,11 @@ export function cartTotalRub(lines: CartLine[]): number {
   return cartItems(lines).reduce((sum, { line, item }) => sum + (item.priceRub ?? 0) * line.quantity, 0);
 }
 
-export function cartTotalPoints(lines: CartLine[]): number {
-  return cartItems(lines).reduce((sum, { line, item }) => sum + (item.pricePoints ?? 0) * line.quantity, 0);
-}
-
 /**
- * A cart never mixes the two currencies: a basket that is part roubles and
- * part medals has no single total to show, let alone charge.
+ * The same basket, priced the other way. Everything can be paid for either
+ * way, so a cart has both totals and the currency is picked once at
+ * checkout rather than per item.
  */
-export function cartCurrency(lines: CartLine[]): 'rub' | 'points' | null {
-  const items = cartItems(lines);
-  if (!items.length) return null;
-  return isMedalPriced(items[0].item) ? 'points' : 'rub';
-}
-
-export function wouldMixCurrencies(lines: CartLine[], item: ShopItem): boolean {
-  const current = cartCurrency(lines);
-  if (current === null) return false;
-  return current !== (isMedalPriced(item) ? 'points' : 'rub');
+export function cartTotalPoints(lines: CartLine[]): number {
+  return cartItems(lines).reduce((sum, { line, item }) => sum + pointsPrice(item.priceRub) * line.quantity, 0);
 }

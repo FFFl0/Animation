@@ -1,4 +1,5 @@
 import { FrameId } from './cosmetics';
+import { AnimatedAvatarId } from '../shop/animatedAvatars';
 import { AnimatedFrameId } from '../shop/animatedFrames';
 import { PresetAvatarId } from './presetAvatars';
 
@@ -17,6 +18,8 @@ export type Avatar = {
   frameId?: FrameId;
   /** Moving frame bought in the shop, drawn over the level one. */
   animatedFrameId?: AnimatedFrameId;
+  /** Moving portrait bought in the shop, shown instead of the photo. */
+  animatedAvatarId?: AnimatedAvatarId;
   /** The rest only describes the 54 fixed roster characters: their portraits
    * are pre-rendered PNGs, but the "silhouette" and "eyes" quiz modes still
    * redraw them from these traits (see src/components/AnimeAvatar.tsx). */

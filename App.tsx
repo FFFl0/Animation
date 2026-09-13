@@ -38,7 +38,7 @@ import ShopScreen from './src/screens/ShopScreen';
 import ShopItemScreen from './src/screens/ShopItemScreen';
 import CartScreen from './src/screens/CartScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
-import { ShopProvider } from './src/shop/ShopContext';
+import { ShopProvider, useShop } from './src/shop/ShopContext';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
@@ -107,6 +107,7 @@ function ScreenTransition({ children, transitionKey }: { children: React.ReactNo
 
 function AppShell() {
   const { profile, loading, recordRoundResult } = useAuth();
+  const { countOf, spendConsumable } = useShop();
   const { theme, resolvedScheme } = useTheme();
   const { setMusicContext } = useSound();
   const t = useT();
@@ -326,7 +327,16 @@ function AppShell() {
     });
 
     if (roundConfig) {
-      const unlocked = await recordRoundResult(roundConfig, activeModeId, score, total);
+      // A streak freeze is offered to the streak, and only spent if the
+      // streak actually needed rescuing.
+      const { unlocked, freezeUsed } = await recordRoundResult(
+        roundConfig,
+        activeModeId,
+        score,
+        total,
+        countOf('streakFreeze') > 0
+      );
+      if (freezeUsed) spendConsumable('streakFreeze');
       if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
     }
     setScreen('result');
@@ -400,7 +410,14 @@ function AppShell() {
               onMatchPlayed={async (score, total) => {
                 // A tournament game is still seven real questions, so it feeds
                 // stats, XP and achievements like any other round.
-                const unlocked = await recordRoundResult(WEEKLY_MATCH_CONFIG, null, score, total);
+                const { unlocked, freezeUsed } = await recordRoundResult(
+                  WEEKLY_MATCH_CONFIG,
+                  null,
+                  score,
+                  total,
+                  countOf('streakFreeze') > 0
+                );
+                if (freezeUsed) spendConsumable('streakFreeze');
                 if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
               }}
             />

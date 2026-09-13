@@ -6,15 +6,17 @@ const KEY = 'animequiz.shop';
 
 /** Everything the shop remembers about one account. */
 export type ShopState = {
-  /** Ids of items already bought — a digital item is owned once, not stocked. */
+  /** Ids of items already bought — an avatar or a frame is owned once, not stocked. */
   owned: string[];
+  /** How many of each consumable are left, by consumable id. */
+  counts: Record<string, number>;
   /** Medal points spent so far; the balance is what the shelf is worth minus this. */
   spentPoints: number;
   cart: CartLine[];
   orders: Order[];
 };
 
-export const EMPTY_SHOP_STATE: ShopState = { owned: [], spentPoints: 0, cart: [], orders: [] };
+export const EMPTY_SHOP_STATE: ShopState = { owned: [], counts: {}, spentPoints: 0, cart: [], orders: [] };
 
 type Store = Record<string, ShopState>;
 

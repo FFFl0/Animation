@@ -37,6 +37,15 @@ export function shortBy(record: TournamentRecord, spent: number, price: number):
   return Math.max(0, price - balanceOf(record, spent));
 }
 
+/**
+ * What an item costs in medal points. A point stands for a rouble of the
+ * same value, so the two prices are one number: nothing to keep in step,
+ * and "300 очков" reads as "300 ₽" without anybody doing arithmetic.
+ */
+export function pointsPrice(priceRub: number): number {
+  return priceRub;
+}
+
 /** Prices in roubles are whole roubles — no kopecks anywhere in the shop. */
 export function formatRub(price: number): string {
   return `${price.toLocaleString('ru-RU')} ₽`;

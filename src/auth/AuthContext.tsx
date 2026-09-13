@@ -11,6 +11,10 @@ import { todayDateStr } from '../quiz/today';
 
 export { AuthError } from './backend';
 
+/** What a finished round produced: new unlocks, and whether a streak freeze
+ * was actually needed (so the caller only spends one when it was). */
+export type RoundOutcome = { unlocked: Achievement[]; freezeUsed: boolean };
+
 type AuthContextValue = {
   profile: Profile | null;
   loading: boolean;
@@ -20,7 +24,13 @@ type AuthContextValue = {
   deleteAccount: () => Promise<void>;
   updateAvatar: (patch: { avatar?: Avatar; favoriteCharacterId?: string | null }) => Promise<void>;
   rename: (username: string) => Promise<void>;
-  recordRoundResult: (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => Promise<Achievement[]>;
+  recordRoundResult: (
+    config: RoundConfig,
+    modeId: ModeId | null,
+    score: number,
+    total: number,
+    useFreeze?: boolean
+  ) => Promise<RoundOutcome>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
   completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -106,8 +116,14 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p);
   };
 
-  const recordRoundResult = async (config: RoundConfig, modeId: ModeId | null, score: number, total: number) => {
-    if (!profile) return [];
+  const recordRoundResult = async (
+    config: RoundConfig,
+    modeId: ModeId | null,
+    score: number,
+    total: number,
+    useFreeze = false
+  ): Promise<RoundOutcome> => {
+    if (!profile) return { unlocked: [], freezeUsed: false };
     const keys = [categoryStatsKey(config.categoryId, config.tier)];
     if (modeId) keys.push(modeStatsKey(modeId));
 
@@ -116,7 +132,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       nextStats[key] = Storage.mergeStat(nextStats[key], score, total);
     }
 
-    const nextStreak = Storage.bumpStreak(profile.streak);
+    const { streak: nextStreak, freezeUsed } = Storage.bumpStreak(profile.streak, useFreeze);
 
     const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => isUnlocked(a, profile)).map((a) => a.id));
 
@@ -148,7 +164,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p);
     Storage.logRoundResult(profile.id, score, total);
 
-    return unlocked;
+    return { unlocked, freezeUsed };
   };
 
   const value = useMemo(

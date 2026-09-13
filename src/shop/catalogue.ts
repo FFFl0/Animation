@@ -1,19 +1,19 @@
+import { AnimatedAvatarId } from './animatedAvatars';
 import { AnimatedFrameId } from './animatedFrames';
+import { ConsumableId } from './consumables';
 
-/** Which of the three shelves an item sits on. */
-export type ShopSection = 'digital' | 'merch' | 'rewards';
+/** Which shelf an item sits on. Sorted by what the thing is, not how it is paid for. */
+export type ShopSection = 'merch' | 'avatars' | 'frames' | 'items';
 
-export const SHOP_SECTIONS: ShopSection[] = ['digital', 'merch', 'rewards'];
+export const SHOP_SECTIONS: ShopSection[] = ['merch', 'avatars', 'frames', 'items'];
 
-/**
- * What buying the item actually gives you. A digital item is granted on the
- * spot; a physical one becomes an order to be packed and posted.
- */
+/** What buying it actually gives you. */
 export type ShopGrant =
+  | { kind: 'animatedAvatar'; avatarId: AnimatedAvatarId }
   | { kind: 'animatedFrame'; frameId: AnimatedFrameId }
+  | { kind: 'consumable'; consumable: ConsumableId; amount: number }
   | { kind: 'physical' };
 
-/** Sizes only apply to things people wear. */
 export const APPAREL_SIZES = ['S', 'M', 'L', 'XL', 'XXL'] as const;
 export type ApparelSize = (typeof APPAREL_SIZES)[number];
 
@@ -25,33 +25,126 @@ export type ShopItem = {
   description: string;
   descriptionEn: string;
   grant: ShopGrant;
-  /** Price in roubles, for anything bought with money. */
-  priceRub?: number;
-  /** Price in medal points, for anything bought with tournament medals. */
-  pricePoints?: number;
+  /**
+   * The one price. Every item can be paid for either way — in roubles, or in
+   * the medal points that stand for the same value (see economy.ts), so there
+   * is nothing to keep in step between two numbers.
+   */
+  priceRub: number;
   /** Asks for a size at checkout. */
   sizes?: boolean;
-  /** Shown with a "limited" mark — a reward that will not come back. */
+  /** Shown with a "limited" mark. */
   limited?: boolean;
+  /** Shown in the "popular" row at the top of the shop. */
+  popular?: boolean;
 };
 
 export const SHOP_ITEMS: ShopItem[] = [
-  // ---- digital: cosmetics, bought with money, no effect on play
+  // ---- аватарки: a still picture with the motion added in code
+  {
+    id: 'avatar-sakura',
+    section: 'avatars',
+    title: 'Сакура',
+    titleEn: 'Sakura',
+    description: 'Розовые хвостики и лепестки, которые кружат вокруг портрета.',
+    descriptionEn: 'Pink twintails with petals drifting around the portrait.',
+    grant: { kind: 'animatedAvatar', avatarId: 'sakura' },
+    priceRub: 250,
+    popular: true,
+  },
+  {
+    id: 'avatar-shadow',
+    section: 'avatars',
+    title: 'Тень',
+    titleEn: 'Shadow',
+    description: 'Тёмный силуэт, по которому медленно проходит блик.',
+    descriptionEn: 'A dark silhouette with a highlight sweeping slowly across it.',
+    grant: { kind: 'animatedAvatar', avatarId: 'shadow' },
+    priceRub: 300,
+    popular: true,
+  },
+  {
+    id: 'avatar-frost',
+    section: 'avatars',
+    title: 'Иней',
+    titleEn: 'Frost',
+    description: 'Снежные искры вокруг ледяных волос.',
+    descriptionEn: 'Snow sparks around icy hair.',
+    grant: { kind: 'animatedAvatar', avatarId: 'frost' },
+    priceRub: 300,
+    popular: true,
+  },
+  {
+    id: 'avatar-ember',
+    section: 'avatars',
+    title: 'Уголёк',
+    titleEn: 'Ember',
+    description: 'Тёплое свечение, которое дышит вокруг рыжей макушки.',
+    descriptionEn: 'A warm glow breathing around a ginger head.',
+    grant: { kind: 'animatedAvatar', avatarId: 'ember' },
+    priceRub: 250,
+    popular: true,
+  },
+  {
+    id: 'avatar-mint',
+    section: 'avatars',
+    title: 'Мята',
+    titleEn: 'Mint',
+    description: 'Мятные хвостики и блик, идущий по кругу.',
+    descriptionEn: 'Mint twintails and a highlight going round.',
+    grant: { kind: 'animatedAvatar', avatarId: 'mint' },
+    priceRub: 250,
+  },
+  {
+    id: 'avatar-violet',
+    section: 'avatars',
+    title: 'Аметист',
+    titleEn: 'Amethyst',
+    description: 'Фиолетовое сияние, которое то разгорается, то гаснет.',
+    descriptionEn: 'A violet halo that brightens and fades.',
+    grant: { kind: 'animatedAvatar', avatarId: 'violet' },
+    priceRub: 300,
+    popular: true,
+  },
+  {
+    id: 'avatar-sunny',
+    section: 'avatars',
+    title: 'Солнце',
+    titleEn: 'Sunny',
+    description: 'Золотые искры вокруг светлых волос.',
+    descriptionEn: 'Golden sparks around fair hair.',
+    grant: { kind: 'animatedAvatar', avatarId: 'sunny' },
+    priceRub: 250,
+  },
+  {
+    id: 'avatar-neko',
+    section: 'avatars',
+    title: 'Котик',
+    titleEn: 'Kitty',
+    description: 'Кот, который дышит. Просто кот.',
+    descriptionEn: 'A cat that breathes. Just a cat.',
+    grant: { kind: 'animatedAvatar', avatarId: 'neko' },
+    priceRub: 200,
+    popular: true,
+  },
+
+  // ---- рамки: drawn and animated in code, no files at all
   {
     id: 'frame-aurora',
-    section: 'digital',
-    title: 'Рамка «Аврора»',
-    titleEn: 'Aurora frame',
+    section: 'frames',
+    title: 'Аврора',
+    titleEn: 'Aurora',
     description: 'Переливающееся кольцо, которое медленно вращается вокруг аватарки.',
     descriptionEn: 'A shifting ring that turns slowly around your avatar.',
     grant: { kind: 'animatedFrame', frameId: 'aurora' },
     priceRub: 149,
+    popular: true,
   },
   {
     id: 'frame-petals',
-    section: 'digital',
-    title: 'Рамка «Лепестки»',
-    titleEn: 'Petals frame',
+    section: 'frames',
+    title: 'Лепестки',
+    titleEn: 'Petals',
     description: 'Лепестки сакуры кружат по орбите вокруг портрета.',
     descriptionEn: 'Sakura petals drifting in orbit around your portrait.',
     grant: { kind: 'animatedFrame', frameId: 'petals' },
@@ -59,9 +152,9 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'frame-ember',
-    section: 'digital',
-    title: 'Рамка «Уголёк»',
-    titleEn: 'Ember frame',
+    section: 'frames',
+    title: 'Уголёк',
+    titleEn: 'Ember',
     description: 'Тёплое свечение, которое дышит в такт.',
     descriptionEn: 'A warm glow that breathes in and out.',
     grant: { kind: 'animatedFrame', frameId: 'ember' },
@@ -69,16 +162,82 @@ export const SHOP_ITEMS: ShopItem[] = [
   },
   {
     id: 'frame-circuit',
-    section: 'digital',
-    title: 'Рамка «Контур»',
-    titleEn: 'Circuit frame',
+    section: 'frames',
+    title: 'Контур',
+    titleEn: 'Circuit',
     description: 'Бегущий пунктир — киберпанк для профиля.',
     descriptionEn: 'A marching dash — cyberpunk for your profile.',
     grant: { kind: 'animatedFrame', frameId: 'circuit' },
     priceRub: 179,
   },
+  {
+    id: 'frame-champion',
+    section: 'frames',
+    title: 'Рамка чемпиона',
+    titleEn: 'Champion frame',
+    description: 'Золотые кольца навстречу друг другу.',
+    descriptionEn: 'Two gold rings turning against each other.',
+    grant: { kind: 'animatedFrame', frameId: 'champion' },
+    priceRub: 300,
+    popular: true,
+  },
+  {
+    id: 'frame-eternal',
+    section: 'frames',
+    title: 'Вечность',
+    titleEn: 'Eternal',
+    description: 'Две встречные орбиты. Лимитированная — второй раз не вернётся.',
+    descriptionEn: 'Two opposing orbits. Limited — it will not come back.',
+    grant: { kind: 'animatedFrame', frameId: 'eternal' },
+    priceRub: 400,
+    limited: true,
+  },
 
-  // ---- merch: real things, posted to a real address
+  // ---- игровые предметы: used up inside a quiz
+  {
+    id: 'item-hint-1',
+    section: 'items',
+    title: 'Подсказка 50/50',
+    titleEn: '50/50 hint',
+    description: 'Убирает два неверных варианта. Одна штука.',
+    descriptionEn: 'Removes two wrong answers. One of them.',
+    grant: { kind: 'consumable', consumable: 'hint5050', amount: 1 },
+    priceRub: 49,
+  },
+  {
+    id: 'item-hint-5',
+    section: 'items',
+    title: 'Подсказки 50/50 ×5',
+    titleEn: '50/50 hints ×5',
+    description: 'Пять подсказок пачкой — дешевле, чем по одной.',
+    descriptionEn: 'Five hints in a pack — cheaper than one at a time.',
+    grant: { kind: 'consumable', consumable: 'hint5050', amount: 5 },
+    priceRub: 199,
+    popular: true,
+  },
+  {
+    id: 'item-skip-3',
+    section: 'items',
+    title: 'Пропуск вопроса ×3',
+    titleEn: 'Skip question ×3',
+    description: 'Пропускает вопрос без ошибки. Три штуки.',
+    descriptionEn: 'Skips a question without getting it wrong. Three of them.',
+    grant: { kind: 'consumable', consumable: 'skipQuestion', amount: 3 },
+    priceRub: 129,
+  },
+  {
+    id: 'item-freeze',
+    section: 'items',
+    title: 'Заморозка серии',
+    titleEn: 'Streak freeze',
+    description: 'Сохраняет серию дней, если вы пропустили день.',
+    descriptionEn: 'Keeps your day streak alive if you miss a day.',
+    grant: { kind: 'consumable', consumable: 'streakFreeze', amount: 1 },
+    priceRub: 99,
+    popular: true,
+  },
+
+  // ---- мерч в реале
   {
     id: 'merch-tee',
     section: 'merch',
@@ -89,6 +248,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     grant: { kind: 'physical' },
     priceRub: 1990,
     sizes: true,
+    popular: true,
   },
   {
     id: 'merch-hoodie',
@@ -130,6 +290,7 @@ export const SHOP_ITEMS: ShopItem[] = [
     descriptionEn: 'Twelve vinyl stickers — characters and cats.',
     grant: { kind: 'physical' },
     priceRub: 390,
+    popular: true,
   },
   {
     id: 'merch-figure',
@@ -140,61 +301,6 @@ export const SHOP_ITEMS: ShopItem[] = [
     descriptionEn: 'PVC, 12 cm, on a branded stand.',
     grant: { kind: 'physical' },
     priceRub: 3290,
-  },
-
-  // ---- rewards: bought with medals only, and only won at the tournament
-  {
-    id: 'reward-frame-champion',
-    section: 'rewards',
-    title: 'Рамка чемпиона',
-    titleEn: 'Champion frame',
-    description: 'Золотое кольцо навстречу самому себе. Только за медали.',
-    descriptionEn: 'Two gold rings turning against each other. Medals only.',
-    grant: { kind: 'animatedFrame', frameId: 'champion' },
-    pricePoints: 150,
-  },
-  {
-    id: 'reward-frame-eternal',
-    section: 'rewards',
-    title: 'Рамка «Вечность»',
-    titleEn: 'Eternal frame',
-    description: 'Две встречные орбиты. Лимитированная — второй раз в магазин не вернётся.',
-    descriptionEn: 'Two opposing orbits. Limited — it will not come back.',
-    grant: { kind: 'animatedFrame', frameId: 'eternal' },
-    pricePoints: 400,
-    limited: true,
-  },
-  {
-    id: 'reward-stickers',
-    section: 'rewards',
-    title: 'Стикеры победителя',
-    titleEn: "Winner's stickers",
-    description: 'Тот же набор, что в мерче, но с турнирной печатью. Приедет почтой.',
-    descriptionEn: 'The merch sticker pack with a tournament stamp. Posted to you.',
-    grant: { kind: 'physical' },
-    pricePoints: 60,
-  },
-  {
-    id: 'reward-mug',
-    section: 'rewards',
-    title: 'Кружка призёра',
-    titleEn: "Winner's mug",
-    description: 'Кружка с вашим местом и неделей турнира. Приедет почтой.',
-    descriptionEn: 'A mug with your place and the tournament week on it. Posted to you.',
-    grant: { kind: 'physical' },
-    pricePoints: 250,
-  },
-  {
-    id: 'reward-hoodie',
-    section: 'rewards',
-    title: 'Худи чемпиона',
-    titleEn: 'Champion hoodie',
-    description: 'Худи с именной вышивкой. Двенадцать золотых медалей — и оно ваше.',
-    descriptionEn: 'A hoodie embroidered with your name. Twelve golds and it is yours.',
-    grant: { kind: 'physical' },
-    pricePoints: 900,
-    sizes: true,
-    limited: true,
   },
 ];
 
@@ -208,11 +314,13 @@ export function itemsOf(section: ShopSection): ShopItem[] {
   return SHOP_ITEMS.filter((item) => item.section === section);
 }
 
-/** Rewards are paid in medal points; everything else in roubles. */
-export function isMedalPriced(item: ShopItem): boolean {
-  return item.pricePoints !== undefined;
-}
+export const POPULAR_ITEMS = SHOP_ITEMS.filter((item) => item.popular);
 
 export function needsDelivery(item: ShopItem): boolean {
   return item.grant.kind === 'physical';
+}
+
+/** A consumable stacks; everything else is owned once and only once. */
+export function isStackable(item: ShopItem): boolean {
+  return item.grant.kind === 'consumable';
 }

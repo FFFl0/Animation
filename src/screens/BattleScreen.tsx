@@ -198,6 +198,8 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
     return (
       <View style={{ flex: 1 }}>
         <QuizScreen
+          // a bought hint against another player is an advantage nobody agreed to
+          allowItems={false}
           config={battleConfig}
           onFinish={handleFinish}
           onClose={resetToMenu}

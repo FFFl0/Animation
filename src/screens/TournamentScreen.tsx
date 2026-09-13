@@ -194,6 +194,8 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
     return (
       <View style={{ flex: 1 }}>
         <QuizScreen
+          // a bought hint against another player is an advantage nobody agreed to
+          allowItems={false}
           key={quizKey}
           config={WEEKLY_MATCH_CONFIG}
           onFinish={(score) => finishGame(score)}
