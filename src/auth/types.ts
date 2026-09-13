@@ -29,6 +29,8 @@ export type Profile = {
   stats: Record<string, ModeStat>;
   streak: Streak;
   achievements: string[];
+  /** Achievement id -> the day it was earned, as YYYY-MM-DD. */
+  achievementDates: Record<string, string>;
   dailyChallenge: DailyChallengeResult | null;
 };
 

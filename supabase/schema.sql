@@ -740,3 +740,7 @@ do $$ begin
   alter publication supabase_realtime add table public.tournament_games;
 exception when duplicate_object then null;
 end $$;
+
+-- The achievements screen shows the date each one was earned, keyed by
+-- achievement id. Older profiles simply start empty and fill in as they play.
+alter table public.profiles add column if not exists achievement_dates jsonb not null default '{}'::jsonb;

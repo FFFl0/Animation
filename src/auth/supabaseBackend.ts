@@ -20,6 +20,7 @@ type ProfileRow = {
   stats: Profile['stats'];
   streak: Profile['streak'];
   achievements: string[];
+  achievement_dates: Record<string, string>;
   daily_challenge: Profile['dailyChallenge'];
   created_at: string;
 };
@@ -33,6 +34,7 @@ function rowToProfile(row: ProfileRow): Profile {
     stats: row.stats ?? {},
     streak: row.streak ?? { count: 0, lastPlayedDate: null },
     achievements: row.achievements ?? [],
+    achievementDates: row.achievement_dates ?? {},
     dailyChallenge: row.daily_challenge ?? null,
     createdAt: row.created_at,
   };
@@ -45,6 +47,7 @@ function patchToRow(patch: Partial<Profile>): Record<string, unknown> {
   if (patch.stats !== undefined) row.stats = patch.stats;
   if (patch.streak !== undefined) row.streak = patch.streak;
   if (patch.achievements !== undefined) row.achievements = patch.achievements;
+  if (patch.achievementDates !== undefined) row.achievement_dates = patch.achievementDates;
   if (patch.dailyChallenge !== undefined) row.daily_challenge = patch.dailyChallenge;
   return row;
 }
@@ -99,6 +102,7 @@ async function resolveOrCreateProfile(client: SupabaseClient, userId: string, em
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    achievement_dates: {},
     daily_challenge: null,
     created_at: new Date().toISOString(),
   };
@@ -131,6 +135,7 @@ export async function register(username: string, password: string, recoveryEmail
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    achievement_dates: {},
     daily_challenge: null,
     created_at: new Date().toISOString(),
   };

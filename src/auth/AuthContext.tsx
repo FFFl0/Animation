@@ -6,7 +6,7 @@ import { unregisterPushToken } from '../notifications/pushTokens';
 import { RoundConfig } from '../quiz/types';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
-import { ACHIEVEMENTS, Achievement } from '../data/achievements';
+import { ACHIEVEMENTS, Achievement, isUnlocked } from '../data/achievements';
 import { todayDateStr } from '../quiz/today';
 
 export { AuthError } from './backend';
@@ -118,7 +118,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const nextStreak = Storage.bumpStreak(profile.streak);
 
-    const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => a.check(profile)).map((a) => a.id));
+    const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => isUnlocked(a, profile)).map((a) => a.id));
 
     const today = todayDateStr();
     const nextDailyChallenge =
@@ -126,11 +126,29 @@ export function AuthProvider({ children }: { children: ReactNode }) {
         ? { date: today, score, total }
         : profile.dailyChallenge;
 
-    const p = await Storage.updateAccount(profile.id, { stats: nextStats, streak: nextStreak, dailyChallenge: nextDailyChallenge });
+    // The round has to be banked before the unlocks are read: an
+    // achievement is a question about the profile after this round, not
+    // before it.
+    const afterRound: Profile = { ...profile, stats: nextStats, streak: nextStreak, dailyChallenge: nextDailyChallenge };
+    const unlocked = ACHIEVEMENTS.filter((a) => !unlockedBefore.has(a.id) && isUnlocked(a, afterRound));
+
+    const nextDates = { ...profile.achievementDates };
+    for (const achievement of unlocked) nextDates[achievement.id] = today;
+    // The id list is what other people see on our profile, so it is banked
+    // too — unlocks are derived from our own stats, which friends cannot read.
+    // Deduped: a streak achievement can re-unlock after the streak breaks.
+    const nextIds = [...new Set([...profile.achievements, ...unlocked.map((a) => a.id)])];
+
+    const p = await Storage.updateAccount(profile.id, {
+      stats: nextStats,
+      streak: nextStreak,
+      dailyChallenge: nextDailyChallenge,
+      ...(unlocked.length ? { achievements: nextIds, achievementDates: nextDates } : null),
+    });
     setProfile(p);
     Storage.logRoundResult(profile.id, score, total);
 
-    return ACHIEVEMENTS.filter((a) => !unlockedBefore.has(a.id) && a.check(p));
+    return unlocked;
   };
 
   const value = useMemo(

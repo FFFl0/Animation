@@ -153,6 +153,16 @@ const ru: StringDict = {
   achievements: {
     pageTitle: 'Достижения',
     unlockedOf: (n: number, total: number) => `Открыто ${n} из ${total}`,
+    secretTitle: 'Секретное',
+    done: 'Выполнено',
+    filter: {
+      all: 'Все',
+      quiz: 'Квиз',
+      stats: 'Статистика',
+      collection: 'Коллекция',
+      special: 'Особые',
+      secret: 'Секретные',
+    },
   },
   profile: {
     pageTitle: 'Профиль',
@@ -672,6 +682,16 @@ const en: StringDict = {
   achievements: {
     pageTitle: 'Achievements',
     unlockedOf: (n: number, total: number) => `Unlocked ${n} of ${total}`,
+    secretTitle: 'Secret',
+    done: 'Unlocked',
+    filter: {
+      all: 'All',
+      quiz: 'Quiz',
+      stats: 'Stats',
+      collection: 'Collection',
+      special: 'Special',
+      secret: 'Secret',
+    },
   },
   profile: {
     pageTitle: 'Profile',

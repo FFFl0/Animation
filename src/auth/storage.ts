@@ -28,6 +28,7 @@ function normalizeAccount(account: Account): Account {
     stats: account.stats ?? {},
     streak: account.streak ?? { count: 0, lastPlayedDate: null },
     achievements: account.achievements ?? [],
+    achievementDates: account.achievementDates ?? {},
     favoriteCharacterId: account.favoriteCharacterId ?? null,
     dailyChallenge: account.dailyChallenge ?? null,
   };
@@ -67,6 +68,7 @@ export async function register(username: string, password: string, _recoveryEmai
     stats: {},
     streak: { count: 0, lastPlayedDate: null },
     achievements: [],
+    achievementDates: {},
     dailyChallenge: null,
     passwordHash,
     salt,
