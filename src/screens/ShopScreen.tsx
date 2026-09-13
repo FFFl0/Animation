@@ -11,6 +11,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
 import AnimatedAvatar from '../components/AnimatedAvatar';
+import WalletSheet from '../components/WalletSheet';
 import { SHOP_SECTIONS, ShopItem, ShopSection, itemsOf } from '../shop/catalogue';
 import { SHOP_IMAGES } from '../shop/shopImages';
 import { formatRub, pointsPrice } from '../shop/economy';
@@ -36,9 +37,10 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
   const t = useT();
   const { language } = useLanguage();
   const { width } = useWindowDimensions();
-  const { balance, cart, orders, ownsItem } = useShop();
+  const { balance, spent, medals, cart, orders, ownsItem } = useShop();
   const [section, setSection] = useState<ShopSection>('avatars');
   const [showAll, setShowAll] = useState(false);
+  const [walletOpen, setWalletOpen] = useState(false);
 
   const columns = COLUMNS[section];
   const cardWidth = (width - 40 - GAP * (columns - 1)) / columns;
@@ -77,8 +79,13 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
         </View>
 
         <View style={styles.walletRow}>
-          <Icon name="medal" size={16} color={theme.primary} />
-          <Text style={styles.walletText}>{t('shop.balance', balance)}</Text>
+          {/* the balance opens its own arithmetic: where the points came from */}
+          <SoundTouchable style={styles.walletTap} onPress={() => setWalletOpen(true)} accessibilityRole="button">
+            <Icon name="medal" size={16} color={theme.primary} />
+            <Text style={styles.walletText}>{t('shop.balance', balance)}</Text>
+            <Icon name="chevronRight" size={13} color={theme.textMuted} />
+          </SoundTouchable>
+          <View style={{ flex: 1 }} />
           <SoundTouchable onPress={onOpenOrders} accessibilityRole="button">
             <Text style={styles.walletLink}>{t('shop.myOrders')}</Text>
           </SoundTouchable>
@@ -141,6 +148,14 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
           </View>
         </View>
       </ScrollView>
+
+      <WalletSheet
+        visible={walletOpen}
+        onClose={() => setWalletOpen(false)}
+        medals={medals}
+        spent={spent}
+        balance={balance}
+      />
     </SafeAreaView>
   );
 }
@@ -317,7 +332,8 @@ function makeStyles(theme: Theme) {
       textShadowRadius: 6,
     },
     walletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 14 },
-    walletText: { flex: 1, fontSize: 13, fontFamily: fontFamily('700'), color: theme.text },
+    walletTap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
+    walletText: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.text },
     walletLink: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.primary },
     tabStrip: { flexGrow: 0 },
     tabs: { gap: 8, paddingHorizontal: 20, paddingVertical: 14, alignItems: 'center' },

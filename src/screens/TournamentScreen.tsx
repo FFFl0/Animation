@@ -29,6 +29,7 @@ import {
   playableMatchesFor,
   winsOf,
 } from '../tournament/doubleElim';
+import { MEDAL_POINTS } from '../shop/economy';
 import {
   MedalKind,
   TournamentRecord,
@@ -517,6 +518,8 @@ function MedalBanner({
         {placeLabel(place, t)}
         {medal ? ` · ${t(`tournament.medal${medal[0].toUpperCase()}${medal.slice(1)}` as 'tournament.medalGold')}` : ''}
       </Text>
+      {/* what the medal is worth in the shop, at the moment it is won */}
+      {medal && <Text style={styles.medalBannerWorth}>{t('tournament.medalWorth', MEDAL_POINTS[medal])}</Text>}
     </View>
   );
 }
@@ -1045,6 +1048,7 @@ function makeStyles(theme: Theme) {
       marginTop: 12,
     },
     medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
+    medalBannerWorth: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.primary },
     roundBlock: { marginBottom: 14 },
     roundLabel: {
       alignSelf: 'flex-start',

@@ -26,6 +26,8 @@ type ShopContextValue = {
   ready: boolean;
   /** Medal points still to spend. */
   balance: number;
+  /** Medal points already spent — the other half of the wallet's arithmetic. */
+  spent: number;
   medals: TournamentRecord;
   owned: string[];
   counts: Record<string, number>;
@@ -187,6 +189,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     () => ({
       ready,
       balance,
+      spent: state.spentPoints,
       medals,
       owned: state.owned,
       counts: state.counts,

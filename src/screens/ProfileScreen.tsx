@@ -18,6 +18,8 @@ import { levelFromStats } from '../data/level';
 import MedalShelf from '../components/MedalShelf';
 import { EMPTY_RECORD, TournamentRecord, totalMedals } from '../tournament/medals';
 import { loadRecord } from '../tournament/medalStorage';
+import WalletSheet from '../components/WalletSheet';
+import { useShop } from '../shop/ShopContext';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
@@ -49,6 +51,8 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
   const [medals, setMedals] = useState<TournamentRecord>(EMPTY_RECORD);
+  const [walletOpen, setWalletOpen] = useState(false);
+  const { balance, spent } = useShop();
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -308,6 +312,14 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
         labels={{ gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') }}
       />
       {totalMedals(medals) === 0 && <Text style={styles.medalHint}>{t('tournament.profileEmpty')}</Text>}
+      {/* the rate belongs next to the medals, where somebody wonders what they are for */}
+      <SoundTouchable style={styles.rateRow} onPress={() => setWalletOpen(true)} accessibilityRole="button">
+        <View style={{ flex: 1 }}>
+          <Text style={styles.rateText}>{t('wallet.rate')}</Text>
+          <Text style={styles.rateBalance}>{t('shop.balance', balance)}</Text>
+        </View>
+        <Icon name="chevronRight" size={15} color={theme.textMuted} />
+      </SoundTouchable>
       {/* medals are only worth anything in the shop, so say where to spend them */}
       <SoundTouchable style={styles.linkRow} onPress={onOpenShop} accessibilityRole="button">
         <Icon name="gem" size={17} color={theme.primary} />
@@ -409,6 +421,14 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
           <Text style={styles.deleteLinkText}>{t('profile.deleteTitle')}</Text>
         </SoundTouchable>
       )}
+
+      <WalletSheet
+        visible={walletOpen}
+        onClose={() => setWalletOpen(false)}
+        medals={medals}
+        spent={spent}
+        balance={balance}
+      />
     </ScrollView>
   );
 }
@@ -525,6 +545,9 @@ function makeStyles(theme: Theme) {
     },
     photoButtonText: { color: theme.primary, fontFamily: fontFamily('700'), fontSize: 13 },
     photoHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 10, textAlign: 'center' },
+    rateRow: { flexDirection: 'row', alignItems: 'center', gap: 10, paddingVertical: 12 },
+    rateText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted },
+    rateBalance: { fontSize: 14, fontFamily: fontFamily('800'), color: theme.text, marginTop: 2 },
     medalHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 8, textAlign: 'center' },
     photoError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 6, textAlign: 'center' },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
