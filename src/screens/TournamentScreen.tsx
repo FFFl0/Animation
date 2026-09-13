@@ -57,7 +57,6 @@ import {
 
 type Props = {
   onBack: () => void;
-  onOpenPractice: () => void;
   onMatchPlayed: (score: number, total: number) => void;
 };
 
@@ -80,7 +79,7 @@ const POLL_MS = 5000;
  * three. Registration runs all week; the bracket is fixed when it starts at
  * the weekend and the highest rated sixteen who signed up get the seats.
  */
-export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed }: Props) {
+export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { buzz } = useSound();
@@ -224,9 +223,6 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
           <Icon name="globe" size={32} color={theme.textMuted} />
           <Text style={styles.offlineTitle}>{t('tournament.offlineTitle')}</Text>
           <Text style={styles.offlineText}>{t('tournament.offlineText')}</Text>
-          <SoundTouchable style={styles.primaryButton} onPress={onOpenPractice} activeOpacity={0.88}>
-            <Text style={styles.primaryButtonText}>{t('tournament.toPractice')}</Text>
-          </SoundTouchable>
         </View>
       )}
 
@@ -297,12 +293,6 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
                 {totalMedals(record) === 0 && <Text style={styles.recordLine}>{t('tournament.medalsHint')}</Text>}
               </>
             )}
-
-            <SoundTouchable style={styles.practiceLink} onPress={onOpenPractice} activeOpacity={0.85}>
-              <Icon name="target" size={15} color={theme.primary} />
-              <Text style={styles.practiceLinkText}>{t('tournament.practiceLink')}</Text>
-              <Icon name="chevronRight" size={14} color={theme.textMuted} />
-            </SoundTouchable>
           </ScrollView>
         </>
       )}
@@ -1120,19 +1110,6 @@ function makeStyles(theme: Theme) {
     listMeta: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
     listLosses: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
     ruleText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: fontFamily('600'), color: theme.text },
-    practiceLink: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 10,
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.lg,
-      paddingHorizontal: 16,
-      paddingVertical: 14,
-      marginTop: 16,
-    },
-    practiceLinkText: { flex: 1, fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     offlineWrap: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 6 },
     offlineTitle: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.text, marginTop: 8, textAlign: 'center' },
     offlineText: {
