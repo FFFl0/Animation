@@ -30,18 +30,9 @@ import {
   winsOf,
 } from '../tournament/doubleElim';
 import { MEDAL_POINTS } from '../shop/economy';
-import {
-  MedalKind,
-  TournamentRecord,
-  EMPTY_RECORD,
-  applyRun,
-  medalForPlace,
-  placeOf,
-  placeRange,
-  totalMedals,
-} from '../tournament/medals';
-import { loadRecord, saveRecord } from '../tournament/medalStorage';
+import { MedalKind, medalForPlace, placeOf, placeRange, totalMedals } from '../tournament/medals';
 import MedalShelf from '../components/MedalShelf';
+import { useShop } from '../shop/ShopContext';
 import { useAuth } from '../auth/AuthContext';
 import {
   WeeklyState,
@@ -94,10 +85,7 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const [playing, setPlaying] = useState<MatchId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
   const [tick, setTick] = useState(0);
-  const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
-  // Nothing is banked before the shelf has been read, or an empty one would
-  // be written straight over the medals already on it.
-  const [recordReady, setRecordReady] = useState(false);
+  const { ready: walletReady, medals: record, recordTournamentRun } = useShop();
 
   const bracket = useMemo(() => (state ? toDeBracket(state) : null), [state]);
   const mySeat = state?.mySeat ?? null;
@@ -125,27 +113,16 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
 
-  useEffect(() => {
-    if (!profile) return;
-    loadRecord(profile.id).then((saved) => {
-      setRecord(saved);
-      setRecordReady(true);
-    });
-  }, [profile?.id]);
-
   // A finished run goes on the shelf as soon as it is finished, not when the
   // player next opens the screen — and the tournament id keeps a re-read from
   // counting the same medal twice.
   useEffect(() => {
-    if (!recordReady || !profile || myPlace === null || !state) return;
-    const runId = state.tournament.id;
-    if (record.lastRunId === runId) return;
-    const updated = applyRun(record, myPlace, runId);
-    setRecord(updated);
-    saveRecord(profile.id, updated);
+    if (!walletReady || !profile || myPlace === null || !state) return;
+    if (record.lastRunId === state.tournament.id) return;
+    recordTournamentRun(myPlace, state.tournament.id);
     buzz(myPlace === 1 ? 'success' : 'tap');
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [recordReady, myPlace, state?.tournament.id]);
+  }, [walletReady, myPlace, state?.tournament.id]);
 
   // Keeps the countdown moving, and re-reads the server while a match is
   // waiting on the other side to hand a score in.

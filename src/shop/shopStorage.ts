@@ -4,8 +4,11 @@ import { Order } from './orders';
 
 const KEY = 'animequiz.shop';
 
-/** Everything the shop remembers about one account. */
-export type ShopState = {
+/**
+ * The device-side half. With a cloud account only `cart` is used — the
+ * wallet lives on the server; a local-only account keeps everything here.
+ */
+export type LocalShopState = {
   /** Ids of items already bought — an avatar or a frame is owned once, not stocked. */
   owned: string[];
   /** How many of each consumable are left, by consumable id. */
@@ -16,9 +19,9 @@ export type ShopState = {
   orders: Order[];
 };
 
-export const EMPTY_SHOP_STATE: ShopState = { owned: [], counts: {}, spentPoints: 0, cart: [], orders: [] };
+export const EMPTY_SHOP_STATE: LocalShopState = { owned: [], counts: {}, spentPoints: 0, cart: [], orders: [] };
 
-type Store = Record<string, ShopState>;
+type Store = Record<string, LocalShopState>;
 
 async function readStore(): Promise<Store> {
   try {
@@ -30,12 +33,12 @@ async function readStore(): Promise<Store> {
 }
 
 /** Kept per account, so two people sharing a phone keep their own purchases. */
-export async function loadShop(userId: string): Promise<ShopState> {
+export async function loadShop(userId: string): Promise<LocalShopState> {
   const store = await readStore();
   return { ...EMPTY_SHOP_STATE, ...store[userId] };
 }
 
-export async function saveShop(userId: string, state: ShopState): Promise<void> {
+export async function saveShop(userId: string, state: LocalShopState): Promise<void> {
   try {
     const store = await readStore();
     await AsyncStorage.setItem(KEY, JSON.stringify({ ...store, [userId]: state }));

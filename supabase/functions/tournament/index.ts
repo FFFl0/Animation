@@ -107,6 +107,34 @@ function buildDefs(): MatchDef[] {
 const MATCH_DEFS = buildDefs();
 const DEF_BY_ID = new Map(MATCH_DEFS.map((d) => [d.id, d]));
 
+/** Mirrors MEDAL_POINTS in src/shop/economy.ts. */
+const MEDAL_POINTS: Record<string, number> = { gold: 75, silver: 30, bronze: 10 };
+
+/**
+ * Where each exit lands in the final standings, derived from the bracket the
+ * same way src/tournament/medals.ts derives it: the losers-bracket final is
+ * third, and every round before it is worth however many players are knocked
+ * out after it. Losing in the winners bracket is a drop, not an exit.
+ */
+const PLACE_BY_EXIT: Record<string, number> = (() => {
+  const rounds = [...new Set(MATCH_DEFS.filter((d) => d.bracket === 'lb').map((d) => d.round))].sort((a, b) => b - a);
+  const places: Record<string, number> = { gf: 2 };
+  let knockedOutLater = 0;
+  for (const round of rounds) {
+    const matches = MATCH_DEFS.filter((d) => d.bracket === 'lb' && d.round === round);
+    for (const def of matches) places[def.id] = 3 + knockedOutLater;
+    knockedOutLater += matches.length;
+  }
+  return places;
+})();
+
+function medalForPlace(place: number): string | null {
+  if (place === 1) return 'gold';
+  if (place === 2) return 'silver';
+  if (place === 3) return 'bronze';
+  return null;
+}
+
 type GameRow = {
   match_id: string;
   game_no: number;
@@ -165,6 +193,14 @@ class Bracket {
   isPlayable(id: string): boolean {
     const [a, b] = this.participants(id);
     return a !== null && b !== null && this.decidedSide(id) === null;
+  }
+
+  /** The seed that lost a decided match, or null while it is still open. */
+  loserSeed(id: string): number | null {
+    const side = this.decidedSide(id);
+    if (!side) return null;
+    const [a, b] = this.participants(id);
+    return side === 'a' ? b : a;
   }
 
   /** The game currently being played in a match, if any. */
@@ -422,6 +458,7 @@ async function settle(admin: SupabaseClient, tournament: TournamentRow): Promise
   if (side) {
     const [a, b] = bracket.participants('gf');
     const championSeed = side === 'a' ? a! : b!;
+    await awardMedals(admin, tournament, entrants, bracket, championSeed);
     await admin
       .from('weekly_tournaments')
       .update({
@@ -431,6 +468,51 @@ async function settle(admin: SupabaseClient, tournament: TournamentRow): Promise
       })
       .eq('id', tournament.id)
       .neq('status', 'finished');
+  }
+}
+
+/**
+ * Writes everybody's finish once the grand final is decided. Medals live
+ * here rather than on the phone: a device can be wiped, reinstalled or
+ * edited, and a record of what somebody won should survive all three.
+ *
+ * Keyed on (tournament, user), so running the settle loop again — which
+ * happens on every visit to the screen — cannot award the same medal twice.
+ */
+async function awardMedals(
+  admin: SupabaseClient,
+  tournament: TournamentRow,
+  entrants: Map<number, Entrant>,
+  bracket: Bracket,
+  championSeed: number
+): Promise<void> {
+  const rows: { tournament_id: string; user_id: string; place: number; medal: string | null; points: number }[] = [];
+
+  for (const [seed, entrant] of entrants) {
+    // Bots win nothing: there is nobody to give it to.
+    if (!entrant.user_id) continue;
+
+    let place: number | null = null;
+    if (seed === championSeed) {
+      place = 1;
+    } else {
+      const exit = MATCH_DEFS.find((d) => d.bracket !== 'wb' && bracket.loserSeed(d.id) === seed);
+      place = exit ? PLACE_BY_EXIT[exit.id] ?? null : null;
+    }
+    if (place === null) continue;
+
+    const medal = medalForPlace(place);
+    rows.push({
+      tournament_id: tournament.id,
+      user_id: entrant.user_id,
+      place,
+      medal,
+      points: medal ? MEDAL_POINTS[medal] : 0,
+    });
+  }
+
+  if (rows.length) {
+    await admin.from('tournament_medals').upsert(rows, { onConflict: 'tournament_id,user_id', ignoreDuplicates: true });
   }
 }
 

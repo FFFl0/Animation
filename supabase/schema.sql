@@ -744,3 +744,229 @@ end $$;
 -- The achievements screen shows the date each one was earned, keyed by
 -- achievement id. Older profiles simply start empty and fill in as they play.
 alter table public.profiles add column if not exists achievement_dates jsonb not null default '{}'::jsonb;
+
+-- ============================================================
+-- КОШЕЛЁК И МАГАЗИН
+--
+-- Медали, очки и покупки переехали с телефона на сервер. Ни одна из
+-- таблиц ниже не имеет политик insert/update/delete — писать в них может
+-- только Edge Function `shop` (и `tournament`, которая начисляет медали)
+-- под service role. Клиент может лишь читать свои строки.
+-- ============================================================
+
+-- Что человек выиграл. Одна строка на турнир на игрока, поэтому повторный
+-- вызов расчёта не начислит медаль дважды.
+create table if not exists public.tournament_medals (
+  tournament_id uuid not null references public.weekly_tournaments(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  place int not null,
+  -- gold / silver / bronze, или null за место ниже третьего
+  medal text,
+  -- Сколько очков это принесло. Заморожено в момент начисления: если курс
+  -- когда-нибудь поменяется, уже заработанное не пересчитается.
+  points int not null default 0,
+  awarded_at timestamptz not null default now(),
+  primary key (tournament_id, user_id)
+);
+
+alter table public.tournament_medals enable row level security;
+
+drop policy if exists "See your own medals" on public.tournament_medals;
+create policy "See your own medals"
+  on public.tournament_medals for select
+  using (auth.uid() = user_id);
+
+create index if not exists tournament_medals_user_idx on public.tournament_medals (user_id);
+
+-- Что куплено. Цифровой предмет — одна строка; расходник — тоже строка,
+-- а его остаток лежит рядом в shop_inventory.
+create table if not exists public.shop_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  item_id text not null,
+  paid_with text not null check (paid_with in ('points', 'rub')),
+  points_spent int not null default 0,
+  rub_amount int not null default 0,
+  created_at timestamptz not null default now()
+);
+
+alter table public.shop_purchases enable row level security;
+
+drop policy if exists "See your own purchases" on public.shop_purchases;
+create policy "See your own purchases"
+  on public.shop_purchases for select
+  using (auth.uid() = user_id);
+
+create index if not exists shop_purchases_user_idx on public.shop_purchases (user_id);
+
+-- Сколько расходников осталось.
+create table if not exists public.shop_inventory (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  consumable text not null,
+  count int not null default 0 check (count >= 0),
+  primary key (user_id, consumable)
+);
+
+alter table public.shop_inventory enable row level security;
+
+drop policy if exists "See your own inventory" on public.shop_inventory;
+create policy "See your own inventory"
+  on public.shop_inventory for select
+  using (auth.uid() = user_id);
+
+-- Заказы на физические товары. Адрес лежит здесь, а не на телефоне, иначе
+-- заказ просто некуда отправлять.
+create table if not exists public.shop_orders (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  lines jsonb not null,
+  total_rub int not null default 0,
+  total_points int not null default 0,
+  paid_with text not null check (paid_with in ('points', 'rub')),
+  delivery jsonb not null,
+  status text not null default 'awaitingPayment',
+  created_at timestamptz not null default now()
+);
+
+alter table public.shop_orders enable row level security;
+
+drop policy if exists "See your own orders" on public.shop_orders;
+create policy "See your own orders"
+  on public.shop_orders for select
+  using (auth.uid() = user_id);
+
+create index if not exists shop_orders_user_idx on public.shop_orders (user_id, created_at desc);
+
+-- Баланс — производная величина, а не хранимое число: заработанное минус
+-- потраченное. Второго счётчика, который может разъехаться с первым, нет.
+create or replace function public.shop_balance(p_user uuid)
+returns int
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select
+    coalesce((select sum(points) from public.tournament_medals where user_id = p_user), 0)
+    - coalesce((select sum(points_spent) from public.shop_purchases where user_id = p_user), 0)
+    - coalesce((select sum(total_points) from public.shop_orders where user_id = p_user), 0);
+$$;
+
+revoke execute on function public.shop_balance(uuid) from anon, authenticated;
+
+/*
+ * Покупка цифрового предмета. Цену передаёт Edge Function — она одна знает
+ * каталог, клиент цену не присылает никогда.
+ *
+ * Проверка баланса и списание происходят в одном операторе под блокировкой
+ * строк пользователя, иначе два быстрых нажатия подряд оба прошли бы
+ * проверку и увели баланс в минус.
+ */
+create or replace function public.shop_buy(
+  p_user uuid,
+  p_item text,
+  p_points int,
+  p_rub int,
+  p_paid text,
+  p_consumable text default null,
+  p_amount int default 0
+)
+returns int
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_balance int;
+begin
+  if p_paid = 'points' then
+    -- Блокируем медали игрока на время проверки: пока идёт эта транзакция,
+    -- параллельная покупка ждёт, а не считает тот же баланс второй раз.
+    perform 1 from public.tournament_medals where user_id = p_user for update;
+    v_balance := public.shop_balance(p_user);
+    if v_balance < p_points then
+      raise exception 'not enough points' using errcode = 'P0001';
+    end if;
+  end if;
+
+  insert into public.shop_purchases (user_id, item_id, paid_with, points_spent, rub_amount)
+  values (p_user, p_item, p_paid, case when p_paid = 'points' then p_points else 0 end,
+          case when p_paid = 'rub' then p_rub else 0 end);
+
+  if p_consumable is not null and p_amount > 0 then
+    insert into public.shop_inventory (user_id, consumable, count)
+    values (p_user, p_consumable, p_amount)
+    on conflict (user_id, consumable) do update set count = public.shop_inventory.count + excluded.count;
+  end if;
+
+  return public.shop_balance(p_user);
+end;
+$$;
+
+revoke execute on function public.shop_buy(uuid, text, int, int, text, text, int) from anon, authenticated;
+
+/* Заказ физических товаров. Те же правила, плюс адрес доставки. */
+create or replace function public.shop_place_order(
+  p_user uuid,
+  p_lines jsonb,
+  p_delivery jsonb,
+  p_points int,
+  p_rub int,
+  p_paid text
+)
+returns uuid
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_balance int;
+  v_id uuid;
+begin
+  if p_paid = 'points' then
+    perform 1 from public.tournament_medals where user_id = p_user for update;
+    v_balance := public.shop_balance(p_user);
+    if v_balance < p_points then
+      raise exception 'not enough points' using errcode = 'P0001';
+    end if;
+  end if;
+
+  insert into public.shop_orders (user_id, lines, delivery, total_points, total_rub, paid_with, status)
+  values (
+    p_user, p_lines, p_delivery,
+    case when p_paid = 'points' then p_points else 0 end,
+    case when p_paid = 'rub' then p_rub else 0 end,
+    p_paid,
+    case when p_paid = 'points' then 'paid' else 'awaitingPayment' end
+  )
+  returning id into v_id;
+
+  return v_id;
+end;
+$$;
+
+revoke execute on function public.shop_place_order(uuid, jsonb, jsonb, int, int, text) from anon, authenticated;
+
+/*
+ * Расход одной штуки. Условие в самом UPDATE, поэтому два одновременных
+ * списания не могут увести остаток ниже нуля.
+ */
+create or replace function public.shop_spend(p_user uuid, p_consumable text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_left int;
+begin
+  update public.shop_inventory
+     set count = count - 1
+   where user_id = p_user and consumable = p_consumable and count > 0
+  returning count into v_left;
+
+  return v_left is not null;
+end;
+$$;
+
+revoke execute on function public.shop_spend(uuid, text) from anon, authenticated;

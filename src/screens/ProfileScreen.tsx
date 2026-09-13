@@ -16,8 +16,7 @@ import { deleteAvatarPhoto, uploadAvatarPhoto } from '../avatar/avatarStorage';
 import { PresetAvatarId, PRESET_AVATAR_IDS, PRESET_AVATAR_IMAGES } from '../data/presetAvatars';
 import { levelFromStats } from '../data/level';
 import MedalShelf from '../components/MedalShelf';
-import { EMPTY_RECORD, TournamentRecord, totalMedals } from '../tournament/medals';
-import { loadRecord } from '../tournament/medalStorage';
+import { totalMedals } from '../tournament/medals';
 import WalletSheet from '../components/WalletSheet';
 import { useShop } from '../shop/ShopContext';
 import AnimeAvatar from '../components/AnimeAvatar';
@@ -50,9 +49,8 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
   const [draftName, setDraftName] = useState('');
   const [renameBusy, setRenameBusy] = useState(false);
   const [renameError, setRenameError] = useState<string | null>(null);
-  const [medals, setMedals] = useState<TournamentRecord>(EMPTY_RECORD);
   const [walletOpen, setWalletOpen] = useState(false);
-  const { balance, spent } = useShop();
+  const { balance, spent, medals } = useShop();
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
 
@@ -79,10 +77,6 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
   useEffect(() => {
     getReminderEnabled().then(setReminderOn);
   }, []);
-
-  useEffect(() => {
-    if (profile) loadRecord(profile.id).then(setMedals);
-  }, [profile?.id]);
 
   const handleToggleReminder = async () => {
     setReminderError(null);
