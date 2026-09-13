@@ -1,12 +1,12 @@
 import { useEffect, useRef } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Image, Platform, StyleSheet, Text, View } from 'react-native';
 import { useSafeAreaInsets } from 'react-native-safe-area-context';
 import { Achievement } from '../data/achievements';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
-import Icon from './Icon';
+import { ACHIEVEMENT_IMAGES } from '../data/achievementImages';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { achievementTitle } from '../data/achievements';
@@ -68,8 +68,8 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
           },
         ]}
       >
-        <View style={[styles.iconWrap, { backgroundColor: theme.primaryLight }]}>
-          <Icon name={current.icon} size={18} color={theme.primary} />
+        <View style={styles.artWrap}>
+          <Image source={ACHIEVEMENT_IMAGES[current.id]} style={styles.art} resizeMode="cover" />
         </View>
         <View style={styles.textWrap}>
           <Text style={[styles.label, { color: theme.primary }]}>{t('achievementToast.label')}</Text>
@@ -105,13 +105,15 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
-  iconWrap: {
-    width: 38,
+  artWrap: {
+    width: 52,
     height: 38,
-    borderRadius: 13,
-    alignItems: 'center',
-    justifyContent: 'center',
+    borderRadius: 11,
+    overflow: 'hidden',
+    // The artwork is drawn on cream paper — keep it that way in either theme.
+    backgroundColor: '#FDFAF9',
   },
+  art: { width: '100%', height: '100%' },
   textWrap: { flex: 1 },
   label: { fontSize: 10, fontFamily: fontFamily('700'), textTransform: 'uppercase', letterSpacing: 0.5 },
   title: { fontSize: 14, fontFamily: fontFamily('700'), marginTop: 1 },

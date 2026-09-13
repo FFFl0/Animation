@@ -1,5 +1,5 @@
 import { useMemo, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -17,6 +17,7 @@ import {
   progressOf,
   unlockedCount,
 } from '../data/achievements';
+import { ACHIEVEMENT_IMAGES } from '../data/achievementImages';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
@@ -27,6 +28,9 @@ type Filter = 'all' | AchievementGroup;
 const FILTERS: Filter[] = ['all', ...ACHIEVEMENT_GROUPS];
 const COLUMNS = 3;
 const GAP = 8;
+// Matches the shipped artwork (420x224) — see assets/achievements/README.md.
+const ART_RATIO = 420 / 224;
+const ART_BACKDROP = '#FDFAF9';
 
 export default function AchievementsScreen() {
   const { profile } = useAuth();
@@ -113,15 +117,11 @@ function AchievementCard({
         <Icon name={unlocked ? 'check' : 'lock'} size={11} color={unlocked ? theme.onPrimary : theme.textMuted} />
       </View>
 
-      <View style={[styles.iconWrap, unlocked && styles.iconWrapUnlocked]}>
-        <Icon
-          name={hidden ? 'lock' : achievement.icon}
-          size={26}
-          color={unlocked ? theme.primary : theme.textMuted}
-        />
+      <View style={styles.artWrap}>
+        <Image source={ACHIEVEMENT_IMAGES[achievement.id]} style={styles.art} resizeMode="cover" />
       </View>
 
-      <Text style={[styles.cardTitle, !unlocked && styles.cardTitleLocked]} numberOfLines={2}>
+      <Text style={styles.cardTitle} numberOfLines={2}>
         {hidden ? t('achievements.secretTitle') : achievementTitle(achievement, language)}
       </Text>
       <Text style={styles.cardDesc} numberOfLines={3}>
@@ -139,7 +139,8 @@ function AchievementCard({
         ) : (
           <>
             <View style={styles.track}>
-              <View style={[styles.fill, { width: `${Math.round((current / achievement.target) * 100)}%` }]} />
+              {/* A secret gives nothing away, the bar included. */}
+              <View style={[styles.fill, { width: hidden ? 0 : `${Math.round((current / achievement.target) * 100)}%` }]} />
             </View>
             <Text style={styles.counter}>
               {hidden ? '???' : `${current} / ${achievement.target}`}
@@ -178,49 +179,57 @@ function makeStyles(theme: Theme) {
       borderRadius: radius.lg,
       borderWidth: 1.5,
       borderColor: theme.border,
-      padding: 10,
-      minHeight: 168,
+      padding: 8,
+      minHeight: 186,
     },
     cardUnlocked: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
     badge: {
       position: 'absolute',
-      top: 8,
-      right: 8,
+      top: 6,
+      right: 6,
+      zIndex: 2,
       width: 20,
       height: 20,
       borderRadius: 10,
       alignItems: 'center',
       justifyContent: 'center',
     },
-    badgeLocked: { backgroundColor: theme.background },
+    badgeLocked: { backgroundColor: theme.card, borderWidth: 1, borderColor: theme.border },
     badgeDone: { backgroundColor: theme.success },
-    iconWrap: {
-      width: 46,
-      height: 46,
-      borderRadius: 16,
-      backgroundColor: theme.background,
-      alignItems: 'center',
-      justifyContent: 'center',
-      alignSelf: 'center',
-      marginTop: 8,
-      marginBottom: 10,
+    // The artwork is drawn on cream paper, so it keeps its own light backing
+    // in either theme rather than floating on a dark card.
+    artWrap: {
+      // The ratio lives on the box, not the image: a bare aspectRatio on an
+      // Image is sized from the ratio alone on Android instead of stretching.
+      width: '100%',
+      aspectRatio: ART_RATIO,
+      borderRadius: radius.md,
+      backgroundColor: ART_BACKDROP,
+      overflow: 'hidden',
+      marginBottom: 8,
     },
-    iconWrapUnlocked: { backgroundColor: theme.card },
-    cardTitle: { fontSize: 12, lineHeight: 15, fontFamily: fontFamily('800'), color: theme.text },
-    cardTitleLocked: { color: theme.text },
-    cardDesc: { fontSize: 10, lineHeight: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 3 },
+    art: { width: '100%', height: '100%' },
+    cardTitle: { fontSize: 12, lineHeight: 15, fontFamily: fontFamily('800'), color: theme.text, textAlign: 'center' },
+    cardDesc: {
+      fontSize: 10,
+      lineHeight: 13,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      marginTop: 3,
+      textAlign: 'center',
+    },
     cardFoot: { marginTop: 'auto', paddingTop: 8 },
     track: { height: 5, borderRadius: 3, backgroundColor: theme.border, overflow: 'hidden' },
     fill: { height: '100%', borderRadius: 3, backgroundColor: theme.primary },
     counter: { fontSize: 10, fontFamily: fontFamily('700'), color: theme.textMuted, textAlign: 'center', marginTop: 4 },
     donePill: {
-      alignSelf: 'flex-start',
+      alignSelf: 'center',
       backgroundColor: theme.primary,
       borderRadius: radius.pill,
       paddingHorizontal: 10,
       paddingVertical: 4,
     },
     donePillText: { fontSize: 10, fontFamily: fontFamily('800'), color: theme.onPrimary },
-    doneDate: { fontSize: 9, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 4 },
+    doneDate: { fontSize: 9, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 4, textAlign: 'center' },
   });
 }

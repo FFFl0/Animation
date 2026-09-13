@@ -153,7 +153,7 @@ const ru: StringDict = {
   achievements: {
     pageTitle: 'Достижения',
     unlockedOf: (n: number, total: number) => `Открыто ${n} из ${total}`,
-    secretTitle: 'Секретное',
+    secretTitle: 'Секретное достижение',
     done: 'Выполнено',
     filter: {
       all: 'Все',
@@ -682,7 +682,7 @@ const en: StringDict = {
   achievements: {
     pageTitle: 'Achievements',
     unlockedOf: (n: number, total: number) => `Unlocked ${n} of ${total}`,
-    secretTitle: 'Secret',
+    secretTitle: 'Secret achievement',
     done: 'Unlocked',
     filter: {
       all: 'All',
