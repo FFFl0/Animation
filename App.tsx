@@ -34,6 +34,11 @@ import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
 import TournamentScreen, { WEEKLY_MATCH_CONFIG } from './src/screens/TournamentScreen';
+import ShopScreen from './src/screens/ShopScreen';
+import ShopItemScreen from './src/screens/ShopItemScreen';
+import CartScreen from './src/screens/CartScreen';
+import OrdersScreen from './src/screens/OrdersScreen';
+import { ShopProvider } from './src/shop/ShopContext';
 import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
@@ -67,6 +72,10 @@ type Screen =
   | 'leaderboard'
   | 'battle'
   | 'tournament'
+  | 'shop'
+  | 'shopItem'
+  | 'cart'
+  | 'orders'
   | 'friends'
   | 'friendProfile'
   | 'compare'
@@ -108,6 +117,7 @@ function AppShell() {
   // yet at that point, hence its own state rather than a Screen.
   const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth' | 'privacy'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
+  const [shopItemId, setShopItemId] = useState<string | null>(null);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
@@ -172,7 +182,15 @@ function AppShell() {
           return true;
         }
         case 'tournament':
+        case 'shop':
           setScreen('home');
+          return true;
+        case 'shopItem':
+        case 'orders':
+          setScreen('shop');
+          return true;
+        case 'cart':
+          setScreen(shopItemId ? 'shopItem' : 'shop');
           return true;
         case 'friendProfile':
           setScreen('friends');
@@ -336,8 +354,46 @@ function AppShell() {
               onOpenSettings={() => setScreen('profile')}
               onOpenBattle={() => setScreen('battle')}
               onOpenTournament={() => setScreen('tournament')}
+              onOpenShop={() => setScreen('shop')}
             />
           )}
+          {screen === 'shop' && (
+            <ShopScreen
+              onBack={() => setScreen('home')}
+              onOpenItem={(id) => {
+                setShopItemId(id);
+                setScreen('shopItem');
+              }}
+              onOpenCart={() => setScreen('cart')}
+              onOpenOrders={() => setScreen('orders')}
+            />
+          )}
+
+          {screen === 'shopItem' && shopItemId && (
+            <ShopItemScreen
+              itemId={shopItemId}
+              onBack={() => setScreen('shop')}
+              onOpenCart={() => setScreen('cart')}
+            />
+          )}
+
+          {screen === 'cart' && (
+            <CartScreen
+              onBack={() => setScreen(shopItemId ? 'shopItem' : 'shop')}
+              onOrdered={() => setScreen('orders')}
+            />
+          )}
+
+          {screen === 'orders' && (
+            <OrdersScreen
+              onBack={() => setScreen('shop')}
+              onOpenItem={(id) => {
+                setShopItemId(id);
+                setScreen('shopItem');
+              }}
+            />
+          )}
+
           {screen === 'tournament' && (
             <TournamentScreen
               onBack={() => setScreen('home')}
@@ -480,6 +536,7 @@ function AppShell() {
           {screen === 'achievements' && <AchievementsScreen />}
           {screen === 'profile' && (
             <ProfileScreen
+              onOpenShop={() => setScreen('shop')}
               onOpenAbout={() => setScreen('about')}
               onOpenPrivacy={() => {
                 setPrivacyFrom('profile');
@@ -563,6 +620,7 @@ export default function App() {
         <LanguageProvider>
           <SoundProvider>
             <AuthProvider>
+              <ShopProvider>
               <PresenceProvider>
                 <NotificationsProvider>
                   <ResponsiveShell>
@@ -572,6 +630,7 @@ export default function App() {
                   </ResponsiveShell>
                 </NotificationsProvider>
               </PresenceProvider>
+              </ShopProvider>
             </AuthProvider>
           </SoundProvider>
         </LanguageProvider>

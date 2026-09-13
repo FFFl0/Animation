@@ -4,6 +4,7 @@ import Svg, { Circle, Ellipse, Path } from 'react-native-svg';
 import { Avatar, HairStyle } from '../data/avatar';
 import { AVATAR_IMAGES } from '../data/avatarImages';
 import { FRAME_IMAGES } from '../data/cosmeticImages';
+import AnimatedFrame from './AnimatedFrame';
 import { PRESET_AVATAR_IMAGES, isPresetAvatarId } from '../data/presetAvatars';
 import { fontFamily } from '../theme/fonts';
 
@@ -85,7 +86,7 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
           <Image source={source ?? { uri: photo! }} style={{ width: size, height: size }} resizeMode="cover" />
         </View>,
         // Roster portraits are shown as-is, frames belong to players only.
-        characterId ? undefined : avatar.frameId,
+        characterId ? undefined : avatar,
         size
       );
     }
@@ -100,7 +101,7 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
         >
           <Text style={[styles.placeholderText, { fontSize: Math.round(size * 0.42) }]}>{initialOf(name)}</Text>
         </View>,
-        avatar.frameId,
+        avatar,
         size
       );
     }
@@ -136,20 +137,25 @@ export default function AnimeAvatar({ avatar, size = 96, variant = 'full', chara
   );
 }
 
-function withFrame(circle: ReactElement, frameId: Avatar['frameId'], size: number) {
-  const frameImage = frameId ? FRAME_IMAGES[frameId] : undefined;
-  if (!frameImage) return circle;
+function withFrame(circle: ReactElement, avatar: Avatar | undefined, size: number) {
+  const frameImage = avatar?.frameId ? FRAME_IMAGES[avatar.frameId] : undefined;
+  const animated = avatar?.animatedFrameId;
+  if (!frameImage && !animated) return circle;
 
   const frameSize = Math.round(size * FRAME_OVERHANG);
   const offset = -(frameSize - size) / 2;
   return (
     <View style={{ width: size, height: size }}>
       {circle}
-      <Image
-        source={frameImage}
-        style={{ position: 'absolute', top: offset, left: offset, width: frameSize, height: frameSize }}
-        resizeMode="contain"
-      />
+      {frameImage && (
+        <Image
+          source={frameImage}
+          style={{ position: 'absolute', top: offset, left: offset, width: frameSize, height: frameSize }}
+          resizeMode="contain"
+        />
+      )}
+      {/* the bought frame sits on top: it is the one somebody paid for */}
+      {animated && <AnimatedFrame id={animated} size={size} />}
     </View>
   );
 }

@@ -27,6 +27,7 @@ type Props = {
   onOpenSettings: () => void;
   onOpenBattle: () => void;
   onOpenTournament: () => void;
+  onOpenShop: () => void;
 };
 
 function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
@@ -50,7 +51,7 @@ function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
   }
 }
 
-export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle, onOpenTournament }: Props) {
+export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle, onOpenTournament, onOpenShop }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -87,6 +88,17 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
             <Text style={styles.battleTitle}>{t('home.tournamentTitle')}</Text>
             <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.tournamentSubtitle')}</Text>
           </View>
+        </SoundTouchable>
+
+        <SoundTouchable style={styles.shopRow} onPress={onOpenShop} activeOpacity={0.85}>
+          <View style={styles.shopIcon}>
+            <Icon name="gem" size={17} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.shopTitle}>{t('home.shopTitle')}</Text>
+            <Text style={styles.shopSubtitle} numberOfLines={1}>{t('home.shopSubtitle')}</Text>
+          </View>
+          <Icon name="chevronRight" size={15} color={theme.textMuted} />
         </SoundTouchable>
 
         <StreakCard days={profile.streak.count} />
@@ -174,6 +186,28 @@ function makeStyles(theme: Theme) {
       overflow: 'hidden',
       marginBottom: 24,
     },
+    shopRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 12,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.lg,
+      paddingHorizontal: 14,
+      paddingVertical: 12,
+      marginBottom: 12,
+    },
+    shopIcon: {
+      width: 36,
+      height: 36,
+      borderRadius: 13,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.primaryLight,
+    },
+    shopTitle: { fontSize: 14, fontFamily: fontFamily('800'), color: theme.text },
+    shopSubtitle: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
     tournamentCard: {
       width: '100%',
       aspectRatio: 3.5,

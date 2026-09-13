@@ -28,9 +28,10 @@ import { useT, translateAuthError } from '../i18n/strings';
 type Props = {
   onOpenAbout: () => void;
   onOpenPrivacy: () => void;
+  onOpenShop: () => void;
 };
 
-export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
+export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }: Props) {
   const { profile, logout, deleteAccount, updateAvatar, rename } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
@@ -307,6 +308,12 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy }: Props) {
         labels={{ gold: t('tournament.medalGold'), silver: t('tournament.medalSilver'), bronze: t('tournament.medalBronze') }}
       />
       {totalMedals(medals) === 0 && <Text style={styles.medalHint}>{t('tournament.profileEmpty')}</Text>}
+      {/* medals are only worth anything in the shop, so say where to spend them */}
+      <SoundTouchable style={styles.linkRow} onPress={onOpenShop} accessibilityRole="button">
+        <Icon name="gem" size={17} color={theme.primary} />
+        <Text style={styles.linkText}>{t('profile.spendMedals')}</Text>
+        <Icon name="chevronRight" size={15} color={theme.textMuted} />
+      </SoundTouchable>
 
       <Text style={styles.sectionTitle}>{t('profile.themeTitle')}</Text>
       <View style={styles.themeTabs}>

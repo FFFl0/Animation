@@ -1,4 +1,5 @@
 import { FrameId } from './cosmetics';
+import { AnimatedFrameId } from '../shop/animatedFrames';
 import { PresetAvatarId } from './presetAvatars';
 
 export type HairStyle = 'long' | 'twin' | 'bob' | 'short' | 'spiky' | 'ponytail';
@@ -14,6 +15,8 @@ export type Avatar = {
   presetId?: PresetAvatarId;
   /** Frame unlocked by player level — absent means "none equipped". */
   frameId?: FrameId;
+  /** Moving frame bought in the shop, drawn over the level one. */
+  animatedFrameId?: AnimatedFrameId;
   /** The rest only describes the 54 fixed roster characters: their portraits
    * are pre-rendered PNGs, but the "silhouette" and "eyes" quiz modes still
    * redraw them from these traits (see src/components/AnimeAvatar.tsx). */
