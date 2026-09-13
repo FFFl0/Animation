@@ -1,0 +1,46 @@
+{
+  "expo": {
+    "name": "AnimeQuiz",
+    "slug": "anime-quiz",
+    "owner": "rizzls-team",
+    "version": "1.0.0",
+    "orientation": "portrait",
+    "icon": "./assets/icon.png",
+    "userInterfaceStyle": "automatic",
+    "scheme": "animequiz",
+    "plugins": [
+      "expo-notifications",
+      [
+        "expo-image-picker",
+        {
+          "photosPermission": "Разрешите доступ к галерее, чтобы выбрать фото для аватара."
+        }
+      ]
+    ],
+    "ios": {
+      "bundleIdentifier": "com.animequiz.app",
+      "supportsTablet": true,
+      "config": {
+        "usesNonExemptEncryption": false
+      }
+    },
+    "android": {
+      "package": "com.animequiz.app",
+      "adaptiveIcon": {
+        "backgroundColor": "#FDF9F6",
+        "foregroundImage": "./assets/android-icon-foreground.png",
+        "backgroundImage": "./assets/android-icon-background.png",
+        "monochromeImage": "./assets/android-icon-monochrome.png"
+      },
+      "predictiveBackGestureEnabled": false
+    },
+    "web": {
+      "favicon": "./assets/favicon.png"
+    },
+    "extra": {
+      "eas": {
+        "projectId": "d612ef80-a5cb-4b96-b7aa-592bfbc67ee4"
+      }
+    }
+  }
+}

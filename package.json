@@ -1,0 +1,57 @@
+{
+  "name": "animequiz",
+  "version": "1.0.0",
+  "main": "index.ts",
+  "scripts": {
+    "start": "expo start",
+    "android": "expo start --android",
+    "ios": "expo start --ios",
+    "web": "expo start --web",
+    "test": "jest"
+  },
+  "dependencies": {
+    "@expo-google-fonts/manrope": "^0.4.2",
+    "@react-native-async-storage/async-storage": "3.1.1",
+    "@sentry/react-native": "^8.26.0",
+    "@supabase/supabase-js": "^2.115.0",
+    "expo": "^57.0.19",
+    "expo-application": "^57.0.2",
+    "expo-audio": "~57.0.4",
+    "expo-constants": "^57.0.17",
+    "expo-crypto": "~57.0.2",
+    "expo-font": "~57.0.3",
+    "expo-haptics": "^57.0.2",
+    "expo-image-manipulator": "^57.0.16",
+    "expo-image-picker": "^57.0.16",
+    "expo-linking": "^57.0.9",
+    "expo-notifications": "~57.0.17",
+    "expo-sharing": "^57.0.18",
+    "expo-status-bar": "~57.0.1",
+    "expo-video": "^57.0.3",
+    "expo-web-browser": "~57.0.2",
+    "react": "19.2.3",
+    "react-dom": "19.2.3",
+    "react-native": "0.86.3",
+    "react-native-safe-area-context": "^5.9.1",
+    "react-native-svg": "15.15.5",
+    "react-native-url-polyfill": "^4.0.0",
+    "react-native-view-shot": "^5.1.1",
+    "react-native-web": "^0.21.2"
+  },
+  "devDependencies": {
+    "@types/jest": "^30.0.0",
+    "@types/node": "^22.20.2",
+    "@types/react": "~19.2.18",
+    "babel-preset-expo": "^57.0.10",
+    "jest-expo": "~57.0.5",
+    "typescript": "~6.0.3"
+  },
+  "private": true,
+  "jest": {
+    "preset": "jest-expo",
+    "testPathIgnorePatterns": [
+      "/node_modules/",
+      "/dist/"
+    ]
+  }
+}
