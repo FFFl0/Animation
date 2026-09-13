@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
@@ -15,11 +15,15 @@ import {
   DeBracket,
   GAME_QUESTIONS,
   MATCH_DEFS,
+  MatchDef,
   MatchId,
+  Slot,
   WINS_PER_MATCH,
   championSeed,
   isDecided,
   isEliminated,
+  isPlayable,
+  matchDef,
   lossesOf,
   participantsOf,
   playableMatchesFor,
@@ -539,6 +543,60 @@ function matchName(id: MatchId, t: ReturnType<typeof useT>): string {
   return t(`tournament.lbRound.${def.round}`);
 }
 
+/**
+ * The bracket, drawn the way a bracket is drawn: one column per round, laid
+ * out left to right with elbows joining a match to the two that feed it, and
+ * scrolled sideways because sixteen players do not fit on a phone.
+ */
+const CARD_W = 152;
+const CARD_H = 56;
+const CARD_GAP = 6;
+const PITCH = CARD_H + CARD_GAP;
+const GUTTER = 24;
+const LINE = 1.5;
+/** Height of the round label above each column, so the elbows line up with the cards. */
+const ROUND_LABEL_H = 28;
+
+type Column = { label: string; defs: MatchDef[] };
+type Layout = { pitch: number; offset: number };
+
+/**
+ * Where each round sits vertically. A round with half as many matches as the
+ * one before it has each match centred between its two feeders, which is one
+ * half-pitch down and twice the spacing; a round with the same number of
+ * matches (the losers bracket, where knocked-out players drop in) stays put.
+ */
+function layoutColumns(columns: Column[]): Layout[] {
+  const out: Layout[] = [];
+  let pitch = PITCH;
+  let offset = 0;
+  columns.forEach((column, i) => {
+    if (i > 0 && column.defs.length < columns[i - 1].defs.length) {
+      offset += pitch / 2;
+      pitch *= 2;
+    }
+    out.push({ pitch, offset });
+  });
+  return out;
+}
+
+function centerY(layout: Layout, index: number): number {
+  return layout.offset + index * layout.pitch + CARD_H / 2;
+}
+
+function columnHeight(columns: Column[], layout: Layout[]): number {
+  return Math.max(
+    ...columns.map((column, i) => layout[i].offset + Math.max(0, column.defs.length - 1) * layout[i].pitch + CARD_H)
+  );
+}
+
+/** Indices in `prev` that feed `def` — the drop-ins from the other bracket are not in it. */
+function feederIndices(def: MatchDef, prev: Column): number[] {
+  return [def.a, def.b]
+    .map((slot) => (slot.from === 'winner' ? prev.defs.findIndex((d) => d.id === slot.match) : -1))
+    .filter((i) => i >= 0);
+}
+
 function BracketView({
   bracket,
   state,
@@ -552,46 +610,186 @@ function BracketView({
   theme: Theme;
   t: ReturnType<typeof useT>;
 }) {
-  const rounds = [
-    { bracket: 'wb' as const, title: t('tournament.upperTitle'), hint: t('tournament.upperHint'), count: 4 },
-    { bracket: 'lb' as const, title: t('tournament.lowerTitle'), hint: t('tournament.lowerHint'), count: 6 },
+  const wbColumns: Column[] = [
+    ...Array.from({ length: 4 }, (_, round) => ({
+      label: t(`tournament.wbRound.${round}`),
+      defs: MATCH_DEFS.filter((d) => d.bracket === 'wb' && d.round === round),
+    })),
+    { label: t('tournament.grandFinal'), defs: MATCH_DEFS.filter((d) => d.bracket === 'gf') },
   ];
+  const lbColumns: Column[] = Array.from({ length: 6 }, (_, round) => ({
+    label: t(`tournament.lbRound.${round}`),
+    defs: MATCH_DEFS.filter((d) => d.bracket === 'lb' && d.round === round),
+  }));
+
+  // Where the player is right now, so the bracket opens on their own match
+  // instead of on the first round every time.
+  const open = state.mySeat === null ? null : playableMatchesFor(bracket, state.mySeat)[0] ?? null;
+  const openDef = open ? matchDef(open) : null;
+  const focusOf = (columns: Column[]) =>
+    openDef ? columns.findIndex((c) => c.defs.some((d) => d.id === openDef.id)) : -1;
 
   return (
     <>
-      {rounds.map((section) => (
-        <View key={section.bracket}>
-          <Text style={styles.sectionTitle}>{section.title}</Text>
-          <Text style={styles.sectionHint}>{section.hint}</Text>
-          {Array.from({ length: section.count }, (_, round) => (
-            <View key={round} style={styles.roundBlock}>
-              <Text style={styles.roundLabel}>
-                {section.bracket === 'wb' ? t(`tournament.wbRound.${round}`) : t(`tournament.lbRound.${round}`)}
-              </Text>
-              {MATCH_DEFS.filter((d) => d.bracket === section.bracket && d.round === round).map((def) => (
-                <MatchRow key={def.id} id={def.id} bracket={bracket} state={state} styles={styles} theme={theme} t={t} />
-              ))}
-            </View>
-          ))}
-        </View>
-      ))}
+      <Text style={styles.sectionTitle}>{t('tournament.upperTitle')}</Text>
+      <Text style={styles.sectionHint}>{t('tournament.upperHint')}</Text>
+      <BracketScroller
+        columns={wbColumns}
+        focus={focusOf(wbColumns)}
+        bracket={bracket}
+        state={state}
+        styles={styles}
+        theme={theme}
+        t={t}
+      />
 
-      <Text style={styles.sectionTitle}>{t('tournament.grandFinal')}</Text>
-      <View style={styles.roundBlock}>
-        <MatchRow id="gf" bracket={bracket} state={state} styles={styles} theme={theme} t={t} highlight />
-      </View>
+      <Text style={styles.sectionTitle}>{t('tournament.lowerTitle')}</Text>
+      <Text style={styles.sectionHint}>{t('tournament.lowerHint')}</Text>
+      <BracketScroller
+        columns={lbColumns}
+        focus={focusOf(lbColumns)}
+        bracket={bracket}
+        state={state}
+        styles={styles}
+        theme={theme}
+        t={t}
+      />
     </>
   );
 }
 
-function MatchRow({
+function BracketScroller({
+  columns,
+  focus,
+  bracket,
+  state,
+  styles,
+  theme,
+  t,
+}: {
+  columns: Column[];
+  focus: number;
+  bracket: DeBracket;
+  state: WeeklyState;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+}) {
+  const scroller = useRef<ScrollView>(null);
+  const jumped = useRef(false);
+  const layout = useMemo(() => layoutColumns(columns), [columns]);
+  const height = columnHeight(columns, layout);
+
+  // Jumping to the player's own round only works once the row has a width, so
+  // it waits for the content rather than firing on mount.
+  const jumpToFocus = () => {
+    if (jumped.current || focus <= 0) return;
+    jumped.current = true;
+    scroller.current?.scrollTo({ x: focus * (CARD_W + GUTTER), animated: false });
+  };
+
+  return (
+    <View>
+      <View style={styles.swipeHint}>
+        <Text style={styles.swipeHintText}>{t('tournament.swipeHint')}</Text>
+        <Icon name="chevronRight" size={13} color={theme.textMuted} />
+      </View>
+      <ScrollView
+        ref={scroller}
+        horizontal
+        showsHorizontalScrollIndicator={false}
+        style={styles.bracketBleed}
+        contentContainerStyle={styles.bracketRow}
+        onContentSizeChange={jumpToFocus}
+      >
+        {columns.map((column, i) => (
+          <View key={column.label} style={{ flexDirection: 'row' }}>
+            {i > 0 && (
+              <Connectors
+                prev={columns[i - 1]}
+                next={column}
+                prevLayout={layout[i - 1]}
+                nextLayout={layout[i]}
+                height={height}
+                theme={theme}
+              />
+            )}
+            <View style={{ width: CARD_W }}>
+              <Text style={styles.roundLabel} numberOfLines={1}>
+                {column.label}
+              </Text>
+              <View style={{ height }}>
+                {column.defs.map((def, j) => (
+                  <View key={def.id} style={{ position: 'absolute', top: layout[i].offset + j * layout[i].pitch, width: CARD_W }}>
+                    <MatchCard id={def.id} bracket={bracket} state={state} styles={styles} theme={theme} t={t} />
+                  </View>
+                ))}
+              </View>
+            </View>
+          </View>
+        ))}
+      </ScrollView>
+    </View>
+  );
+}
+
+/** The elbows between two columns: one per match in the right-hand column. */
+function Connectors({
+  prev,
+  next,
+  prevLayout,
+  nextLayout,
+  height,
+  theme,
+}: {
+  prev: Column;
+  next: Column;
+  prevLayout: Layout;
+  nextLayout: Layout;
+  height: number;
+  theme: Theme;
+}) {
+  const line = { position: 'absolute' as const, backgroundColor: theme.border };
+  return (
+    <View style={{ width: GUTTER, height: height + ROUND_LABEL_H, paddingTop: ROUND_LABEL_H }}>
+      {next.defs.map((def, j) => {
+        const ys = feederIndices(def, prev).map((i) => centerY(prevLayout, i));
+        if (!ys.length) return null;
+        const target = centerY(nextLayout, j);
+        const top = Math.min(...ys);
+        const bottom = Math.max(...ys);
+        return (
+          <View key={def.id}>
+            {ys.map((y) => (
+              <View key={y} style={[line, { left: 0, top: y - LINE / 2, width: GUTTER / 2, height: LINE }]} />
+            ))}
+            {bottom > top && (
+              <View style={[line, { left: GUTTER / 2 - LINE / 2, top, width: LINE, height: bottom - top }]} />
+            )}
+            <View style={[line, { left: GUTTER / 2, top: target - LINE / 2, width: GUTTER / 2 + 1, height: LINE }]} />
+          </View>
+        );
+      })}
+    </View>
+  );
+}
+
+/** Where a side that is not filled in yet will come from: "Победитель 1/4". */
+function slotLabel(slot: Slot, t: ReturnType<typeof useT>): string {
+  if (slot.from === 'seed') return '—';
+  const def = matchDef(slot.match);
+  const round =
+    def.bracket === 'gf' ? t('tournament.grandFinal') : t(`tournament.${def.bracket}Short.${def.round}`);
+  return t(slot.from === 'winner' ? 'tournament.winnerOf' : 'tournament.loserOf', round);
+}
+
+function MatchCard({
   id,
   bracket,
   state,
   styles,
   theme,
   t,
-  highlight,
 }: {
   id: MatchId;
   bracket: DeBracket;
@@ -599,23 +797,27 @@ function MatchRow({
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
-  highlight?: boolean;
 }) {
+  const def = matchDef(id);
   const [a, b] = participantsOf(bracket, id);
   const [winsA, winsB] = winsOf(bracket, id);
   const done = isDecided(bracket, id);
+  const live = isPlayable(bracket, id);
   const mine = state.mySeat !== null && (a === state.mySeat || b === state.mySeat);
 
-  const Side = ({ seed, wins, other }: { seed: number | null; wins: number; other: number }) => {
+  const Side = ({ seed, slot, wins, other }: { seed: number | null; slot: Slot; wins: number; other: number }) => {
     const entrant = seed === null ? null : bracket.entrants[seed];
     const won = done && wins > other;
+    const lost = done && wins < other;
     return (
       <View style={styles.matchSide}>
+        {/* the seed column is kept even when empty, so the names line up */}
+        <Text style={styles.matchSeed}>{entrant ? seed! + 1 : ''}</Text>
         <Text
-          style={[styles.matchName, !entrant && styles.matchNamePending, won && styles.matchNameWon]}
+          style={[styles.matchName, !entrant && styles.matchNamePending, won && styles.matchNameWon, lost && styles.matchNameLost]}
           numberOfLines={1}
         >
-          {entrant ? entrant.name : '—'}
+          {entrant ? entrant.name : slotLabel(slot, t)}
         </Text>
         <Text style={[styles.matchScore, won && styles.matchNameWon]}>{entrant ? wins : ''}</Text>
       </View>
@@ -623,10 +825,18 @@ function MatchRow({
   };
 
   return (
-    <View style={[styles.matchCard, mine && styles.matchCardMine, highlight && styles.matchCardFinal]}>
-      <Side seed={a} wins={winsA} other={winsB} />
+    <View
+      style={[
+        styles.matchCard,
+        def.bracket === 'gf' && styles.matchCardFinal,
+        mine && styles.matchCardMine,
+        live && styles.matchCardLive,
+      ]}
+    >
+      <Side seed={a} slot={def.a} wins={winsA} other={winsB} />
       <View style={styles.matchDivider} />
-      <Side seed={b} wins={winsB} other={winsA} />
+      <Side seed={b} slot={def.b} wins={winsB} other={winsA} />
+      {live && <View style={styles.liveDot} />}
     </View>
   );
 }
@@ -854,25 +1064,45 @@ function makeStyles(theme: Theme) {
       paddingHorizontal: 10,
       paddingVertical: 3,
       marginBottom: 8,
+      maxWidth: CARD_W,
       overflow: 'hidden',
     },
+    swipeHint: { flexDirection: 'row', alignItems: 'center', gap: 4, marginBottom: 6 },
+    swipeHintText: { fontSize: 11, fontFamily: fontFamily('600'), color: theme.textMuted },
+    // The row sticks out past the screen edges on purpose: the page has side
+    // padding, the bracket scrolls edge to edge.
+    bracketRow: { flexDirection: 'row', paddingLeft: 20, paddingRight: 20, paddingBottom: 16 },
+    bracketBleed: { marginHorizontal: -20 },
     matchCard: {
+      height: CARD_H,
+      justifyContent: 'center',
       backgroundColor: theme.card,
       borderWidth: 1.5,
       borderColor: theme.border,
       borderRadius: radius.md ?? 12,
-      paddingHorizontal: 12,
-      paddingVertical: 8,
-      marginBottom: 6,
+      paddingHorizontal: 8,
+      paddingVertical: 5,
     },
-    matchCardMine: { borderColor: theme.primary },
+    matchCardMine: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
     matchCardFinal: { backgroundColor: theme.primaryLight, borderColor: theme.primaryLight },
-    matchSide: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10, paddingVertical: 3 },
+    matchCardLive: { borderColor: theme.success },
+    liveDot: {
+      position: 'absolute',
+      top: -3,
+      right: -3,
+      width: 9,
+      height: 9,
+      borderRadius: 5,
+      backgroundColor: theme.success,
+    },
+    matchSide: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingVertical: 2 },
+    matchSeed: { fontSize: 10, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 13 },
     matchDivider: { height: 1, backgroundColor: theme.border },
-    matchName: { flex: 1, fontSize: 13, fontFamily: fontFamily('600'), color: theme.text },
-    matchNamePending: { color: theme.textMuted },
+    matchName: { flex: 1, fontSize: 12, lineHeight: 15, fontFamily: fontFamily('600'), color: theme.text },
+    matchNamePending: { fontSize: 10, color: theme.textMuted },
     matchNameWon: { fontFamily: fontFamily('800'), color: theme.text },
-    matchScore: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 12, textAlign: 'right' },
+    matchNameLost: { color: theme.textMuted },
+    matchScore: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 10, textAlign: 'right' },
     listCard: {
       backgroundColor: theme.card,
       borderWidth: 1.5,
