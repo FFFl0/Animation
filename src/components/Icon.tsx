@@ -45,6 +45,7 @@ export type IconName =
   | 'trash'
   | 'image'
   | 'edit'
+  | 'gem'
   | 'chevronRight'
   | 'play'
   | 'pause';
@@ -362,6 +363,14 @@ function renderIcon(name: IconName, common: any, color: string) {
         <>
           <Path d="M9 7 4 12l5 5" {...common} />
           <Path d="M4 12h9a6 6 0 0 1 6 6v1" {...common} />
+        </>
+      );
+    case 'gem':
+      return (
+        <>
+          <Path d="M6 4h12l4 6-10 10L2 10l4-6z" {...common} />
+          <Path d="M2 10h20" {...common} />
+          <Path d="M9.5 4 7.5 10l4.5 10 4.5-10-2-6" {...common} />
         </>
       );
     case 'edit':

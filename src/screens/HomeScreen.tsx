@@ -14,6 +14,7 @@ import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
+import StreakCard from '../components/StreakCard';
 import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
@@ -88,13 +89,7 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           </View>
         </SoundTouchable>
 
-        <View style={styles.streakCard}>
-          <Icon name="flame" size={26} color={theme.primary} />
-          <View>
-            <Text style={styles.streakLabel}>{t('home.streakLabel')}</Text>
-            <Text style={styles.streakValue}>{profile.streak.count}</Text>
-          </View>
-        </View>
+        <StreakCard days={profile.streak.count} />
 
         <Text style={styles.sectionTitle}>{t('home.sectionCategory')}</Text>
         <View style={styles.grid}>
@@ -166,17 +161,6 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
       justifyContent: 'center',
     },
-    streakCard: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: theme.primaryLight,
-      borderRadius: radius.lg,
-      padding: 14,
-      marginBottom: 22,
-    },
-    streakLabel: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text, opacity: 0.7 },
-    streakValue: { fontSize: 20, fontFamily: fontFamily('800'), color: theme.text },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 12 },
     cardBackground: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0, width: '100%', height: '100%' },
     battleCard: {
