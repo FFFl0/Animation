@@ -26,6 +26,19 @@ import {
   winsOf,
 } from '../tournament/doubleElim';
 import {
+  MedalKind,
+  TournamentRecord,
+  EMPTY_RECORD,
+  applyRun,
+  medalForPlace,
+  placeOf,
+  placeRange,
+  totalMedals,
+} from '../tournament/medals';
+import { loadRecord, saveRecord } from '../tournament/medalStorage';
+import MedalShelf from '../components/MedalShelf';
+import { useAuth } from '../auth/AuthContext';
+import {
   WeeklyState,
   canPlayWeekly,
   fetchWeekly,
@@ -68,6 +81,7 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { buzz } = useSound();
   const t = useT();
+  const { profile } = useAuth();
 
   const [state, setState] = useState<WeeklyState | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -76,9 +90,17 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
   const [playing, setPlaying] = useState<MatchId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
   const [tick, setTick] = useState(0);
+  const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
+  // Nothing is banked before the shelf has been read, or an empty one would
+  // be written straight over the medals already on it.
+  const [recordReady, setRecordReady] = useState(false);
 
   const bracket = useMemo(() => (state ? toDeBracket(state) : null), [state]);
   const mySeat = state?.mySeat ?? null;
+  // Set once the player is out or has lifted the trophy; null while they are
+  // still in it.
+  const myPlace = bracket && mySeat !== null ? placeOf(bracket, mySeat) : null;
+  const myMedal = myPlace === null ? null : medalForPlace(myPlace);
   const myMatch = bracket && mySeat !== null ? playableMatchesFor(bracket, mySeat)[0] ?? null : null;
   const mySide: 'a' | 'b' | null =
     bracket && myMatch && mySeat !== null ? (participantsOf(bracket, myMatch)[0] === mySeat ? 'a' : 'b') : null;
@@ -98,6 +120,28 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
     load().catch(() => setPhase('offline'));
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, []);
+
+  useEffect(() => {
+    if (!profile) return;
+    loadRecord(profile.id).then((saved) => {
+      setRecord(saved);
+      setRecordReady(true);
+    });
+  }, [profile?.id]);
+
+  // A finished run goes on the shelf as soon as it is finished, not when the
+  // player next opens the screen — and the tournament id keeps a re-read from
+  // counting the same medal twice.
+  useEffect(() => {
+    if (!recordReady || !profile || myPlace === null || !state) return;
+    const runId = state.tournament.id;
+    if (record.lastRunId === runId) return;
+    const updated = applyRun(record, myPlace, runId);
+    setRecord(updated);
+    saveRecord(profile.id, updated);
+    buzz(myPlace === 1 ? 'success' : 'tap');
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [recordReady, myPlace, state?.tournament.id]);
 
   // Keeps the countdown moving, and re-reads the server while a match is
   // waiting on the other side to hand a score in.
@@ -212,6 +256,8 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
                 bracket={bracket}
                 myMatch={myMatch}
                 waiting={waiting}
+                place={myPlace}
+                medal={myMedal}
                 styles={styles}
                 theme={theme}
                 t={t}
@@ -229,6 +275,24 @@ export default function TournamentScreen({ onBack, onOpenPractice, onMatchPlayed
             {tab === 'players' && <Players state={state} styles={styles} theme={theme} t={t} bracket={bracket} />}
             {tab === 'matches' && bracket && <Matches bracket={bracket} state={state} styles={styles} t={t} theme={theme} />}
             {tab === 'rules' && <Rules styles={styles} theme={theme} t={t} />}
+
+            {record.runs > 0 && (
+              <>
+                <Text style={styles.sectionTitle}>{t('tournament.medals')}</Text>
+                <MedalShelf
+                  record={record}
+                  labels={{
+                    gold: t('tournament.medalGold'),
+                    silver: t('tournament.medalSilver'),
+                    bronze: t('tournament.medalBronze'),
+                  }}
+                />
+                <Text style={styles.recordLine}>
+                  {t('tournament.recordLine', record.runs, placeLabel(record.bestPlace, t))}
+                </Text>
+                {totalMedals(record) === 0 && <Text style={styles.recordLine}>{t('tournament.medalsHint')}</Text>}
+              </>
+            )}
 
             <SoundTouchable style={styles.practiceLink} onPress={onOpenPractice} activeOpacity={0.85}>
               <Icon name="target" size={15} color={theme.primary} />
@@ -302,6 +366,8 @@ function MyStanding({
   bracket,
   myMatch,
   waiting,
+  place,
+  medal,
   styles,
   theme,
   t,
@@ -313,6 +379,8 @@ function MyStanding({
   bracket: DeBracket | null;
   myMatch: MatchId | null;
   waiting: boolean;
+  place: number | null;
+  medal: MedalKind | null;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
@@ -344,17 +412,19 @@ function MyStanding({
       <View style={styles.card}>
         <Icon name="crown" size={28} color={theme.primary} />
         <Text style={styles.cardLabel}>{t('tournament.youChampion')}</Text>
+        <MedalBanner place={place} medal={medal} styles={styles} theme={theme} t={t} />
       </View>
     );
   }
 
-  if (isEliminated(bracket, seat)) {
+  if (place !== null || isEliminated(bracket, seat)) {
     return (
       <View style={styles.card}>
         <Text style={styles.cardLabel}>{t('tournament.youOut')}</Text>
         <Text style={styles.cardText}>
           {champion !== null ? t('tournament.championIs', bracket.entrants[champion].name) : t('tournament.youOutHint')}
         </Text>
+        <MedalBanner place={place} medal={medal} styles={styles} theme={theme} t={t} />
       </View>
     );
   }
@@ -427,6 +497,38 @@ function MyStanding({
       )}
     </View>
   );
+}
+
+/** Where the run ended, and the medal if it was worth one. */
+function MedalBanner({
+  place,
+  medal,
+  styles,
+  theme,
+  t,
+}: {
+  place: number | null;
+  medal: MedalKind | null;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+}) {
+  if (place === null) return null;
+  return (
+    <View style={styles.medalBanner}>
+      <Icon name="medal" size={18} color={medal ? theme.primary : theme.textMuted} />
+      <Text style={styles.medalBannerText}>
+        {placeLabel(place, t)}
+        {medal ? ` · ${t(`tournament.medal${medal[0].toUpperCase()}${medal.slice(1)}` as 'tournament.medalGold')}` : ''}
+      </Text>
+    </View>
+  );
+}
+
+/** "1 место", or "9–12 место" where the bracket cannot separate them. */
+function placeLabel(place: number, t: ReturnType<typeof useT>): string {
+  const [from, to] = placeRange(place);
+  return from === to ? t('tournament.place', from) : t('tournament.placeRange', from, to);
 }
 
 /** "1/8", "Финал нижней сетки", "Гранд-финал" — a round a player can recognise. */
@@ -728,6 +830,19 @@ function makeStyles(theme: Theme) {
     ghostOutlineText: { color: theme.text, fontSize: 14, fontFamily: fontFamily('700') },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
     sectionHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2, marginBottom: 10 },
+    recordLine: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 8, textAlign: 'center' },
+    medalBanner: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 8,
+      alignSelf: 'stretch',
+      justifyContent: 'center',
+      backgroundColor: theme.primaryLight,
+      borderRadius: radius.md,
+      paddingVertical: 10,
+      marginTop: 12,
+    },
+    medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
     roundBlock: { marginBottom: 14 },
     roundLabel: {
       alignSelf: 'flex-start',

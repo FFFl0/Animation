@@ -28,9 +28,8 @@ import {
 } from '../tournament/bracket';
 import { buildSeats } from '../tournament/bots';
 import { clearTournament, loadTournament, saveTournament } from '../tournament/tournamentStorage';
-import { EMPTY_RECORD, TournamentRecord, applyRun, medalFor, roundsReached } from '../tournament/medals';
-import { loadRecord, saveRecord } from '../tournament/medalStorage';
-import MedalShelf from '../components/MedalShelf';
+import { EMPTY_PRACTICE_RECORD, PracticeRecord, applyPracticeRun, roundsReached } from '../tournament/practiceRecord';
+import { loadPracticeRecord, savePracticeRecord } from '../tournament/medalStorage';
 
 type Props = {
   onBack: () => void;
@@ -62,7 +61,7 @@ export default function PracticeTournamentScreen({ onBack, onMatchPlayed }: Prop
   const [phase, setPhase] = useState<Phase>('loading');
   const [lastRound, setLastRound] = useState<number | null>(null);
   const [quizKey, setQuizKey] = useState(0);
-  const [record, setRecord] = useState<TournamentRecord>(EMPTY_RECORD);
+  const [record, setRecord] = useState<PracticeRecord>(EMPTY_PRACTICE_RECORD);
 
   useEffect(() => {
     if (!profile) return;
@@ -70,7 +69,7 @@ export default function PracticeTournamentScreen({ onBack, onMatchPlayed }: Prop
       setBracket(saved);
       setPhase('bracket');
     });
-    loadRecord(profile.id).then(setRecord);
+    loadPracticeRecord(profile.id).then(setRecord);
   }, [profile?.id]);
 
   if (!profile) return null;
@@ -106,12 +105,12 @@ export default function PracticeTournamentScreen({ onBack, onMatchPlayed }: Prop
     buzz(next.myExitRound === played ? 'error' : 'success');
 
     // The run is over the moment the player is out or lifts the trophy; the
-    // shelf is updated here rather than on the results screen so leaving
-    // early cannot cost somebody a medal they earned.
+    // tally is updated here rather than on the results screen so leaving
+    // early cannot cost somebody the run they just played.
     if (isMyTournamentOver(next)) {
-      const updated = applyRun(record, next, String(next.seed));
+      const updated = applyPracticeRun(record, next, String(next.seed));
       setRecord(updated);
-      saveRecord(profile.id, updated);
+      savePracticeRecord(profile.id, updated);
     }
   };
 
@@ -188,10 +187,6 @@ function roundLabel(round: number, t: ReturnType<typeof useT>): string {
   return `1/${TOURNAMENT_SIZE >> round}`;
 }
 
-function medalLabels(t: ReturnType<typeof useT>) {
-  return { gold: t('practice.medalGold'), silver: t('practice.medalSilver'), bronze: t('practice.medalBronze') };
-}
-
 function Intro({
   styles,
   theme,
@@ -202,7 +197,7 @@ function Intro({
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
-  record: TournamentRecord;
+  record: PracticeRecord;
   onStart: () => void;
 }) {
   return (
@@ -223,11 +218,7 @@ function Intro({
       </View>
 
       {record.runs > 0 && (
-        <>
-          <Text style={styles.sectionTitle}>{t('practice.medals')}</Text>
-          <MedalShelf record={record} labels={medalLabels(t)} />
-          <Text style={styles.recordLine}>{t('practice.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
-        </>
+        <Text style={styles.recordLine}>{t('practice.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
       )}
 
       <SoundTouchable style={styles.primaryButton} onPress={onStart} activeOpacity={0.88}>
@@ -254,7 +245,7 @@ function Standing({
   onAbandon,
 }: {
   bracket: Bracket;
-  record: TournamentRecord;
+  record: PracticeRecord;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
@@ -310,11 +301,7 @@ function Standing({
       )}
 
       {over && (
-        <>
-          <Text style={styles.sectionTitle}>{t('practice.medals')}</Text>
-          <MedalShelf record={record} labels={medalLabels(t)} />
-          <Text style={styles.recordLine}>{t('practice.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
-        </>
+        <Text style={styles.recordLine}>{t('practice.recordLine', record.runs, roundName(record.bestRound, t))}</Text>
       )}
 
       <Text style={styles.sectionTitle}>{t('practice.path')}</Text>
@@ -405,7 +392,6 @@ function RoundResult({
   const myScore = match.seatA === me ? match.scoreA : match.scoreB;
   const theirScore = match.seatA === me ? match.scoreB : match.scoreA;
   const champion = bracket.championSeat === me;
-  const medal = isMyTournamentOver(bracket) ? medalFor(bracket) : null;
 
   return (
     <>
@@ -427,13 +413,6 @@ function RoundResult({
           <Text style={[styles.scoreValue, { color: won ? theme.text : theme.danger }]}>{theirScore}</Text>
         </View>
       </View>
-
-      {medal && (
-        <View style={styles.medalBanner}>
-          <Icon name="medal" size={18} color={theme.primary} />
-          <Text style={styles.medalBannerText}>{t('practice.medalEarned', t(`practice.medal${medal[0].toUpperCase()}${medal.slice(1)}` as 'practice.medalGold'))}</Text>
-        </View>
-      )}
 
       <Text style={styles.lead}>
         {champion
@@ -577,17 +556,6 @@ function makeStyles(theme: Theme) {
       textAlign: 'center',
       marginTop: 10,
     },
-    medalBanner: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 8,
-      backgroundColor: theme.primaryLight,
-      borderRadius: radius.pill,
-      paddingHorizontal: 16,
-      paddingVertical: 9,
-      marginTop: 16,
-    },
-    medalBannerText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
     ghostButton: { alignSelf: 'stretch', paddingVertical: 14, alignItems: 'center', marginTop: 14 },
     ghostButtonText: { color: theme.danger, fontSize: 14, fontFamily: fontFamily('700') },
     rivalBadge: {

@@ -3,6 +3,12 @@ import { Language, useLanguage } from './LanguageContext';
 type StringValue = string | ((...args: any[]) => string);
 type StringDict = { [key: string]: StringValue | StringDict };
 
+/** 1st, 2nd, 3rd, 4th — the English suffix for a place. */
+function ordinal(n: number): string {
+  if (n % 100 >= 11 && n % 100 <= 13) return 'th';
+  return ['th', 'st', 'nd', 'rd'][n % 10] ?? 'th';
+}
+
 const ru: StringDict = {
   common: {
     pressBackAgainToExit: 'Нажмите «Назад» ещё раз, чтобы выйти',
@@ -253,14 +259,8 @@ const ru: StringDict = {
     advanced: (round: string, left: number) => `Проходите дальше, впереди ${round}. Осталось участников: ${left}`,
     eliminated: (round: string) => `На этом тренировка закончена — вы вылетели в раунде ${round}.`,
     toBracket: 'К сетке',
-    medals: 'Медали',
-    medalGold: 'Золото',
-    medalSilver: 'Серебро',
-    medalBronze: 'Бронза',
-    medalEarned: (medal: string) => `Награда: ${medal}`,
     bestTitle: 'титул',
     recordLine: (runs: number, best: string) => `Тренировок сыграно: ${runs} · лучший результат: ${best}`,
-    profileEmpty: 'Сыграйте турнир — медали появятся здесь.',
   },
   tournament: {
     title: 'Турнир',
@@ -325,10 +325,11 @@ const ru: StringDict = {
     medalGold: 'Золото',
     medalSilver: 'Серебро',
     medalBronze: 'Бронза',
-    medalEarned: (medal: string) => `Награда: ${medal}`,
-    bestTitle: 'титул',
+    medalsHint: 'Медали дают за первые три места.',
+    place: (n: number) => `${n} место`,
+    placeRange: (from: number, to: number) => `${from}–${to} место`,
     recordLine: (runs: number, best: string) => `Турниров сыграно: ${runs} · лучший результат: ${best}`,
-    profileEmpty: 'Сыграйте турнир — медали появятся здесь.',
+    profileEmpty: 'Сыграйте недельный турнир — медали появятся здесь.',
   },
   battle: {
     title: 'Битва фанатов',
@@ -782,14 +783,8 @@ const en: StringDict = {
     advanced: (round: string, left: number) => `You are through to the ${round}. Players left: ${left}`,
     eliminated: (round: string) => `That is the end of the run — you went out in the ${round}.`,
     toBracket: 'To the bracket',
-    medals: 'Medals',
-    medalGold: 'Gold',
-    medalSilver: 'Silver',
-    medalBronze: 'Bronze',
-    medalEarned: (medal: string) => `Awarded: ${medal}`,
     bestTitle: 'the title',
     recordLine: (runs: number, best: string) => `Practice runs played: ${runs} · best result: ${best}`,
-    profileEmpty: 'Play a tournament and your medals will show up here.',
   },
   tournament: {
     title: 'Tournament',
@@ -854,10 +849,11 @@ const en: StringDict = {
     medalGold: 'Gold',
     medalSilver: 'Silver',
     medalBronze: 'Bronze',
-    medalEarned: (medal: string) => `Awarded: ${medal}`,
-    bestTitle: 'the title',
+    medalsHint: 'Medals go to the top three.',
+    place: (n: number) => `${n}${ordinal(n)} place`,
+    placeRange: (from: number, to: number) => `${from}–${to}${ordinal(to)} place`,
     recordLine: (runs: number, best: string) => `Tournaments played: ${runs} · best result: ${best}`,
-    profileEmpty: 'Play a tournament and your medals will show up here.',
+    profileEmpty: 'Play the weekly tournament and your medals will show up here.',
   },
   battle: {
     title: 'Fan Battle',
