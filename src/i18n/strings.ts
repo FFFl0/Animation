@@ -135,6 +135,9 @@ const ru: StringDict = {
     byCategory: 'По категориям',
     byMode: 'По режимам',
     gamesAccuracy: (games: number, acc: number) => `${games} игр · точность ${acc}%`,
+    heroNote: 'Маленькие шаги к большой победе',
+    quote: '«Каждый ответ приближает тебя к ещё большему знанию»',
+    grouping: { categories: 'Все режимы', modes: 'По режимам' },
   },
   achievements: {
     pageTitle: 'Достижения',
@@ -640,6 +643,9 @@ const en: StringDict = {
     byCategory: 'By Category',
     byMode: 'By Mode',
     gamesAccuracy: (games: number, acc: number) => `${games} games · ${acc}% accuracy`,
+    heroNote: 'Small steps towards a big win',
+    quote: '"Every answer takes you a little closer to knowing it all"',
+    grouping: { categories: 'All modes', modes: 'By mode' },
   },
   achievements: {
     pageTitle: 'Achievements',

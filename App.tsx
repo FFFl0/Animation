@@ -468,7 +468,15 @@ function AppShell() {
               onChooseCategory={() => setScreen('home')}
             />
           )}
-          {screen === 'stats' && <StatsScreen onOpenLeaderboard={() => setScreen('leaderboard')} />}
+          {screen === 'stats' && (
+            <StatsScreen
+              onOpenLeaderboard={() => setScreen('leaderboard')}
+              onOpenCategory={(id) => {
+                setSelectedCategory(id);
+                setScreen('categoryDetail');
+              }}
+            />
+          )}
           {screen === 'leaderboard' && (
             <LeaderboardScreen
               onBack={() => setScreen('stats')}
