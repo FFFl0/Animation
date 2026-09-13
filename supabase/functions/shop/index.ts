@@ -73,6 +73,96 @@ function pointsPrice(rub: number): number {
 
 const MAX_PER_LINE = 9;
 
+/**
+ * Selling digital goods for money inside an app distributed through Google
+ * Play has to go through Play Billing — an alternative payment method for
+ * them is grounds for removal, whether it replaces the store's or sits
+ * beside it. Physical goods are the opposite: the store's billing is
+ * forbidden and an acquirer is required.
+ *
+ * So merch goes through ЮKassa and cosmetics do not. Flip this only if the
+ * app stops being distributed through a store that has such a rule — a
+ * direct APK or a channel whose terms allow it.
+ */
+const DIGITAL_RUB_ENABLED = false;
+
+// ---------------------------------------------------------------- ЮKassa
+
+const YOOKASSA_API = 'https://api.yookassa.ru/v3/payments';
+
+function yookassaAuth(): string | null {
+  const shop = Deno.env.get('YOOKASSA_SHOP_ID');
+  const secret = Deno.env.get('YOOKASSA_SECRET_KEY');
+  if (!shop || !secret) return null;
+  return `Basic ${btoa(`${shop}:${secret}`)}`;
+}
+
+/** Roubles as ЮKassa wants them: a string with two decimal places. */
+function amountValue(rub: number): string {
+  return `${rub}.00`;
+}
+
+type PaymentCreated = { id: string; confirmationUrl: string };
+
+/**
+ * Creates a payment and hands back the page to send the buyer to. The
+ * order id doubles as the idempotence key, so a retried request cannot
+ * charge somebody twice for one basket.
+ */
+async function createPayment(
+  orderId: string,
+  rub: number,
+  description: string,
+  returnUrl: string,
+  phone: string | null
+): Promise<PaymentCreated | null> {
+  const auth = yookassaAuth();
+  if (!auth) return null;
+
+  const body: Record<string, unknown> = {
+    amount: { value: amountValue(rub), currency: 'RUB' },
+    capture: true,
+    confirmation: { type: 'redirect', return_url: returnUrl },
+    description,
+    metadata: { order_id: orderId },
+  };
+
+  // Receipts are a legal requirement for selling to individuals, but they
+  // only go through once a receipt solution is connected on the ЮKassa
+  // side and the VAT code matches the tax regime — so this is opt-in
+  // rather than a guess that breaks every payment. See BUILD.md.
+  if (Deno.env.get('YOOKASSA_RECEIPTS') === '1' && phone) {
+    body.receipt = {
+      customer: { phone },
+      items: [
+        {
+          description: description.slice(0, 128),
+          quantity: '1.00',
+          amount: { value: amountValue(rub), currency: 'RUB' },
+          vat_code: Number(Deno.env.get('YOOKASSA_VAT_CODE') ?? 1),
+          payment_mode: 'full_payment',
+          payment_subject: 'commodity',
+        },
+      ],
+    };
+  }
+
+  const response = await fetch(YOOKASSA_API, {
+    method: 'POST',
+    headers: {
+      Authorization: auth,
+      'Idempotence-Key': orderId,
+      'Content-Type': 'application/json',
+    },
+    body: JSON.stringify(body),
+  });
+
+  if (!response.ok) return null;
+  const payment = await response.json();
+  const url = payment?.confirmation?.confirmation_url;
+  return url ? { id: String(payment.id), confirmationUrl: String(url) } : null;
+}
+
 // ---------------------------------------------------------------- state
 
 async function readState(admin: SupabaseClient, userId: string) {
@@ -146,6 +236,8 @@ Deno.serve(async (req) => {
     consumable?: string;
     lines?: { itemId: string; quantity: number; size?: string }[];
     delivery?: Record<string, unknown>;
+    /** Where ЮKassa sends the buyer back to once the page is done. */
+    returnUrl?: string;
   };
   try {
     payload = await req.json();
@@ -163,10 +255,7 @@ Deno.serve(async (req) => {
     if (price.physical) return json({ error: 'needsDelivery' }, 400);
 
     const currency = payload.currency === 'points' ? 'points' : 'rub';
-    // Nothing is charged in roubles until a payment provider exists; saying
-    // so here rather than in the app keeps the client from ever granting
-    // itself an item it has not paid for.
-    if (currency === 'rub') return json({ error: 'paymentUnavailable' }, 409);
+    if (currency === 'rub' && !DIGITAL_RUB_ENABLED) return json({ error: 'digitalRubDisabled' }, 409);
 
     // A one-off item cannot be bought twice; a consumable stacks.
     if (!price.consumable) {
@@ -207,9 +296,9 @@ Deno.serve(async (req) => {
     }
 
     const currency = payload.currency === 'points' ? 'points' : 'rub';
-    if (currency === 'rub') return json({ error: 'paymentUnavailable' }, 409);
+    if (currency === 'rub' && !yookassaAuth()) return json({ error: 'paymentUnavailable' }, 409);
 
-    const { error } = await admin.rpc('shop_place_order', {
+    const { data: orderId, error } = await admin.rpc('shop_place_order', {
       p_user: user.id,
       p_lines: lines,
       p_delivery: payload.delivery ?? {},
@@ -220,7 +309,32 @@ Deno.serve(async (req) => {
     if (error) {
       return json({ error: error.message.includes('not enough points') ? 'notEnoughPoints' : 'orderFailed' }, 409);
     }
-    return json(await readState(admin, user.id));
+
+    // Paid with points there is nothing to charge: the order is already
+    // settled and the state below shows it.
+    if (currency === 'points') return json(await readState(admin, user.id));
+
+    const phone = typeof payload.delivery?.phone === 'string' ? payload.delivery.phone : null;
+    const payment = await createPayment(
+      String(orderId),
+      totalRub,
+      `AnimeQuiz — заказ №${String(orderId).slice(0, 8)}`,
+      typeof payload.returnUrl === 'string' ? payload.returnUrl : 'https://example.com/',
+      phone
+    );
+
+    if (!payment) {
+      // The order stays in the list as unpaid rather than vanishing, so a
+      // buyer whose payment never started can see what happened.
+      return json({ ...(await readState(admin, user.id)), error: 'paymentFailed' }, 502);
+    }
+
+    await admin.from('shop_orders').update({ payment_id: payment.id }).eq('id', orderId);
+
+    return json({
+      ...(await readState(admin, user.id)),
+      confirmation: { url: payment.confirmationUrl, orderId: String(orderId) },
+    });
   }
 
   if (payload.action === 'spend') {

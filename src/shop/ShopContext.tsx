@@ -9,6 +9,8 @@ import * as Cart from './cart';
 import { CartLine } from './cart';
 import { Delivery, Order, PaidWith, deliveryProblems, newOrderId } from './orders';
 import { EMPTY_SHOP_STATE, LocalShopState, loadShop, saveShop } from './shopStorage';
+import * as Linking from 'expo-linking';
+import * as WebBrowser from 'expo-web-browser';
 import { ShopError, ShopState, buyItem, fetchShop, isCloudShop, placeOrderRemote, spendItem } from './shopApi';
 import { payRubles } from './payment';
 
@@ -206,9 +208,19 @@ export function ShopProvider({ children }: { children: ReactNode }) {
 
     if (cloud) {
       try {
-        const next = await placeOrderRemote(local.cart, delivery, currency);
+        // The card page comes back here when it is done, so the app can
+        // re-read the order instead of leaving the buyer in a browser.
+        const returnUrl = Linking.createURL('order');
+        const next = await placeOrderRemote(local.cart, delivery, currency, returnUrl);
         setWallet(next);
         commitLocal({ ...local, cart: [] });
+
+        if (next.confirmation) {
+          await WebBrowser.openAuthSessionAsync(next.confirmation.url, returnUrl);
+          // Whether they paid is the webhook's business, not the browser's:
+          // coming back is not proof of anything, so the state is re-read.
+          refresh();
+        }
         return { ok: true, order: next.orders[0] };
       } catch (e) {
         return { ok: false, reason: e instanceof ShopError ? e.reason : 'orderFailed' };

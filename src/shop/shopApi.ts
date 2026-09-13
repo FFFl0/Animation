@@ -5,6 +5,9 @@ import { ConsumableId } from './consumables';
 import { CartLine } from './cart';
 import { Delivery, Order } from './orders';
 
+/** Where to send the buyer to pay, when an order needs paying for. */
+export type PaymentConfirmation = { url: string; orderId: string };
+
 /** The wallet as the server sees it. The balance is computed there, never here. */
 export type ShopState = {
   medals: TournamentRecord;
@@ -13,6 +16,8 @@ export type ShopState = {
   owned: string[];
   counts: Record<string, number>;
   orders: Order[];
+  /** Present only on an order that still has to be paid for by card. */
+  confirmation?: PaymentConfirmation;
 };
 
 export const isCloudShop = isSupabaseConfigured;
@@ -38,10 +43,16 @@ export const buyItem = (itemId: string, currency: 'points' | 'rub') =>
 
 export const spendItem = (consumable: ConsumableId) => call({ action: 'spend', consumable });
 
-export const placeOrderRemote = (lines: CartLine[], delivery: Delivery, currency: 'points' | 'rub') =>
+export const placeOrderRemote = (
+  lines: CartLine[],
+  delivery: Delivery,
+  currency: 'points' | 'rub',
+  returnUrl: string
+) =>
   call({
     action: 'order',
     currency,
     delivery,
+    returnUrl,
     lines: lines.map((line) => ({ itemId: line.itemId, quantity: line.quantity, size: line.size as ApparelSize })),
   });

@@ -12,7 +12,8 @@ import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
 import AnimatedAvatar from '../components/AnimatedAvatar';
 import WalletSheet from '../components/WalletSheet';
-import { SHOP_SECTIONS, ShopItem, ShopSection, itemsOf } from '../shop/catalogue';
+import { SHOP_SECTIONS, ShopItem, ShopSection, itemsOf, needsDelivery } from '../shop/catalogue';
+import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { SHOP_IMAGES } from '../shop/shopImages';
 import { formatRub, pointsPrice } from '../shop/economy';
 import { cartCount } from '../shop/cart';
@@ -276,7 +277,9 @@ function ShopCard({
             <Icon name="gem" size={12} color={theme.primary} />
             <Text style={styles.pricePoints}>{pointsPrice(item.priceRub)}</Text>
           </View>
-          <Text style={[styles.priceRub, round && { textAlign: 'center' }]}>{formatRub(item.priceRub)}</Text>
+          {(needsDelivery(item) || DIGITAL_RUB_ENABLED) && (
+            <Text style={[styles.priceRub, round && { textAlign: 'center' }]}>{formatRub(item.priceRub)}</Text>
+          )}
         </View>
       )}
     </SoundTouchable>

@@ -14,6 +14,7 @@ import Icon from '../components/Icon';
 import { APPAREL_SIZES, ApparelSize, isStackable, needsDelivery, shopItem } from '../shop/catalogue';
 import { formatRub, pointsPrice } from '../shop/economy';
 import { Currency, useShop } from '../shop/ShopContext';
+import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { ItemPreview, itemDescription, itemTitle } from './ShopScreen';
 
 type Props = {
@@ -41,6 +42,9 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   const owned = !stacks && ownsItem(item.id);
   const physical = needsDelivery(item);
   const points = pointsPrice(item.priceRub);
+  // Cosmetics are sold for medals only while the store rule applies — see
+  // DIGITAL_RUB_ENABLED. Showing a price nobody can pay would be a lie.
+  const takesRub = physical || DIGITAL_RUB_ENABLED;
   // an owned item has nothing left to be short of
   const missing = owned ? 0 : Math.max(0, points - balance);
   const inStock = item.grant.kind === 'consumable' ? countOf(item.grant.consumable) : 0;
@@ -96,8 +100,12 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
           <View style={styles.priceRow}>
             <Icon name="gem" size={20} color={theme.primary} />
             <Text style={styles.pricePoints}>{t('shop.pointsPrice', points)}</Text>
-            <Text style={styles.priceOr}>{t('shop.or')}</Text>
-            <Text style={styles.priceRub}>{formatRub(item.priceRub)}</Text>
+            {takesRub && (
+              <>
+                <Text style={styles.priceOr}>{t('shop.or')}</Text>
+                <Text style={styles.priceRub}>{formatRub(item.priceRub)}</Text>
+              </>
+            )}
           </View>
           <Text style={styles.priceNote}>{t(physical ? 'shop.deliveryNote' : 'shop.digitalNote')}</Text>
           <Text style={styles.priceNote}>{t('shop.balance', balance)}</Text>
@@ -158,14 +166,16 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
             >
               <Text style={styles.primaryButtonText}>{t('shop.buyForPoints', points)}</Text>
             </SoundTouchable>
-            <SoundTouchable
-              style={[styles.secondaryButton, busy && styles.buttonDisabled]}
-              onPress={() => buy('rub')}
-              activeOpacity={0.88}
-              disabled={busy}
-            >
-              <Text style={styles.secondaryButtonText}>{t('shop.buyForRub', formatRub(item.priceRub))}</Text>
-            </SoundTouchable>
+            {takesRub && (
+              <SoundTouchable
+                style={[styles.secondaryButton, busy && styles.buttonDisabled]}
+                onPress={() => buy('rub')}
+                activeOpacity={0.88}
+                disabled={busy}
+              >
+                <Text style={styles.secondaryButtonText}>{t('shop.buyForRub', formatRub(item.priceRub))}</Text>
+              </SoundTouchable>
+            )}
           </>
         )}
 

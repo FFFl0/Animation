@@ -15,7 +15,7 @@ export type OrderLine = {
   size?: ApparelSize;
 };
 
-export type OrderStatus = 'awaitingPayment' | 'paid' | 'shipped';
+export type OrderStatus = 'awaitingPayment' | 'paid' | 'shipped' | 'canceled';
 
 /** How the order was paid for — or would be, once payment is connected. */
 export type PaidWith = 'rub' | 'points';

@@ -1,6 +1,7 @@
 import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SHOP_ITEMS, needsDelivery } from '../catalogue';
+import { DIGITAL_RUB_ENABLED } from '../payment';
 
 /**
  * The Edge Function keeps its own copy of the prices, because the client
@@ -62,5 +63,16 @@ describe('catalogue price parity', () => {
       expect(server[item.id].consumable ?? null).toBe(expected ? expected.consumable : null);
       expect(server[item.id].amount ?? null).toBe(expected ? expected.amount : null);
     }
+  });
+});
+
+describe('digital rouble switch parity', () => {
+  it('agrees with the function about whether cosmetics take money', () => {
+    const text = readFileSync(SOURCE, 'utf8');
+    const onServer = text.match(/const DIGITAL_RUB_ENABLED = (true|false);/)?.[1];
+    // The server decides; the app only mirrors it so it does not offer a
+    // button the server will refuse.
+    expect(onServer).toBeDefined();
+    expect(onServer === 'true').toBe(DIGITAL_RUB_ENABLED);
   });
 });

@@ -970,3 +970,11 @@ end;
 $$;
 
 revoke execute on function public.shop_spend(uuid, text) from anon, authenticated;
+
+-- Оплата мерча картой. Заказ живёт в статусе awaitingPayment, пока ЮKassa
+-- не подтвердит платёж своим вебхуком; id платежа хранится здесь, чтобы
+-- вебхук нашёл заказ, а расхождения можно было свести с выпиской.
+alter table public.shop_orders add column if not exists payment_id text;
+alter table public.shop_orders add column if not exists paid_at timestamptz;
+
+create index if not exists shop_orders_payment_idx on public.shop_orders (payment_id);

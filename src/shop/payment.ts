@@ -28,6 +28,18 @@ export type PaymentRequest = {
 
 export const isPaymentConfigured = false;
 
+/**
+ * Whether cosmetics can be paid for in roubles. Mirrors DIGITAL_RUB_ENABLED
+ * in supabase/functions/shop/index.ts, which is the one that decides — this
+ * copy only stops the app offering a button the server will refuse. A test
+ * keeps the two in step.
+ *
+ * It is off because an app distributed through Google Play has to sell
+ * digital goods through Play Billing; merch is the opposite and must not.
+ * Cosmetics are sold for medals instead, which no store has a rule about.
+ */
+export const DIGITAL_RUB_ENABLED = false;
+
 export async function payRubles(_request: PaymentRequest): Promise<PaymentOutcome> {
   return { status: 'unavailable' };
 }
