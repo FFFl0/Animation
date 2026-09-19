@@ -186,8 +186,8 @@ function HeroFade({ theme }: { theme: Theme }) {
       <Defs>
         <LinearGradient id="shopHeroFade" x1="0" y1="0" x2="0" y2="1">
           <Stop offset="0" stopColor={theme.background} stopOpacity="0" />
-          <Stop offset="0.55" stopColor={theme.background} stopOpacity="0" />
-          <Stop offset="0.82" stopColor={theme.background} stopOpacity="0.45" />
+          <Stop offset="0.62" stopColor={theme.background} stopOpacity="0" />
+          <Stop offset="0.86" stopColor={theme.background} stopOpacity="0.42" />
           <Stop offset="1" stopColor={theme.background} stopOpacity="1" />
         </LinearGradient>
       </Defs>
@@ -319,7 +319,7 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     scroll: { paddingBottom: 40 },
-    hero: { height: 252, overflow: 'hidden' },
+    hero: { height: 300, overflow: 'hidden' },
     heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
     heroTop: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14 },
     heroButton: {
