@@ -1,6 +1,7 @@
 import { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -59,6 +60,7 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
           {/* explicit size, not absoluteFill: without one the image lays out at
               its own pixel size and the parent just crops the top-left of it */}
           <Image source={HERO} style={styles.heroImage} resizeMode="cover" />
+          <HeroFade theme={theme} />
           <View style={styles.heroTop}>
             <SoundTouchable onPress={onBack} style={styles.heroButton} accessibilityRole="button">
               <Text style={styles.heroBack}>‹</Text>
@@ -167,6 +169,31 @@ export function itemTitle(item: ShopItem, language: string): string {
 
 export function itemDescription(item: ShopItem, language: string): string {
   return language === 'en' ? item.descriptionEn : item.description;
+}
+
+/**
+ * Melts the bottom of the artwork into the page. Without it the hero ends
+ * on a hard line across the screen; with it the picture just runs out.
+ *
+ * The gradient is the page's own background colour rather than black, so it
+ * lands on whatever the theme is instead of bruising a light one — and it
+ * only reaches full opacity at the very bottom, leaving the title above it
+ * with dark enough artwork behind to stay legible.
+ */
+function HeroFade({ theme }: { theme: Theme }) {
+  return (
+    <Svg style={StyleSheet.absoluteFill} width="100%" height="100%" pointerEvents="none">
+      <Defs>
+        <LinearGradient id="shopHeroFade" x1="0" y1="0" x2="0" y2="1">
+          <Stop offset="0" stopColor={theme.background} stopOpacity="0" />
+          <Stop offset="0.55" stopColor={theme.background} stopOpacity="0" />
+          <Stop offset="0.82" stopColor={theme.background} stopOpacity="0.45" />
+          <Stop offset="1" stopColor={theme.background} stopOpacity="1" />
+        </LinearGradient>
+      </Defs>
+      <Rect x="0" y="0" width="100%" height="100%" fill="url(#shopHeroFade)" />
+    </Svg>
+  );
 }
 
 const PREVIEW_BOX = { width: '100%', aspectRatio: 4 / 3 } as const;
@@ -292,7 +319,7 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     scroll: { paddingBottom: 40 },
-    hero: { height: 232, justifyContent: 'space-between', overflow: 'hidden' },
+    hero: { height: 252, overflow: 'hidden' },
     heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
     heroTop: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14 },
     heroButton: {
@@ -317,7 +344,7 @@ function makeStyles(theme: Theme) {
     },
     cartBadgeText: { fontSize: 11, fontFamily: fontFamily('800'), color: theme.onPrimary },
     heroBack: { fontSize: 24, lineHeight: 26, fontFamily: fontFamily('800'), color: '#FFFFFF' },
-    heroText: { paddingHorizontal: 20, paddingBottom: 18 },
+    heroText: { paddingHorizontal: 20, paddingTop: 10 },
     heroTitle: {
       fontSize: 34,
       fontFamily: fontFamily('800'),
@@ -334,7 +361,7 @@ function makeStyles(theme: Theme) {
       textShadowOffset: { width: 0, height: 1 },
       textShadowRadius: 6,
     },
-    walletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 14 },
+    walletRow: { flexDirection: 'row', alignItems: 'center', gap: 6, paddingHorizontal: 20, paddingTop: 4 },
     walletTap: { flexDirection: 'row', alignItems: 'center', gap: 6 },
     walletText: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.text },
     walletLink: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.primary },
