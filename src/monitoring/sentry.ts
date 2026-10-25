@@ -56,6 +56,18 @@ export function reportHandledError(error: unknown, context?: Record<string, unkn
   Sentry.captureException(error, context ? { extra: context } : undefined);
 }
 
+/**
+ * Report a crash an error boundary caught.
+ *
+ * Marked fatal rather than reported like a handled error: this one did reach
+ * the player, as a screen that stopped working, and the two should not sit in
+ * the same bucket when deciding what to fix first.
+ */
+export function reportCrash(error: unknown, context: { area: string; componentStack: string }): void {
+  if (!DSN) return;
+  Sentry.captureException(error, { level: 'fatal', extra: context, tags: { area: context.area } });
+}
+
 /** Leaves a trail of what the player was doing before a crash. */
 export function leaveBreadcrumb(message: string, data?: Record<string, unknown>): void {
   if (!DSN) return;

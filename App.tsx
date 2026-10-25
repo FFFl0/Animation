@@ -62,6 +62,9 @@ import { Achievement } from './src/data/achievements';
 import { dateSeed } from './src/quiz/generateQuiz';
 import { todayDateStr } from './src/quiz/today';
 import { parseRecoveryUrl, parseAuthTokensFromUrl, RecoveryTokens } from './src/auth/parseRecoveryUrl';
+import ErrorBoundary from './src/monitoring/ErrorBoundary';
+import CrashScreen from './src/monitoring/CrashScreen';
+import BareCrashScreen from './src/monitoring/BareCrashScreen';
 import { useT } from './src/i18n/strings';
 
 type Screen =
@@ -689,26 +692,42 @@ export default function App() {
   }
 
   return (
-    <SafeAreaProvider>
-      <ThemeProvider>
-        <LanguageProvider>
-          <SoundProvider>
-            <AuthProvider>
-              <ShopProvider>
-              <PresenceProvider>
-                <NotificationsProvider>
-                  <ResponsiveShell>
-                    <DeepLinkGate>
-                      <AppShell />
-                    </DeepLinkGate>
-                  </ResponsiveShell>
-                </NotificationsProvider>
-              </PresenceProvider>
-              </ShopProvider>
-            </AuthProvider>
-          </SoundProvider>
-        </LanguageProvider>
-      </ThemeProvider>
-    </SafeAreaProvider>
+    // Two boundaries, because the fallback needs what it is protecting. The
+    // inner one is inside the providers, so it can be themed and translated,
+    // and it covers the screens — which is where crashes come from. The outer
+    // one catches a provider failing to start, where none of that is
+    // available, and falls back to something hard-coded.
+    <ErrorBoundary area="root" fallback={(_error, retry) => <BareCrashScreen onRetry={retry} />}>
+      <SafeAreaProvider>
+        <ThemeProvider>
+          <LanguageProvider>
+            <SoundProvider>
+              <AuthProvider>
+                <ShopProvider>
+                <PresenceProvider>
+                  <NotificationsProvider>
+                    <ResponsiveShell>
+                      <DeepLinkGate>
+                        {/* Recovery works by remounting: React has already
+                            unmounted everything below, so rendering again
+                            builds a fresh shell on its first screen, while the
+                            providers above keep the player signed in. */}
+                        <ErrorBoundary
+                          area="screens"
+                          fallback={(error, retry) => <CrashScreen error={error} onRetry={retry} />}
+                        >
+                          <AppShell />
+                        </ErrorBoundary>
+                      </DeepLinkGate>
+                    </ResponsiveShell>
+                  </NotificationsProvider>
+                </PresenceProvider>
+                </ShopProvider>
+              </AuthProvider>
+            </SoundProvider>
+          </LanguageProvider>
+        </ThemeProvider>
+      </SafeAreaProvider>
+    </ErrorBoundary>
   );
 }

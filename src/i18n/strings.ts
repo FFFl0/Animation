@@ -610,6 +610,14 @@ const ru: StringDict = {
     animeSection: 'Аниме в игре',
     charactersSection: 'Персонажи',
   },
+  crash: {
+    title: 'Что-то пошло не так',
+    body: 'Этот экран сломался и не смог открыться. Это наша ошибка, а не ваша.',
+    progressSafe: 'Прогресс, покупки и переписка на месте — ничего не потерялось.',
+    retry: 'Вернуться в приложение',
+    reportSent: 'Отчёт об ошибке отправлен — мы её увидим.',
+    reportOff: 'Отправка отчётов выключена в этой сборке.',
+  },
   legal: {
     privacyTitle: 'Политика конфиденциальности',
     updated: (date: string) => `Обновлено: ${date}`,
@@ -1261,6 +1269,14 @@ const en: StringDict = {
     contentHint: 'Questions are drawn from these series and characters.',
     animeSection: 'Anime in the game',
     charactersSection: 'Characters',
+  },
+  crash: {
+    title: 'Something went wrong',
+    body: 'This screen broke and could not open. That is our fault, not yours.',
+    progressSafe: 'Your progress, purchases and messages are all still there.',
+    retry: 'Back to the app',
+    reportSent: 'A crash report has been sent — we will see it.',
+    reportOff: 'Crash reporting is off in this build.',
   },
   legal: {
     privacyTitle: 'Privacy Policy',
