@@ -7,6 +7,16 @@ export type ShopSection = 'merch' | 'avatars' | 'frames' | 'items';
 
 export const SHOP_SECTIONS: ShopSection[] = ['merch', 'avatars', 'frames', 'items'];
 
+/**
+ * What the shop's tab strip offers. "all" is not a shelf an item can sit on —
+ * it is the view that shows every shelf at once, and the one the shop opens
+ * on, so the first thing a visitor sees is the whole range rather than
+ * whichever section happened to be first.
+ */
+export type ShopTab = 'all' | ShopSection;
+
+export const SHOP_TABS: ShopTab[] = ['all', ...SHOP_SECTIONS];
+
 /** What buying it actually gives you. */
 export type ShopGrant =
   | { kind: 'animatedAvatar'; avatarId: AnimatedAvatarId }

@@ -35,6 +35,7 @@ import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
 import TournamentScreen, { WEEKLY_MATCH_CONFIG } from './src/screens/TournamentScreen';
 import ShopScreen from './src/screens/ShopScreen';
+import { ShopTab } from './src/shop/catalogue';
 import ShopItemScreen from './src/screens/ShopItemScreen';
 import CartScreen from './src/screens/CartScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
@@ -122,6 +123,11 @@ function AppShell() {
   const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth' | 'privacy'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
   const [shopItemId, setShopItemId] = useState<string | null>(null);
+  // The shop's open tab lives here, not in the screen: the screen unmounts
+  // while an item is on top of it, so coming back would otherwise always
+  // land on the first tab instead of the shelf the shopper was browsing.
+  const [shopTab, setShopTab] = useState<ShopTab>('all');
+  const [shopShowAll, setShopShowAll] = useState(false);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
@@ -381,11 +387,19 @@ function AppShell() {
               onOpenSettings={() => setScreen('profile')}
               onOpenBattle={() => setScreen('battle')}
               onOpenTournament={() => setScreen('tournament')}
-              onOpenShop={() => setScreen('shop')}
+              onOpenShop={() => {
+                setShopTab('all');
+                setShopShowAll(false);
+                setScreen('shop');
+              }}
             />
           )}
           {screen === 'shop' && (
             <ShopScreen
+              tab={shopTab}
+              onChangeTab={setShopTab}
+              showAll={shopShowAll}
+              onChangeShowAll={setShopShowAll}
               onBack={() => setScreen('home')}
               onOpenItem={(id) => {
                 setShopItemId(id);
@@ -592,7 +606,11 @@ function AppShell() {
           {screen === 'achievements' && <AchievementsScreen />}
           {screen === 'profile' && (
             <ProfileScreen
-              onOpenShop={() => setScreen('shop')}
+              onOpenShop={() => {
+                setShopTab('all');
+                setShopShowAll(false);
+                setScreen('shop');
+              }}
               onOpenAbout={() => setScreen('about')}
               onOpenPrivacy={() => {
                 setPrivacyFrom('profile');

@@ -247,7 +247,7 @@ const ru: StringDict = {
     title: 'Магазин',
     subtitle: 'Больше аниме в твоей игре ♡',
     back: 'Назад',
-    section: { merch: 'Мерч в реале', avatars: 'Аватарки', frames: 'Рамки', items: 'Игровые предметы' },
+    section: { all: 'Все', merch: 'Мерч в реале', avatars: 'Аватарки', frames: 'Рамки', items: 'Игровые предметы' },
     promoTitle: {
       merch: 'Мерч в реале',
       avatars: 'Анимированные аватарки',
@@ -900,7 +900,7 @@ const en: StringDict = {
     title: 'Shop',
     subtitle: 'More anime in your game ♡',
     back: 'Back',
-    section: { merch: 'Real merch', avatars: 'Avatars', frames: 'Frames', items: 'Game items' },
+    section: { all: 'All', merch: 'Real merch', avatars: 'Avatars', frames: 'Frames', items: 'Game items' },
     promoTitle: {
       merch: 'Real merch',
       avatars: 'Animated avatars',

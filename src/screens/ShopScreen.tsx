@@ -13,7 +13,7 @@ import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
 import AnimatedAvatar from '../components/AnimatedAvatar';
 import WalletSheet from '../components/WalletSheet';
-import { SHOP_SECTIONS, ShopItem, ShopSection, itemsOf, needsDelivery } from '../shop/catalogue';
+import { SHOP_SECTIONS, SHOP_TABS, ShopItem, ShopSection, ShopTab, itemsOf, needsDelivery } from '../shop/catalogue';
 import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { SHOP_IMAGES } from '../shop/shopImages';
 import { formatRub, pointsPrice } from '../shop/economy';
@@ -27,13 +27,31 @@ type Props = {
   onOpenItem: (itemId: string) => void;
   onOpenCart: () => void;
   onOpenOrders: () => void;
+  /** Which tab is open. Held by the navigator rather than here: this screen
+   * unmounts while an item is on screen, so its own state would be gone by
+   * the time the shopper came back. */
+  tab: ShopTab;
+  onChangeTab: (tab: ShopTab) => void;
+  /** Whether the open shelf is showing everything or only its popular items.
+   * Held by the navigator for the same reason as the tab. */
+  showAll: boolean;
+  onChangeShowAll: (showAll: boolean) => void;
 };
 
 const GAP = 10;
 /** Круглые картинки встают по четыре в ряд, прямоугольные — по две. */
 const COLUMNS: Record<ShopSection, number> = { merch: 2, avatars: 4, frames: 4, items: 2 };
 
-export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrders }: Props) {
+export default function ShopScreen({
+  onBack,
+  onOpenItem,
+  onOpenCart,
+  onOpenOrders,
+  tab,
+  onChangeTab,
+  showAll,
+  onChangeShowAll,
+}: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
@@ -41,18 +59,34 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
   const { balance, spent, medals, cart, orders, ownsItem } = useShop();
-  const [section, setSection] = useState<ShopSection>('avatars');
-  const [showAll, setShowAll] = useState(false);
   const [walletOpen, setWalletOpen] = useState(false);
 
-  const columns = COLUMNS[section];
-  const cardWidth = (width - 40 - GAP * (columns - 1)) / columns;
-  const all = itemsOf(section);
-  const popular = all.filter((item) => item.popular);
-  // "Популярные" only means something while there is a rest to hide.
-  const hasPopular = popular.length > 0 && popular.length < all.length;
-  const items = hasPopular && !showAll ? popular : all;
+  /**
+   * What the grid shows, as one or more blocks.
+   *
+   * "all" lists every shelf in turn rather than merging them into one grid:
+   * a round avatar sits four to a row and a t-shirt two, so a single grid
+   * would have to pick one and make the other look wrong.
+   */
+  const blocks = useMemo(
+    () =>
+      (tab === 'all' ? SHOP_SECTIONS : [tab])
+        .map((key) => ({ key, items: itemsOf(key) }))
+        .filter((block) => block.items.length > 0),
+    [tab]
+  );
+
+  // The popular/everything toggle belongs to a single shelf; "all" is already
+  // everything, so it does not apply there.
+  const single = tab === 'all' ? null : itemsOf(tab);
+  const popular = single?.filter((item) => item.popular) ?? [];
+  const hasPopular = single !== null && popular.length > 0 && popular.length < single.length;
   const inCart = cartCount(cart);
+
+  const widthFor = (key: ShopSection) => {
+    const columns = COLUMNS[key];
+    return { columns, cardWidth: (width - 40 - GAP * (columns - 1)) / columns };
+  };
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
@@ -104,55 +138,79 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
           style={styles.tabStrip}
           contentContainerStyle={styles.tabs}
         >
-          {SHOP_SECTIONS.map((key) => (
+          {SHOP_TABS.map((key) => (
             <SoundTouchable
               key={key}
-              style={[styles.tab, section === key && styles.tabActive]}
+              style={[styles.tab, tab === key && styles.tabActive]}
               onPress={() => {
-                setSection(key);
-                setShowAll(false);
+                onChangeTab(key);
+                onChangeShowAll(false);
               }}
             >
-              <Text style={[styles.tabText, section === key && styles.tabTextActive]}>{t(`shop.section.${key}`)}</Text>
+              <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{t(`shop.section.${key}`)}</Text>
             </SoundTouchable>
           ))}
         </ScrollView>
 
         <View style={styles.body}>
-          <View style={styles.promo}>
-            <View style={{ flex: 1 }}>
-              <Text style={styles.promoTitle}>{t(`shop.promoTitle.${section}`)}</Text>
-              <Text style={styles.promoText}>{t(`shop.promoText.${section}`)}</Text>
+          {tab !== 'all' && (
+            <View style={styles.promo}>
+              <View style={{ flex: 1 }}>
+                <Text style={styles.promoTitle}>{t(`shop.promoTitle.${tab}`)}</Text>
+                <Text style={styles.promoText}>{t(`shop.promoText.${tab}`)}</Text>
+              </View>
+              <Icon name="sparkles" size={26} color={theme.primary} />
             </View>
-            <Icon name="sparkles" size={26} color={theme.primary} />
-          </View>
+          )}
 
-          <View style={styles.rowHead}>
-            <Icon name={hasPopular && !showAll ? 'flame' : 'shuffle'} size={17} color={theme.primary} />
-            <Text style={styles.rowHeadTitle}>{t(hasPopular && !showAll ? 'shop.popular' : 'shop.everything')}</Text>
-            {hasPopular && (
-              <SoundTouchable onPress={() => setShowAll((v) => !v)} accessibilityRole="button">
-                <Text style={styles.rowHeadLink}>{t(showAll ? 'shop.showPopular' : 'shop.showAll')}</Text>
-              </SoundTouchable>
-            )}
-          </View>
+          {blocks.map((block) => {
+            const { columns, cardWidth } = widthFor(block.key);
+            const shown =
+              tab === 'all' ? block.items : hasPopular && !showAll ? popular : block.items;
+            return (
+              <View key={block.key}>
+                <View style={styles.rowHead}>
+                  {tab === 'all' ? (
+                    <>
+                      <Icon name="sparkles" size={17} color={theme.primary} />
+                      <Text style={styles.rowHeadTitle}>{t(`shop.section.${block.key}`)}</Text>
+                    </>
+                  ) : (
+                    <>
+                      <Icon name={hasPopular && !showAll ? 'flame' : 'shuffle'} size={17} color={theme.primary} />
+                      <Text style={styles.rowHeadTitle}>
+                        {t(hasPopular && !showAll ? 'shop.popular' : 'shop.everything')}
+                      </Text>
+                      {hasPopular && (
+                        <SoundTouchable onPress={() => onChangeShowAll(!showAll)} accessibilityRole="button">
+                          <Text style={styles.rowHeadLink}>
+                            {t(showAll ? 'shop.showPopular' : 'shop.showAll')}
+                          </Text>
+                        </SoundTouchable>
+                      )}
+                    </>
+                  )}
+                </View>
 
-          <View style={styles.grid}>
-            {items.map((item) => (
-              <ShopCard
-                key={item.id}
-                item={item}
-                width={cardWidth}
-                round={columns === 4}
-                owned={ownsItem(item.id)}
-                styles={styles}
-                theme={theme}
-                t={t}
-                language={language}
-                onPress={() => onOpenItem(item.id)}
-              />
-            ))}
-          </View>
+                <View style={styles.grid}>
+                  {shown.map((item) => (
+                    <ShopCard
+                      key={item.id}
+                      item={item}
+                      width={cardWidth}
+                      round={columns === 4}
+                      owned={ownsItem(item.id)}
+                      styles={styles}
+                      theme={theme}
+                      t={t}
+                      language={language}
+                      onPress={() => onOpenItem(item.id)}
+                    />
+                  ))}
+                </View>
+              </View>
+            );
+          })}
         </View>
       </ScrollView>
 
