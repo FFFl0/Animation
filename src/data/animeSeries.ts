@@ -58,6 +58,13 @@ export function seriesTitle(series: AnimeSeries, lang: Language): string {
   return pick(series.title, SERIES_EN[series.id]?.title, lang);
 }
 
+/** The genre tags, in the reader's language. The English table already
+ * carries them; this is the only way out of the module. */
+export function seriesTags(series: AnimeSeries, lang: Language): string[] {
+  const english = SERIES_EN[series.id]?.tags;
+  return lang === 'en' && english ? english : series.tags;
+}
+
 export function seriesTitleById(id: string, lang: Language): string {
   const series = ANIME_SERIES.find((s) => s.id === id);
   return series ? seriesTitle(series, lang) : id;

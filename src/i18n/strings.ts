@@ -606,6 +606,9 @@ const ru: StringDict = {
     syncOn: 'включена',
     syncOff: 'только на устройстве',
     credits: 'Сделано с любовью к аниме.\nШрифт Manrope, звуки и иллюстрации — собственные.',
+    contentHint: 'Вопросы составлены по этим тайтлам и персонажам.',
+    animeSection: 'Аниме в игре',
+    charactersSection: 'Персонажи',
   },
   legal: {
     privacyTitle: 'Политика конфиденциальности',
@@ -1255,6 +1258,9 @@ const en: StringDict = {
     syncOn: 'on',
     syncOff: 'this device only',
     credits: 'Made with love for anime.\nManrope typeface; sounds and artwork are our own.',
+    contentHint: 'Questions are drawn from these series and characters.',
+    animeSection: 'Anime in the game',
+    charactersSection: 'Characters',
   },
   legal: {
     privacyTitle: 'Privacy Policy',

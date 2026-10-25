@@ -8,6 +8,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { ToriiHero } from '../components/SakuraDecor';
+import ContentCatalogue from '../components/ContentCatalogue';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { isSupabaseConfigured } from '../auth/supabaseClient';
@@ -60,6 +61,8 @@ export default function AboutScreen({ onBack, onOpenPrivacy }: Props) {
             </View>
           ))}
         </View>
+
+        <ContentCatalogue />
 
         <SoundTouchable style={styles.link} onPress={onOpenPrivacy} accessibilityRole="button">
           <Icon name="lock" size={16} color={theme.primary} />
