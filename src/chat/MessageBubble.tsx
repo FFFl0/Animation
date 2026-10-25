@@ -5,6 +5,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import Icon from '../components/Icon';
+import { formatClock } from './messageGroups';
 
 /** The shape a bubble needs. Direct messages and group messages both satisfy
  * it, so one bubble renders either. */
@@ -17,6 +18,10 @@ export type BubbleMessage = {
   /** Direct messages only — a group message has no single recipient to have
    * read it, and the delivery check is hidden when this is absent. */
   read?: boolean;
+  /** Set once the message has been rewritten; shows the "edited" marker. */
+  editedAt?: string | null;
+  /** Name of the original author, when this is a forwarded copy. */
+  forwardedFrom?: string | null;
 };
 
 /** How far the bubble must travel before releasing counts as "reply". */
@@ -37,6 +42,14 @@ type Props<T extends BubbleMessage> = {
    * isn't enough to identify them. Omitted in a one-to-one chat. */
   authorLabel?: string;
   reactions: ReactionGroup[];
+  /** First of a run from the same author: carries the name in a group. */
+  isFirstInGroup: boolean;
+  /** Last of the run: the only one with the pointed "tail" corner. */
+  isLastInGroup: boolean;
+  /** Localised "edited" marker, shown next to the time. */
+  editedLabel: string;
+  /** Localised "Forwarded from <name>" line. */
+  forwardedLabel: (name: string) => string;
   onReply: (message: T) => void;
   onQuickReact: (message: T) => void;
   onToggleReaction: (message: T, emoji: string) => void;
@@ -45,12 +58,6 @@ type Props<T extends BubbleMessage> = {
   highlighted: boolean;
 };
 
-function formatTime(iso: string): string {
-  const d = new Date(iso);
-  if (Number.isNaN(d.getTime())) return '';
-  return `${d.getHours().toString().padStart(2, '0')}:${d.getMinutes().toString().padStart(2, '0')}`;
-}
-
 export default function MessageBubble<T extends BubbleMessage>({
   message,
   isMine,
@@ -58,6 +65,10 @@ export default function MessageBubble<T extends BubbleMessage>({
   repliedToLabel,
   authorLabel,
   reactions,
+  isFirstInGroup,
+  isLastInGroup,
+  editedLabel,
+  forwardedLabel,
   onReply,
   onQuickReact,
   onToggleReaction,
@@ -127,10 +138,19 @@ export default function MessageBubble<T extends BubbleMessage>({
             style={[
               styles.bubble,
               isMine ? styles.bubbleMine : styles.bubbleTheirs,
+              // Only the bubble that closes a run gets the tail; the ones
+              // above it stay fully rounded, so a run reads as one block.
+              isLastInGroup && (isMine ? styles.tailMine : styles.tailTheirs),
               highlighted && styles.bubbleHighlighted,
             ]}
           >
-            {authorLabel && !isMine && <Text style={styles.author}>{authorLabel}</Text>}
+            {authorLabel && !isMine && isFirstInGroup && <Text style={styles.author}>{authorLabel}</Text>}
+
+            {!!message.forwardedFrom && (
+              <Text style={[styles.forwarded, isMine && styles.forwardedMine]} numberOfLines={1}>
+                {forwardedLabel(message.forwardedFrom)}
+              </Text>
+            )}
 
             {repliedTo && (
               <Pressable onPress={() => onJumpToReplied(repliedTo.id)} style={styles.quote}>
@@ -149,9 +169,22 @@ export default function MessageBubble<T extends BubbleMessage>({
             <Text style={[styles.body, isMine && styles.textOnPrimary]}>{message.body}</Text>
 
             <View style={styles.metaRow}>
-              <Text style={[styles.time, isMine && styles.timeMine]}>{formatTime(message.createdAt)}</Text>
+              {!!message.editedAt && (
+                <Text style={[styles.time, isMine && styles.timeMine]}>{editedLabel}</Text>
+              )}
+              <Text style={[styles.time, isMine && styles.timeMine]}>{formatClock(message.createdAt)}</Text>
               {isMine && message.read !== undefined && (
-                <Icon name="check" size={11} color={message.read ? theme.onPrimary : 'rgba(255,255,255,0.55)'} strokeWidth={2.6} />
+                // One tick means it reached the server, two mean the other
+                // side has opened the conversation — the second is tucked
+                // behind the first the way a messenger draws it.
+                <View style={styles.ticks}>
+                  <Icon name="check" size={11} color={theme.onPrimary} strokeWidth={2.6} />
+                  {message.read && (
+                    <View style={styles.tickSecond}>
+                      <Icon name="check" size={11} color={theme.onPrimary} strokeWidth={2.6} />
+                    </View>
+                  )}
+                </View>
               )}
             </View>
           </View>
@@ -191,8 +224,10 @@ function makeStyles(theme: Theme) {
     // userSelect matters on web only: without it the browser starts
     // selecting the message text instead of letting the drag through.
     bubble: { maxWidth: '78%', borderRadius: radius.lg, paddingVertical: 8, paddingHorizontal: 14, userSelect: 'none' },
-    bubbleTheirs: { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border, borderBottomLeftRadius: 4 },
-    bubbleMine: { backgroundColor: theme.primary, borderBottomRightRadius: 4 },
+    bubbleTheirs: { backgroundColor: theme.card, borderWidth: 1.5, borderColor: theme.border },
+    bubbleMine: { backgroundColor: theme.primary },
+    tailTheirs: { borderBottomLeftRadius: 4 },
+    tailMine: { borderBottomRightRadius: 4 },
     bubbleHighlighted: { borderWidth: 2, borderColor: theme.ink },
     author: { fontSize: 11, fontFamily: fontFamily('800'), color: theme.primary, marginBottom: 2 },
     quote: { flexDirection: 'row', gap: 6, marginBottom: 5, opacity: 0.85 },
@@ -202,7 +237,13 @@ function makeStyles(theme: Theme) {
     quoteBody: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
     body: { fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, lineHeight: 19 },
     textOnPrimary: { color: theme.onPrimary },
+    forwarded: { fontSize: 10, fontFamily: fontFamily('700'), color: theme.primary, marginBottom: 3 },
+    forwardedMine: { color: 'rgba(255,255,255,0.9)' },
     metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
+    ticks: { flexDirection: 'row', alignItems: 'center' },
+    // Pulled left so the two ticks overlap instead of reading as two
+    // separate marks.
+    tickSecond: { marginLeft: -6 },
     time: { fontSize: 9, fontFamily: fontFamily('500'), color: theme.textMuted },
     timeMine: { color: 'rgba(255,255,255,0.75)' },
     reactionsRow: { flexDirection: 'row', gap: 4, marginTop: -4, marginLeft: 8 },

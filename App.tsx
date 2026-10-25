@@ -43,6 +43,8 @@ import FriendsScreen from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import ChatScreen from './src/screens/ChatScreen';
+import ChatsScreen from './src/screens/ChatsScreen';
+import { useLastSeenHeartbeat } from './src/chat/presence';
 import GroupsScreen from './src/screens/GroupsScreen';
 import GroupChatScreen from './src/screens/GroupChatScreen';
 import AboutScreen from './src/screens/AboutScreen';
@@ -76,6 +78,7 @@ type Screen =
   | 'shopItem'
   | 'cart'
   | 'orders'
+  | 'chats'
   | 'friends'
   | 'friendProfile'
   | 'compare'
@@ -85,7 +88,7 @@ type Screen =
   | 'about'
   | 'privacy';
 
-const TAB_SCREENS: Screen[] = ['home', 'friends', 'stats', 'achievements', 'profile'];
+const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'achievements', 'profile'];
 
 function ScreenTransition({ children, transitionKey }: { children: React.ReactNode; transitionKey: string }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -131,7 +134,16 @@ function AppShell() {
   const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [privacyFrom, setPrivacyFrom] = useState<Screen>('profile');
+  // A conversation is reachable from the chat list and from a friend's
+  // profile (and a group from the list and from the groups screen), so Back
+  // has to return to wherever it was actually opened from.
+  const [chatFrom, setChatFrom] = useState<Screen>('chats');
+  const [groupChatFrom, setGroupChatFrom] = useState<Screen>('chats');
   const lastBackPressRef = useRef(0);
+
+  // Marks the account as present while the app is open, so friends see
+  // "online" in chat instead of a timestamp from last week.
+  useLastSeenHeartbeat(profile?.id ?? null);
 
   useEffect(() => {
     setScreen('home');
@@ -197,11 +209,13 @@ function AppShell() {
           setScreen('friends');
           return true;
         case 'chat':
+          setScreen(chatFrom);
+          return true;
         case 'compare':
           setScreen('friendProfile');
           return true;
         case 'groupChat':
-          setScreen('groups');
+          setScreen(groupChatFrom);
           return true;
         case 'groups':
           setScreen('friends');
@@ -223,6 +237,9 @@ function AppShell() {
           setScreen('stats');
           return true;
         case 'friends':
+          setScreen('chats');
+          return true;
+        case 'chats':
         case 'stats':
         case 'achievements':
         case 'profile':
@@ -245,7 +262,7 @@ function AppShell() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [profile, preAuthScreen, screen, challengeFriend, autoJoinRoomCode, t]);
+  }, [profile, preAuthScreen, screen, challengeFriend, autoJoinRoomCode, chatFrom, groupChatFrom, t]);
 
   if (loading) {
     return (
@@ -435,9 +452,26 @@ function AppShell() {
               autoJoinRoomCode={autoJoinRoomCode ?? undefined}
             />
           )}
+          {screen === 'chats' && (
+            <ChatsScreen
+              onOpenDirect={(player) => {
+                setSelectedFriend(player);
+                setSelectedFriendship(null);
+                setChatFrom('chats');
+                setScreen('chat');
+              }}
+              onOpenGroup={(group) => {
+                setSelectedGroup(group);
+                setGroupChatFrom('chats');
+                setScreen('groupChat');
+              }}
+              onOpenContacts={() => setScreen('friends')}
+            />
+          )}
+
           {screen === 'friends' && (
             <FriendsScreen
-              onBack={() => setScreen('home')}
+              onBack={() => setScreen('chats')}
               onOpenFriend={(player, friendship) => {
                 setSelectedFriend(player);
                 setSelectedFriendship(friendship);
@@ -468,6 +502,7 @@ function AppShell() {
               onBack={() => setScreen('friends')}
               onOpenGroup={(group) => {
                 setSelectedGroup(group);
+                setGroupChatFrom('groups');
                 setScreen('groupChat');
               }}
             />
@@ -476,10 +511,10 @@ function AppShell() {
           {screen === 'groupChat' && selectedGroup && (
             <GroupChatScreen
               group={selectedGroup}
-              onBack={() => setScreen('groups')}
+              onBack={() => setScreen(groupChatFrom)}
               onLeft={() => {
                 setSelectedGroup(null);
-                setScreen('groups');
+                setScreen(groupChatFrom);
               }}
             />
           )}
@@ -489,7 +524,10 @@ function AppShell() {
               friendship={selectedFriendship}
               onBack={() => setScreen('friends')}
               onCompare={() => setScreen('compare')}
-              onOpenChat={() => setScreen('chat')}
+              onOpenChat={() => {
+                setChatFrom('friendProfile');
+                setScreen('chat');
+              }}
               onChallenge={() => {
                 setChallengeFriend(selectedFriend);
                 setScreen('battle');
@@ -497,7 +535,7 @@ function AppShell() {
             />
           )}
           {screen === 'chat' && selectedFriend && (
-            <ChatScreen friend={selectedFriend} onBack={() => setScreen('friendProfile')} />
+            <ChatScreen friend={selectedFriend} onBack={() => setScreen(chatFrom)} />
           )}
           {screen === 'compare' && selectedFriend && (
             <CompareScreen
@@ -540,6 +578,7 @@ function AppShell() {
               onOpenChat={(player) => {
                 setSelectedFriend(player);
                 setSelectedFriendship(null);
+                setChatFrom('leaderboard');
                 setScreen('chat');
               }}
               onChallenge={(player) => {

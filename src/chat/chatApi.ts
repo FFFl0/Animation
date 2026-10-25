@@ -10,6 +10,10 @@ export type ChatMessage = {
   createdAt: string;
   read: boolean;
   replyToId: string | null;
+  /** When it was last edited, or null if it never was. */
+  editedAt: string | null;
+  /** Display name of whoever wrote the message this was forwarded from. */
+  forwardedFrom: string | null;
 };
 
 export type MessageReaction = {
@@ -26,11 +30,14 @@ type MessageRow = {
   created_at: string;
   read: boolean;
   reply_to_id: string | null;
+  edited_at: string | null;
+  forwarded_from: string | null;
 };
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
-const MESSAGE_COLUMNS = 'id, sender_id, recipient_id, body, created_at, read, reply_to_id';
+const MESSAGE_COLUMNS =
+  'id, sender_id, recipient_id, body, created_at, read, reply_to_id, edited_at, forwarded_from';
 
 function toMessage(row: MessageRow): ChatMessage {
   return {
@@ -41,6 +48,8 @@ function toMessage(row: MessageRow): ChatMessage {
     createdAt: row.created_at,
     read: row.read ?? false,
     replyToId: row.reply_to_id ?? null,
+    editedAt: row.edited_at ?? null,
+    forwardedFrom: row.forwarded_from ?? null,
   };
 }
 
@@ -65,7 +74,8 @@ export async function sendMessage(
   meId: string,
   friendId: string,
   body: string,
-  replyToId?: string | null
+  replyToId?: string | null,
+  forwardedFrom?: string | null
 ): Promise<ChatMessage | null> {
   if (!supabase) return null;
   const trimmed = body.trim();
@@ -73,12 +83,34 @@ export async function sendMessage(
 
   const { data, error } = await supabase
     .from('messages')
-    .insert({ sender_id: meId, recipient_id: friendId, body: trimmed, reply_to_id: replyToId ?? null })
+    .insert({
+      sender_id: meId,
+      recipient_id: friendId,
+      body: trimmed,
+      reply_to_id: replyToId ?? null,
+      forwarded_from: forwardedFrom ?? null,
+    })
     .select(MESSAGE_COLUMNS)
     .single();
 
   if (error || !data) return null;
   return toMessage(data as MessageRow);
+}
+
+/**
+ * Rewrites a message you sent. Goes through a SQL function rather than a
+ * plain update: the table's only UPDATE policy belongs to the recipient (for
+ * the read flag), and widening it to the sender would hand them the whole
+ * row. Returns the new edit timestamp, or null if the message wasn't yours.
+ */
+export async function editMessage(messageId: string, body: string): Promise<string | null> {
+  if (!supabase) return null;
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+
+  const { data, error } = await supabase.rpc('edit_message', { p_id: messageId, p_body: trimmed });
+  if (error) return null;
+  return (data as string | null) ?? null;
 }
 
 /** Sender-only, enforced by RLS — this just avoids a pointless round-trip. */
@@ -136,6 +168,30 @@ export function subscribeIncomingMessages(meId: string, friendId: string, onMess
         if (row.sender_id === friendId) onMessage(toMessage(row));
       }
     )
+    .subscribe();
+  return () => {
+    supabase!.removeChannel(channel);
+  };
+}
+
+/** Edits and read receipts from the other side. Both arrive as UPDATEs on a
+ * row that already exists locally, so the screen patches its copy in place
+ * instead of refetching the conversation. */
+export function subscribeMessageUpdates(
+  meId: string,
+  friendId: string,
+  onUpdate: (m: ChatMessage) => void
+): () => void {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel(`chat-upd-${meId}-${friendId}`)
+    .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
+      const row = payload.new as MessageRow;
+      const involvesThisChat =
+        (row.sender_id === friendId && row.recipient_id === meId) ||
+        (row.sender_id === meId && row.recipient_id === friendId);
+      if (involvesThisChat) onUpdate(toMessage(row));
+    })
     .subscribe();
   return () => {
     supabase!.removeChannel(channel);

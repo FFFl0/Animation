@@ -19,6 +19,10 @@ export type GroupMessage = {
   body: string;
   createdAt: string;
   replyToId: string | null;
+  /** When it was last edited, or null if it never was. */
+  editedAt: string | null;
+  /** Display name of whoever wrote the message this was forwarded from. */
+  forwardedFrom: string | null;
 };
 
 export type GroupReaction = {
@@ -35,10 +39,13 @@ type MessageRow = {
   body: string;
   created_at: string;
   reply_to_id: string | null;
+  edited_at: string | null;
+  forwarded_from: string | null;
 };
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
-const MESSAGE_COLUMNS = 'id, group_id, sender_id, body, created_at, reply_to_id';
+const MESSAGE_COLUMNS =
+  'id, group_id, sender_id, body, created_at, reply_to_id, edited_at, forwarded_from';
 
 const GROUP_COLUMNS = 'id, name, owner_id, avatar_url, created_at';
 
@@ -60,6 +67,8 @@ function toMessage(row: MessageRow): GroupMessage {
     body: row.body,
     createdAt: row.created_at,
     replyToId: row.reply_to_id ?? null,
+    editedAt: row.edited_at ?? null,
+    forwardedFrom: row.forwarded_from ?? null,
   };
 }
 
@@ -172,7 +181,8 @@ export async function sendGroupMessage(
   groupId: string,
   senderId: string,
   body: string,
-  replyToId?: string | null
+  replyToId?: string | null,
+  forwardedFrom?: string | null
 ): Promise<GroupMessage | null> {
   if (!supabase) return null;
   const trimmed = body.trim();
@@ -180,12 +190,56 @@ export async function sendGroupMessage(
 
   const { data, error } = await supabase
     .from('group_messages')
-    .insert({ group_id: groupId, sender_id: senderId, body: trimmed, reply_to_id: replyToId ?? null })
+    .insert({
+      group_id: groupId,
+      sender_id: senderId,
+      body: trimmed,
+      reply_to_id: replyToId ?? null,
+      forwarded_from: forwardedFrom ?? null,
+    })
     .select(MESSAGE_COLUMNS)
     .single();
 
   if (error || !data) return null;
   return toMessage(data as MessageRow);
+}
+
+/** Rewrites a message you sent, through the same kind of SQL function direct
+ * messages use. Returns the new edit timestamp, or null if it wasn't yours. */
+export async function editGroupMessage(messageId: string, body: string): Promise<string | null> {
+  if (!supabase) return null;
+  const trimmed = body.trim();
+  if (!trimmed) return null;
+
+  const { data, error } = await supabase.rpc('edit_group_message', { p_id: messageId, p_body: trimmed });
+  if (error) return null;
+  return (data as string | null) ?? null;
+}
+
+/**
+ * Moves your read mark in a group to now. A group message has no single
+ * recipient to mark it read, so unread is counted as "messages newer than
+ * your mark" instead of a flag per message.
+ */
+export async function markGroupRead(groupId: string, userId: string): Promise<void> {
+  if (!supabase) return;
+  await supabase
+    .from('group_reads')
+    .upsert(
+      { group_id: groupId, user_id: userId, last_read_at: new Date().toISOString() },
+      { onConflict: 'group_id,user_id' }
+    );
+}
+
+/** Read marks for every group you're in, keyed by group id. */
+export async function getGroupReadMarks(userId: string): Promise<Map<string, string>> {
+  const marks = new Map<string, string>();
+  if (!isSupabaseConfigured || !supabase) return marks;
+  const { data } = await supabase.from('group_reads').select('group_id, last_read_at').eq('user_id', userId);
+  for (const row of (data as { group_id: string; last_read_at: string }[] | null) ?? []) {
+    marks.set(row.group_id, row.last_read_at);
+  }
+  return marks;
 }
 
 /** Sender-only, enforced by RLS. */
@@ -230,6 +284,23 @@ export function subscribeGroupMessages(groupId: string, onMessage: (m: GroupMess
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
       (payload) => onMessage(toMessage(payload.new as MessageRow))
+    )
+    .subscribe();
+  return () => {
+    supabase!.removeChannel(channel);
+  };
+}
+
+/** Edits made by anyone in the group — an UPDATE on a row the screen already
+ * holds, so it patches its copy rather than refetching. */
+export function subscribeGroupMessageUpdates(groupId: string, onUpdate: (m: GroupMessage) => void): () => void {
+  if (!supabase) return () => {};
+  const channel = supabase
+    .channel(`group-upd-${groupId}`)
+    .on(
+      'postgres_changes',
+      { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
+      (payload) => onUpdate(toMessage(payload.new as MessageRow))
     )
     .subscribe();
   return () => {

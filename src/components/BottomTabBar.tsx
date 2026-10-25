@@ -7,7 +7,7 @@ import Icon, { IconName } from './Icon';
 import { useT } from '../i18n/strings';
 import { useNotifications } from '../notifications/NotificationsContext';
 
-export type TabKey = 'home' | 'friends' | 'stats' | 'achievements' | 'profile';
+export type TabKey = 'home' | 'chats' | 'stats' | 'achievements' | 'profile';
 
 type Props = {
   active: TabKey;
@@ -19,11 +19,14 @@ export default function BottomTabBar({ active, onChange, theme }: Props) {
   const insets = useSafeAreaInsets();
   const styles = makeStyles(theme, insets.bottom);
   const t = useT();
-  const { badgeCount } = useNotifications();
+  const { badgeCount, unreadMessages } = useNotifications();
 
   const TABS: { key: TabKey; label: string; icon: IconName; badge?: number }[] = [
     { key: 'home', label: t('tabs.home'), icon: 'home' },
-    { key: 'friends', label: t('tabs.friends'), icon: 'users', badge: badgeCount },
+    // Friends moved behind the Chats screen's own header button, the way a
+    // messenger keeps contacts one step off the conversation list. Its badge
+    // rides along here so a friend request is still visible from the bar.
+    { key: 'chats', label: t('tabs.chats'), icon: 'chat', badge: unreadMessages + badgeCount },
     { key: 'stats', label: t('tabs.stats'), icon: 'stats' },
     { key: 'achievements', label: t('tabs.achievements'), icon: 'medal' },
     { key: 'profile', label: t('tabs.profile'), icon: 'user' },

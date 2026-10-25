@@ -12,14 +12,17 @@ import {
   addGroupMembers,
   deleteGroup,
   deleteGroupMessage,
+  editGroupMessage,
   getGroupMemberIds,
   getGroupMessages,
   getGroupReactions,
   isSupabaseConfigured,
+  markGroupRead,
   removeGroupMember,
   sendGroupMessage,
   setGroupAvatar,
   subscribeGroupMessageDeletes,
+  subscribeGroupMessageUpdates,
   subscribeGroupMessages,
   subscribeGroupReactions,
   toggleGroupReaction,
@@ -27,6 +30,7 @@ import {
 import ChatRoom from '../chat/ChatRoom';
 import GroupAvatar from '../chat/GroupAvatar';
 import { useReactions } from '../chat/useReactions';
+import { useTyping } from '../chat/presence';
 import { pickProfilePhoto } from '../avatar/photoPicker';
 import { deleteGroupPhoto, uploadGroupPhoto } from '../avatar/avatarStorage';
 import AnimeAvatar from '../components/AnimeAvatar';
@@ -66,6 +70,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
     []
   );
   const { refresh, grouped, mineFor, apply } = useReactions(meId, { fetch: getGroupReactions, toggle });
+  const { typingNames, notifyTyping } = useTyping(group.id, meId, profile?.username ?? '');
 
   const loadMembers = useCallback(async () => {
     const memberIds = await getGroupMemberIds(group.id);
@@ -83,10 +88,17 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
       await loadMembers();
     };
     loadAll();
+    markGroupRead(group.id, meId);
     getFriendships(profile.id).then((all) => setFriends(all.filter((f) => f.status === 'accepted')));
 
     const unsubMessages = subscribeGroupMessages(group.id, (m) => {
       setMessages((prev) => (prev.some((p) => p.id === m.id) ? prev : [...prev, m]));
+      // The chat is open, so whatever just arrived has been seen — keep the
+      // read mark moving or the list would show it as unread.
+      markGroupRead(group.id, meId);
+    });
+    const unsubUpdates = subscribeGroupMessageUpdates(group.id, (m) => {
+      setMessages((prev) => prev.map((p) => (p.id === m.id ? m : p)));
     });
     const unsubDeletes = subscribeGroupMessageDeletes(group.id, (id) => {
       setMessages((prev) => prev.filter((m) => m.id !== id));
@@ -100,6 +112,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
 
     return () => {
       unsubMessages();
+      unsubUpdates();
       unsubDeletes();
       unsubReactions();
     };
@@ -111,6 +124,12 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
   const handleSend = async (text: string, replyToId: string | null) => {
     const sent = await sendGroupMessage(group.id, meId, text, replyToId);
     if (sent) setMessages((prev) => [...prev, sent]);
+  };
+
+  const handleEditMessage = async (message: GroupMessage, text: string) => {
+    const editedAt = await editGroupMessage(message.id, text);
+    if (!editedAt) return;
+    setMessages((prev) => prev.map((m) => (m.id === message.id ? { ...m, body: text, editedAt } : m)));
   };
 
   const handleDeleteMessage = async (message: GroupMessage) => {
@@ -188,6 +207,8 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
     <>
       <ChatRoom
         onBack={onBack}
+        conversationKey={group.id}
+        subtitle={typingNames.length > 0 ? t('chat.typingMany', typingNames) : null}
         header={
           <SoundTouchable style={styles.headerRow} onPress={() => setSheet('settings')} accessibilityRole="button">
             <GroupAvatar url={group.avatarUrl} size={36} />
@@ -200,15 +221,19 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
         }
         messages={messages}
         meId={meId}
+        myName={profile.username}
         labelFor={labelFor}
         showAuthors
         emptyText={t('groups.empty')}
         reactionsFor={grouped}
         myReactionFor={mineFor}
         onSend={handleSend}
+        onEdit={handleEditMessage}
+        canEdit={(m) => m.senderId === meId}
         onToggleReaction={apply}
         onDelete={handleDeleteMessage}
         canDelete={(m) => m.senderId === meId}
+        onTyping={notifyTyping}
       />
 
       <Modal visible={sheet !== 'none'} transparent animationType="fade" onRequestClose={() => setSheet('none')}>

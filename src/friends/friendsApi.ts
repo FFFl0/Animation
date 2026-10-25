@@ -16,6 +16,9 @@ export type PlayerSummary = {
   totalCorrect: number;
   totalQuestions: number;
   totalGames: number;
+  /** Last time this player had the app open, or null if never recorded.
+   * Drives the "online" / "last seen" line in chat. */
+  lastSeenAt: string | null;
 };
 
 export type FriendshipStatus = 'pending' | 'accepted';
@@ -39,6 +42,7 @@ type LeaderboardRow = {
   total_correct: number;
   total_questions: number;
   total_games: number;
+  last_seen_at: string | null;
 };
 
 type FriendshipRow = {
@@ -60,6 +64,7 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     totalCorrect: row.total_correct,
     totalQuestions: row.total_questions,
     totalGames: row.total_games,
+    lastSeenAt: row.last_seen_at ?? null,
   };
 }
 

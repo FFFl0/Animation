@@ -12,13 +12,17 @@ import {
   subscribeBattleInvites,
   subscribeIncomingFriendRequests,
 } from './notificationsApi';
+import { countUnread, subscribeChatList } from '../chat/chatsApi';
 import { presentLocalNotification } from './localNotify';
 import { registerPushToken } from './pushTokens';
 
 type NotificationsContextValue = {
   incomingRequests: Friendship[];
   battleInvites: BattleInvite[];
+  /** Friend requests and battle invites — what the Friends screen answers. */
   badgeCount: number;
+  /** Unread messages across every chat, for the Chats tab badge. */
+  unreadMessages: number;
   refresh: () => void;
   respondToInvite: (inviteId: string, accept: boolean) => Promise<{ roomCode: string } | null>;
 };
@@ -30,6 +34,7 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const { language } = useLanguage();
   const [incomingRequests, setIncomingRequests] = useState<Friendship[]>([]);
   const [battleInvites, setBattleInvites] = useState<BattleInvite[]>([]);
+  const [unreadMessages, setUnreadMessages] = useState(0);
   const meId = profile?.id ?? null;
 
   const refresh = () => {
@@ -66,6 +71,27 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [meId]);
 
+  // Kept apart from the effect above: the unread count has to follow every
+  // message in every chat, while requests and invites only move when their
+  // own tables do.
+  useEffect(() => {
+    setUnreadMessages(0);
+    if (!meId || !isSupabaseConfigured) return;
+
+    let alive = true;
+    const reload = () => {
+      void countUnread(meId).then((n) => {
+        if (alive) setUnreadMessages(n);
+      });
+    };
+    reload();
+    const unsubscribe = subscribeChatList(reload);
+    return () => {
+      alive = false;
+      unsubscribe();
+    };
+  }, [meId]);
+
   const respondToInvite = async (inviteId: string, accept: boolean): Promise<{ roomCode: string } | null> => {
     const invite = battleInvites.find((i) => i.id === inviteId);
     await respondToBattleInvite(inviteId, accept);
@@ -78,10 +104,11 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       incomingRequests,
       battleInvites,
       badgeCount: incomingRequests.length + battleInvites.length,
+      unreadMessages,
       refresh,
       respondToInvite,
     }),
-    [incomingRequests, battleInvites]
+    [incomingRequests, battleInvites, unreadMessages]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

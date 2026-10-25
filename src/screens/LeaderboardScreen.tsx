@@ -35,6 +35,9 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     totalCorrect: row.totalCorrect,
     totalQuestions: row.totalQuestions,
     totalGames: 0,
+    // The leaderboard row carries no presence; opening a chat from here
+    // refetches the player anyway, which is where the status comes from.
+    lastSeenAt: null,
   };
 }
 

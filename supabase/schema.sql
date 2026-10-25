@@ -978,3 +978,139 @@ alter table public.shop_orders add column if not exists payment_id text;
 alter table public.shop_orders add column if not exists paid_at timestamptz;
 
 create index if not exists shop_orders_payment_idx on public.shop_orders (payment_id);
+
+-- ============================================================
+-- МЕССЕНДЖЕР: правка, пересылка, непрочитанное в группах,
+-- «был(а) в сети».
+--
+-- Всё ниже — добавки к уже существующим `messages`, `group_messages`
+-- и `profiles`; таблицы и политики выше не меняются.
+-- ============================================================
+
+-- Когда сообщение правили. null — его не правили ни разу, и тогда клиент
+-- не рисует пометку «изм.». Храним момент правки, а не просто флаг: по нему
+-- видно, что изменилось позже прочтения.
+alter table public.messages add column if not exists edited_at timestamptz;
+alter table public.group_messages add column if not exists edited_at timestamptz;
+
+-- Имя автора пересланного сообщения. Берём имя, а не id: пересылка — это
+-- копия текста, она должна подписываться даже если исходное сообщение
+-- удалили или автора больше нет среди друзей, а на внешний id у клиента в
+-- этот момент может не быть прав по RLS.
+alter table public.messages add column if not exists forwarded_from text;
+alter table public.group_messages add column if not exists forwarded_from text;
+
+-- Правка идёт через функцию, а не через политику UPDATE.
+--
+-- У `messages` уже есть политика «обновлять может получатель» — она нужна,
+-- чтобы отметить сообщение прочитанным. Если добавить рядом вторую,
+-- «обновлять может отправитель», Postgres сложит их через OR, и отправитель
+-- получит доступ ко всей строке целиком, включая `read` — то есть сможет
+-- проставить галочку прочтения на своём же сообщении. Функция сужает право
+-- до ровно двух колонок и проверяет авторство сама.
+create or replace function public.edit_message(p_id uuid, p_body text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := now();
+begin
+  update public.messages
+     set body = p_body, edited_at = v_now
+   where id = p_id and sender_id = auth.uid();
+
+  if not found then return null; end if;
+  return v_now;
+end;
+$$;
+
+grant execute on function public.edit_message(uuid, text) to authenticated;
+
+create or replace function public.edit_group_message(p_id uuid, p_body text)
+returns timestamptz
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_now timestamptz := now();
+begin
+  update public.group_messages
+     set body = p_body, edited_at = v_now
+   where id = p_id and sender_id = auth.uid();
+
+  if not found then return null; end if;
+  return v_now;
+end;
+$$;
+
+grant execute on function public.edit_group_message(uuid, text) to authenticated;
+
+-- Непрочитанное в группах. В личной переписке за это отвечает
+-- `messages.read`, но у группового сообщения нет одного получателя, который
+-- мог бы его прочитать: читают его по-разному десять человек. Поэтому здесь
+-- не флаг на сообщении, а засечка на участнике — до какого момента он
+-- дочитал. Непрочитанное считается как «сообщений в группе новее засечки».
+create table if not exists public.group_reads (
+  group_id uuid not null references public.chat_groups(id) on delete cascade,
+  user_id uuid not null references auth.users(id) on delete cascade,
+  last_read_at timestamptz not null default now(),
+  primary key (group_id, user_id)
+);
+
+alter table public.group_reads enable row level security;
+
+-- Засечка — вещь личная: её видит и двигает только сам участник.
+drop policy if exists "See your own read marks" on public.group_reads;
+create policy "See your own read marks"
+  on public.group_reads for select
+  using (auth.uid() = user_id);
+
+drop policy if exists "Set your own read mark" on public.group_reads;
+create policy "Set your own read mark"
+  on public.group_reads for insert
+  with check (auth.uid() = user_id and public.is_group_member(group_id, auth.uid()));
+
+drop policy if exists "Move your own read mark" on public.group_reads;
+create policy "Move your own read mark"
+  on public.group_reads for update
+  using (auth.uid() = user_id)
+  with check (auth.uid() = user_id);
+
+-- Список чатов берёт по одному последнему сообщению на собеседника и на
+-- группу, то есть читает хвост обеих таблиц по времени. Индексы на
+-- (кто, когда) уже есть у `messages`; группам такой нужен свой.
+create index if not exists group_messages_group_time_idx
+  on public.group_messages (group_id, created_at desc);
+
+-- «Был(а) в сети». Одна отметка на профиль, которую приложение двигает, пока
+-- оно открыто. Клиенту этого достаточно и для «онлайн» (отметка свежее
+-- минуты), и для «был(а) в сети в 14:30».
+alter table public.profiles add column if not exists last_seen_at timestamptz;
+
+-- Отметку надо видеть не только у себя: статус собеседника показывается в
+-- шапке переписки и в списке чатов. Политики `profiles` открывают только
+-- свою строку, поэтому колонка добавляется в `leaderboard` — то же
+-- «безопасное представление над закрытой таблицей», через которое уже
+-- ходят имя и аватар. Представление пересоздаётся целиком: CREATE OR
+-- REPLACE VIEW умеет только дописывать колонки в конец, а `last_seen_at`
+-- встаёт рядом с остальными полями профиля.
+drop view if exists public.leaderboard cascade;
+create view public.leaderboard as
+select
+  id,
+  username,
+  avatar,
+  streak,
+  achievements,
+  stats,
+  last_seen_at,
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats)), 0) as total_games
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;

@@ -3,6 +3,8 @@ import {
   Keyboard,
   KeyboardAvoidingView,
   Modal,
+  NativeScrollEvent,
+  NativeSyntheticEvent,
   Platform,
   Pressable,
   ScrollView,
@@ -12,6 +14,7 @@ import {
   View,
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
+import * as Clipboard from 'expo-clipboard';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
@@ -19,18 +22,38 @@ import { useTheme } from '../theme/ThemeContext';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useT } from '../i18n/strings';
+import { useLanguage } from '../i18n/LanguageContext';
 import MessageBubble, { BubbleMessage, ReactionGroup } from './MessageBubble';
 import EmojiPicker from './EmojiPicker';
+import ForwardSheet from './ForwardSheet';
+import { ChatSummary, sendToChat } from './chatsApi';
+import { buildChatItems, firstUnreadIdOf, formatDayLabel } from './messageGroups';
 
 /** Offered in the long-press menu and by double-tap (the first one). */
 const QUICK_REACTIONS = ['❤️', '👍', '😂', '😮', '😢', '🔥'];
 
+/** How far from the bottom the history has to be scrolled before the
+ * jump-to-latest button appears. */
+const AT_BOTTOM_SLACK = 140;
+
 type Props<T extends BubbleMessage> = {
   /** Rendered under the back button — an avatar and a name, or a group title. */
   header: ReactNode;
+  /** The line under the name: presence, or who is typing. Hidden when empty. */
+  subtitle?: string | null;
   onBack: () => void;
+  /**
+   * Identifies the conversation on screen. Changing it resets the unread
+   * line and the scroll position, and it names the channel the typing
+   * indicator rides on — a friend's id for a direct chat, the group's id
+   * for a group.
+   */
+  conversationKey: string;
   messages: T[];
   meId: string;
+  /** The current user's own display name, used when forwarding something
+   * they wrote — the quote line needs a name, not "You". */
+  myName: string;
   /** Display name for a sender, used for quote lines and (in groups) above
    * other people's bubbles. */
   labelFor: (senderId: string) => string;
@@ -41,9 +64,14 @@ type Props<T extends BubbleMessage> = {
   reactionsFor: (messageId: string) => ReactionGroup[];
   myReactionFor: (messageId: string) => string | null;
   onSend: (text: string, replyToId: string | null) => void | Promise<void>;
+  /** Rewrites a message in place. */
+  onEdit: (message: T, text: string) => void | Promise<void>;
+  canEdit: (message: T) => boolean;
   onToggleReaction: (messageId: string, emoji: string) => void | Promise<void>;
   onDelete: (message: T) => void | Promise<void>;
   canDelete: (message: T) => boolean;
+  /** Called as the composer is typed into, so the other side can be told. */
+  onTyping?: () => void;
 };
 
 /**
@@ -54,30 +82,42 @@ type Props<T extends BubbleMessage> = {
  */
 export default function ChatRoom<T extends BubbleMessage>({
   header,
+  subtitle,
   onBack,
+  conversationKey,
   messages,
   meId,
+  myName,
   labelFor,
   showAuthors = false,
   emptyText,
   reactionsFor,
   myReactionFor,
   onSend,
+  onEdit,
+  canEdit,
   onToggleReaction,
   onDelete,
   canDelete,
+  onTyping,
 }: Props<T>) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
+  const { language } = useLanguage();
   const [draft, setDraft] = useState('');
   const [showEmoji, setShowEmoji] = useState(false);
   const [replyTo, setReplyTo] = useState<T | null>(null);
+  const [editing, setEditing] = useState<T | null>(null);
   const [menuFor, setMenuFor] = useState<T | null>(null);
+  const [forwarding, setForwarding] = useState<T | null>(null);
+  const [toast, setToast] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
   const [query, setQuery] = useState('');
   const [matchIndex, setMatchIndex] = useState(0);
+  const [atBottom, setAtBottom] = useState(true);
+  const [unreadAnchor, setUnreadAnchor] = useState<string | null>(null);
   const scrollRef = useRef<ScrollView>(null);
   const inputRef = useRef<TextInput>(null);
   const searchRef = useRef<TextInput>(null);
@@ -85,12 +125,40 @@ export default function ChatRoom<T extends BubbleMessage>({
   // scrolled to. Filled as rows lay out; a message that has never been on
   // screen simply isn't in here yet, and the scroll is skipped.
   const positionsRef = useRef(new Map<string, number>());
+  // Which conversation the unread line was already placed for. The line is
+  // decided once, from the history as it was when the chat opened — messages
+  // that arrive while it is open belong below the fold, not behind a second
+  // divider.
+  const anchoredRef = useRef('');
 
   useEffect(() => {
     // Jumping to the bottom while reading a search hit would undo the jump
-    // that just put it on screen.
-    if (!searching) scrollRef.current?.scrollToEnd({ animated: true });
+    // that just put it on screen, and jumping while the person has scrolled
+    // up to read history would yank the page out from under them.
+    if (!searching && atBottom) scrollRef.current?.scrollToEnd({ animated: true });
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [messages.length, searching]);
+
+  useEffect(() => {
+    setUnreadAnchor(null);
+    setReplyTo(null);
+    setEditing(null);
+    setAtBottom(true);
+    positionsRef.current.clear();
+  }, [conversationKey]);
+
+  useEffect(() => {
+    if (anchoredRef.current === conversationKey) return;
+    if (messages.length === 0) return;
+    anchoredRef.current = conversationKey;
+    setUnreadAnchor(firstUnreadIdOf(messages, meId));
+  }, [conversationKey, messages, meId]);
+
+  useEffect(() => {
+    if (!toast) return;
+    const timer = setTimeout(() => setToast(null), 1800);
+    return () => clearTimeout(timer);
+  }, [toast]);
 
   const needle = query.trim().toLowerCase();
   const matches = useMemo(
@@ -101,6 +169,12 @@ export default function ChatRoom<T extends BubbleMessage>({
   // Newest first: a search in a chat is usually looking for something recent.
   const orderedMatches = useMemo(() => [...matches].reverse(), [matches]);
   const currentMatchId = orderedMatches[matchIndex] ?? null;
+
+  const items = useMemo(() => buildChatItems(messages, unreadAnchor), [messages, unreadAnchor]);
+  const unreadCount = useMemo(
+    () => messages.filter((m) => m.senderId !== meId && m.read === false).length,
+    [messages, meId]
+  );
 
   useEffect(() => {
     setMatchIndex(0);
@@ -124,25 +198,82 @@ export default function ChatRoom<T extends BubbleMessage>({
     setMatchIndex((i) => (i + delta + orderedMatches.length) % orderedMatches.length);
   };
 
+  const handleScroll = (e: NativeSyntheticEvent<NativeScrollEvent>) => {
+    const { contentOffset, contentSize, layoutMeasurement } = e.nativeEvent;
+    const fromBottom = contentSize.height - contentOffset.y - layoutMeasurement.height;
+    setAtBottom(fromBottom < AT_BOTTOM_SLACK);
+  };
+
+  const jumpToBottom = () => {
+    setAtBottom(true);
+    scrollRef.current?.scrollToEnd({ animated: true });
+  };
+
   const handleSend = () => {
     const text = draft.trim();
     if (!text) return;
+
+    if (editing) {
+      const target = editing;
+      setDraft('');
+      setEditing(null);
+      onEdit(target, text);
+      return;
+    }
+
     const replyId = replyTo?.id ?? null;
     setDraft('');
     setReplyTo(null);
     onSend(text, replyId);
   };
 
+  const handleDraftChange = (text: string) => {
+    setDraft(text);
+    if (text.length > 0) onTyping?.();
+  };
+
   const handleReply = (message: T) => {
+    setEditing(null);
     setReplyTo(message);
     setShowEmoji(false);
     inputRef.current?.focus();
+  };
+
+  const startEditing = (message: T) => {
+    setReplyTo(null);
+    setEditing(message);
+    setDraft(message.body);
+    setShowEmoji(false);
+    inputRef.current?.focus();
+  };
+
+  const cancelEditing = () => {
+    setEditing(null);
+    setDraft('');
+  };
+
+  const copyMessage = async (message: T) => {
+    await Clipboard.setStringAsync(message.body);
+    setToast(t('chat.copied'));
+  };
+
+  /** A forward keeps the original author's name, so passing one along a chain
+   * still credits whoever actually wrote it rather than the last relay. */
+  const forwardTo = async (chat: ChatSummary) => {
+    const message = forwarding;
+    setForwarding(null);
+    if (!message) return;
+    const origin = message.forwardedFrom ?? (message.senderId === meId ? myName : labelFor(message.senderId));
+    const ok = await sendToChat(chat, meId, message.body, origin);
+    setToast(ok ? t('chat.forwarded', chat.title) : t('chat.forwardFailed'));
   };
 
   /** Flashes the quoted message's border so a tapped quote is findable
    * without scrolling the list programmatically. */
   const jumpToMessage = (messageId: string) => {
     setHighlightedId(messageId);
+    const y = positionsRef.current.get(messageId);
+    if (y !== undefined) scrollRef.current?.scrollTo({ y: Math.max(y - 80, 0), animated: true });
     setTimeout(() => setHighlightedId((id) => (id === messageId ? null : id)), 1200);
   };
 
@@ -191,7 +322,14 @@ export default function ChatRoom<T extends BubbleMessage>({
             </View>
           ) : (
             <View style={styles.headerRow}>
-              <View style={styles.headerContent}>{header}</View>
+              <View style={styles.headerContent}>
+                {header}
+                {!!subtitle && (
+                  <Text style={styles.subtitle} numberOfLines={1}>
+                    {subtitle}
+                  </Text>
+                )}
+              </View>
               <SoundTouchable
                 onPress={() => setSearching(true)}
                 accessibilityRole="button"
@@ -204,35 +342,107 @@ export default function ChatRoom<T extends BubbleMessage>({
           )}
         </View>
 
-        <ScrollView ref={scrollRef} style={styles.flex} contentContainerStyle={styles.list}>
-          {messages.length === 0 ? (
-            <Text style={styles.emptyText}>{emptyText}</Text>
-          ) : (
-            messages.map((m) => {
-              const repliedTo = m.replyToId ? messages.find((x) => x.id === m.replyToId) ?? null : null;
-              return (
-                <View key={m.id} onLayout={(e) => positionsRef.current.set(m.id, e.nativeEvent.layout.y)}>
-                <MessageBubble
-                  message={m}
-                  isMine={m.senderId === meId}
-                  repliedTo={repliedTo}
-                  repliedToLabel={repliedTo ? nameFor(repliedTo.senderId) : ''}
-                  authorLabel={showAuthors ? labelFor(m.senderId) : undefined}
-                  reactions={reactionsFor(m.id)}
-                  highlighted={highlightedId === m.id}
-                  onReply={handleReply}
-                  onQuickReact={(msg) => onToggleReaction(msg.id, QUICK_REACTIONS[0])}
-                  onToggleReaction={(msg, emoji) => onToggleReaction(msg.id, emoji)}
-                  onLongPress={setMenuFor}
-                  onJumpToReplied={jumpToMessage}
-                />
-                </View>
-              );
-            })
-          )}
-        </ScrollView>
+        <View style={styles.flex}>
+          <ScrollView
+            ref={scrollRef}
+            style={styles.flex}
+            contentContainerStyle={styles.list}
+            onScroll={handleScroll}
+            scrollEventThrottle={64}
+          >
+            {items.length === 0 ? (
+              <Text style={styles.emptyText}>{emptyText}</Text>
+            ) : (
+              items.map((item) => {
+                if (item.kind === 'date') {
+                  return (
+                    <View key={item.key} style={styles.dayRow}>
+                      <View style={styles.dayPill}>
+                        <Text style={styles.dayText}>{formatDayLabel(item.at, language)}</Text>
+                      </View>
+                    </View>
+                  );
+                }
 
-        {replyTo && (
+                if (item.kind === 'unread') {
+                  return (
+                    <View key={item.key} style={styles.unreadRow}>
+                      <View style={styles.unreadLine} />
+                      <Text style={styles.unreadText}>{t('chat.unreadDivider')}</Text>
+                      <View style={styles.unreadLine} />
+                    </View>
+                  );
+                }
+
+                const m = item.message;
+                const repliedTo = m.replyToId ? messages.find((x) => x.id === m.replyToId) ?? null : null;
+                return (
+                  <View
+                    key={item.key}
+                    style={item.isFirstInGroup ? styles.blockStart : styles.blockContinues}
+                    onLayout={(e) => positionsRef.current.set(m.id, e.nativeEvent.layout.y)}
+                  >
+                    <MessageBubble
+                      message={m}
+                      isMine={m.senderId === meId}
+                      repliedTo={repliedTo}
+                      repliedToLabel={repliedTo ? nameFor(repliedTo.senderId) : ''}
+                      authorLabel={showAuthors ? labelFor(m.senderId) : undefined}
+                      reactions={reactionsFor(m.id)}
+                      isFirstInGroup={item.isFirstInGroup}
+                      isLastInGroup={item.isLastInGroup}
+                      editedLabel={t('chat.edited')}
+                      forwardedLabel={(name: string) => t('chat.forwardedFrom', name)}
+                      highlighted={highlightedId === m.id}
+                      onReply={handleReply}
+                      onQuickReact={(msg) => onToggleReaction(msg.id, QUICK_REACTIONS[0])}
+                      onToggleReaction={(msg, emoji) => onToggleReaction(msg.id, emoji)}
+                      onLongPress={setMenuFor}
+                      onJumpToReplied={jumpToMessage}
+                    />
+                  </View>
+                );
+              })
+            )}
+          </ScrollView>
+
+          {!atBottom && (
+            <SoundTouchable
+              style={styles.jumpButton}
+              onPress={jumpToBottom}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.jumpToLatest')}
+            >
+              <Icon name="chevronRight" size={18} color={theme.text} />
+              {unreadCount > 0 && (
+                <View style={[styles.jumpBadge, { backgroundColor: theme.primary }]}>
+                  <Text style={styles.jumpBadgeText}>{unreadCount > 99 ? '99+' : unreadCount}</Text>
+                </View>
+              )}
+            </SoundTouchable>
+          )}
+
+          {!!toast && (
+            <View style={styles.toast}>
+              <Text style={styles.toastText}>{toast}</Text>
+            </View>
+          )}
+        </View>
+
+        {editing && (
+          <View style={styles.replyBar}>
+            <View style={styles.replyBarAccent} />
+            <View style={styles.replyBarText}>
+              <Text style={styles.replyBarTitle}>{t('chat.editingTitle')}</Text>
+              <Text style={styles.replyBarBody} numberOfLines={1}>{editing.body}</Text>
+            </View>
+            <SoundTouchable onPress={cancelEditing} accessibilityRole="button" accessibilityLabel={t('chat.cancelEdit')}>
+              <Icon name="close" size={16} color={theme.textMuted} />
+            </SoundTouchable>
+          </View>
+        )}
+
+        {replyTo && !editing && (
           <View style={styles.replyBar}>
             <View style={styles.replyBarAccent} />
             <View style={styles.replyBarText}>
@@ -265,18 +475,26 @@ export default function ChatRoom<T extends BubbleMessage>({
             placeholder={t('chat.placeholder')}
             placeholderTextColor={theme.textMuted}
             value={draft}
-            onChangeText={setDraft}
+            onChangeText={handleDraftChange}
             onFocus={() => setShowEmoji(false)}
             onSubmitEditing={handleSend}
             multiline
           />
           <SoundTouchable style={styles.sendButton} onPress={handleSend} accessibilityRole="button">
-            <Icon name="send" size={17} color={theme.onPrimary} />
+            <Icon name={editing ? 'check' : 'send'} size={17} color={theme.onPrimary} />
           </SoundTouchable>
         </View>
 
         {showEmoji && <EmojiPicker onPick={(emoji) => setDraft((prev) => prev + emoji)} />}
       </KeyboardAvoidingView>
+
+      <ForwardSheet
+        visible={!!forwarding}
+        meId={meId}
+        excludeId={conversationKey}
+        onClose={() => setForwarding(null)}
+        onPick={forwardTo}
+      />
 
       <Modal visible={!!menuFor} transparent animationType="fade" onRequestClose={() => setMenuFor(null)}>
         <Pressable style={styles.menuBackdrop} onPress={() => setMenuFor(null)}>
@@ -314,6 +532,44 @@ export default function ChatRoom<T extends BubbleMessage>({
                   <Text style={styles.menuActionText}>{t('chat.reply')}</Text>
                 </SoundTouchable>
 
+                <SoundTouchable
+                  style={styles.menuAction}
+                  onPress={() => {
+                    const target = menuFor;
+                    setMenuFor(null);
+                    void copyMessage(target);
+                  }}
+                >
+                  <Icon name="quote" size={18} color={theme.text} />
+                  <Text style={styles.menuActionText}>{t('chat.copy')}</Text>
+                </SoundTouchable>
+
+                <SoundTouchable
+                  style={styles.menuAction}
+                  onPress={() => {
+                    const target = menuFor;
+                    setMenuFor(null);
+                    setForwarding(target);
+                  }}
+                >
+                  <Icon name="send" size={18} color={theme.text} />
+                  <Text style={styles.menuActionText}>{t('chat.forward')}</Text>
+                </SoundTouchable>
+
+                {canEdit(menuFor) && (
+                  <SoundTouchable
+                    style={styles.menuAction}
+                    onPress={() => {
+                      const target = menuFor;
+                      setMenuFor(null);
+                      startEditing(target);
+                    }}
+                  >
+                    <Icon name="edit" size={18} color={theme.text} />
+                    <Text style={styles.menuActionText}>{t('chat.edit')}</Text>
+                  </SoundTouchable>
+                )}
+
                 {canDelete(menuFor) && (
                   <SoundTouchable
                     style={styles.menuAction}
@@ -343,6 +599,7 @@ function makeStyles(theme: Theme) {
     backButton: { marginBottom: 10 },
     headerRow: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     headerContent: { flex: 1 },
+    subtitle: { fontSize: 11, fontFamily: fontFamily('600'), color: theme.primary, marginTop: 2 },
     searchButton: { width: 36, height: 36, borderRadius: 18, alignItems: 'center', justifyContent: 'center' },
     searchRow: {
       flexDirection: 'row',
@@ -358,8 +615,72 @@ function makeStyles(theme: Theme) {
     searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
     searchCount: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted },
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
-    list: { paddingHorizontal: 16, paddingVertical: 16, gap: 10, flexGrow: 1 },
+    // No `gap` here: spacing is per row, so a run of messages from one person
+    // can sit tighter than the space between two separate ones.
+    list: { paddingHorizontal: 16, paddingVertical: 16, flexGrow: 1 },
+    blockStart: { marginTop: 10 },
+    blockContinues: { marginTop: 2 },
     emptyText: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, textAlign: 'center', marginTop: 40 },
+    dayRow: { alignItems: 'center', marginVertical: 12 },
+    dayPill: {
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.pill,
+      paddingHorizontal: 12,
+      paddingVertical: 4,
+    },
+    dayText: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted },
+    unreadRow: { flexDirection: 'row', alignItems: 'center', gap: 10, marginTop: 14, marginBottom: 4 },
+    unreadLine: { flex: 1, height: 1.5, backgroundColor: theme.primary, opacity: 0.35 },
+    unreadText: { fontSize: 10, fontFamily: fontFamily('800'), color: theme.primary, textTransform: 'uppercase' },
+    jumpButton: {
+      position: 'absolute',
+      right: 16,
+      bottom: 16,
+      width: 42,
+      height: 42,
+      borderRadius: 21,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      alignItems: 'center',
+      justifyContent: 'center',
+      // The icon is a right chevron turned to point down — the icon set has
+      // no downward one, and adding a variant for one button is not worth it.
+      transform: [{ rotate: '90deg' }],
+    },
+    jumpBadge: {
+      position: 'absolute',
+      top: -6,
+      right: -4,
+      minWidth: 18,
+      height: 18,
+      borderRadius: 9,
+      paddingHorizontal: 4,
+      alignItems: 'center',
+      justifyContent: 'center',
+      // Cancels the parent's rotation so the number reads upright.
+      transform: [{ rotate: '-90deg' }],
+    },
+    jumpBadgeText: { fontSize: 10, fontFamily: fontFamily('800'), color: '#FFFFFF' },
+    toast: {
+      position: 'absolute',
+      left: 24,
+      right: 24,
+      bottom: 16,
+      alignItems: 'center',
+    },
+    toastText: {
+      fontSize: 12,
+      fontFamily: fontFamily('700'),
+      color: '#FFFFFF',
+      backgroundColor: 'rgba(0,0,0,0.78)',
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 8,
+      overflow: 'hidden',
+    },
     replyBar: {
       flexDirection: 'row',
       alignItems: 'center',
@@ -434,7 +755,7 @@ function makeStyles(theme: Theme) {
       borderBottomWidth: 1,
       borderBottomColor: theme.border,
     },
-    menuAction: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 13 },
+    menuAction: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 12 },
     menuActionText: { fontSize: 15, fontFamily: fontFamily('700'), color: theme.text },
   });
 }
