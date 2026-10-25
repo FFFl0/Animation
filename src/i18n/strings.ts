@@ -567,6 +567,8 @@ const ru: StringDict = {
     attachOpenFailed: 'Не удалось открыть файл',
     attachClose: 'Закрыть',
     attachSave: 'Скачать',
+    send: 'Отправить',
+    saveEdit: 'Сохранить изменение',
   },
   chats: {
     title: 'Чаты',
@@ -1201,6 +1203,8 @@ const en: StringDict = {
     attachOpenFailed: 'Could not open the file',
     attachClose: 'Close',
     attachSave: 'Download',
+    send: 'Send',
+    saveEdit: 'Save edit',
   },
   chats: {
     title: 'Chats',

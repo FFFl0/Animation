@@ -614,6 +614,7 @@ export default function ChatRoom<T extends BubbleMessage>({
             onPress={handleSend}
             disabled={uploading}
             accessibilityRole="button"
+            accessibilityLabel={editing ? t('chat.saveEdit') : t('chat.send')}
           >
             {uploading ? (
               <ActivityIndicator size="small" color={theme.onPrimary} />
