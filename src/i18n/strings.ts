@@ -231,6 +231,7 @@ const ru: StringDict = {
     youSuffix: ' (ты)',
     online: 'В сети',
     offline: 'Не в сети',
+    acceptRequest: 'Принять запрос в друзья',
   },
   wallet: {
     title: 'Медальные очки',
@@ -900,6 +901,7 @@ const en: StringDict = {
     youSuffix: ' (you)',
     online: 'Online',
     offline: 'Offline',
+    acceptRequest: 'Accept Friend Request',
   },
   wallet: {
     title: 'Medal points',

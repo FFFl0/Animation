@@ -31,6 +31,41 @@ export type Friendship = {
   player: PlayerSummary;
 };
 
+/** Where another player stands relative to this account. A pending request
+ * means something different depending on who sent it — one is waiting on
+ * them, the other is waiting on you — so the two are kept apart. */
+export type FriendState = 'none' | 'pending-out' | 'pending-in' | 'accepted';
+
+export type FriendRelation = {
+  state: FriendState;
+  /** The row to act on when accepting or declining; absent until the
+   * friendship has been read back from the server. */
+  friendshipId: string | null;
+};
+
+export const NO_RELATION: FriendRelation = { state: 'none', friendshipId: null };
+
+export function friendState(friendship: Friendship | null | undefined): FriendState {
+  if (!friendship) return 'none';
+  if (friendship.status === 'accepted') return 'accepted';
+  return friendship.isOutgoing ? 'pending-out' : 'pending-in';
+}
+
+/**
+ * Friendships keyed by the other player, which is how every screen showing a
+ * list of people needs them: a row knows a player id, not a friendship id.
+ */
+export function relationsByPlayer(friendships: Friendship[]): Map<string, FriendRelation> {
+  const relations = new Map<string, FriendRelation>();
+  for (const friendship of friendships) {
+    relations.set(friendship.player.id, {
+      state: friendState(friendship),
+      friendshipId: friendship.friendshipId,
+    });
+  }
+  return relations;
+}
+
 type LeaderboardRow = {
   id: string;
   username: string;

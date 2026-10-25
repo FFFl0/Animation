@@ -8,7 +8,15 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { fetchLeaderboard, isSupabaseConfigured, LeaderboardPeriod, LeaderboardRow } from '../leaderboard/leaderboardApi';
-import { PlayerSummary, sendFriendRequest } from '../friends/friendsApi';
+import {
+  FriendRelation,
+  NO_RELATION,
+  PlayerSummary,
+  getFriendships,
+  relationsByPlayer,
+  respondToRequest,
+  sendFriendRequest,
+} from '../friends/friendsApi';
 import { usePresence } from '../presence/PresenceContext';
 import AnimeAvatar from '../components/AnimeAvatar';
 import PillButton from '../components/PillButton';
@@ -50,7 +58,11 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
   const [period, setPeriod] = useState<LeaderboardPeriod>('all');
   const [rows, setRows] = useState<LeaderboardRow[] | null>(null);
   const [selectedRow, setSelectedRow] = useState<LeaderboardRow | null>(null);
-  const [requestedIds, setRequestedIds] = useState<Set<string>>(new Set());
+  // Null until the friendships have been read. The leaderboard is full of
+  // people you already know, and offering to befriend them again is the kind
+  // of thing that makes an app look like it is not paying attention — so the
+  // button waits rather than guessing.
+  const [relations, setRelations] = useState<Map<string, FriendRelation> | null>(null);
 
   useEffect(() => {
     if (!isSupabaseConfigured) {
@@ -61,10 +73,36 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
     fetchLeaderboard(period).then(setRows);
   }, [period]);
 
+  useEffect(() => {
+    if (!isSupabaseConfigured || !profile) {
+      setRelations(new Map());
+      return;
+    }
+    let cancelled = false;
+    getFriendships(profile.id).then((friendships) => {
+      if (!cancelled) setRelations(relationsByPlayer(friendships));
+    });
+    return () => {
+      cancelled = true;
+    };
+  }, [profile?.id]);
+
+  const relationWith = (playerId: string): FriendRelation => relations?.get(playerId) ?? NO_RELATION;
+
+  const rememberRelation = (playerId: string, relation: FriendRelation) => {
+    setRelations((prev) => new Map(prev ?? []).set(playerId, relation));
+  };
+
   const handleAddFriend = async (targetId: string) => {
     if (!profile) return;
-    setRequestedIds((prev) => new Set(prev).add(targetId));
+    rememberRelation(targetId, { state: 'pending-out', friendshipId: null });
     await sendFriendRequest(profile.id, targetId);
+  };
+
+  /** They asked first, so the useful button is the one that says yes. */
+  const handleAcceptRequest = async (targetId: string, friendshipId: string) => {
+    rememberRelation(targetId, { state: 'accepted', friendshipId });
+    await respondToRequest(friendshipId, true);
   };
 
   const PERIODS: { key: LeaderboardPeriod; label: string }[] = [
@@ -162,6 +200,9 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
                 <Text style={styles.modalStatusText}>
                   {isOnline(selectedRow.id) ? t('leaderboard.online') : t('leaderboard.offline')}
                 </Text>
+                {relationWith(selectedRow.id).state === 'accepted' && (
+                  <Text style={styles.modalRelation}>{t('friends.alreadyFriends')}</Text>
+                )}
 
                 <PillButton
                   title={t('friendProfile.write')}
@@ -174,14 +215,14 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
                   }}
                   style={{ marginTop: 18 }}
                 />
-                <PillButton
-                  title={requestedIds.has(selectedRow.id) ? t('friendProfile.requestSentButton') : t('friendProfile.addFriend')}
-                  variant="ink"
-                  disabled={requestedIds.has(selectedRow.id)}
-                  fullWidth
-                  onPress={() => handleAddFriend(selectedRow.id)}
-                  style={{ marginTop: 10 }}
-                />
+                {relations !== null && (
+                  <FriendAction
+                    relation={relationWith(selectedRow.id)}
+                    onAdd={() => handleAddFriend(selectedRow.id)}
+                    onAccept={(friendshipId) => handleAcceptRequest(selectedRow.id, friendshipId)}
+                    t={t}
+                  />
+                )}
                 <PillButton
                   title={t('friendProfile.challenge')}
                   variant="primary"
@@ -201,6 +242,67 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
       </Modal>
     </SafeAreaView>
   );
+}
+
+/**
+ * The one button that depends on who the other player already is: a stranger
+ * can be added, a request of theirs can be accepted, one of yours can only be
+ * waited on, and a friend needs no button at all — just the reassurance that
+ * they are already a friend.
+ */
+function FriendAction({
+  relation,
+  onAdd,
+  onAccept,
+  t,
+}: {
+  relation: FriendRelation;
+  onAdd: () => void;
+  onAccept: (friendshipId: string) => void;
+  t: ReturnType<typeof useT>;
+}) {
+  switch (relation.state) {
+    case 'accepted':
+      // Nothing to offer: being friends already is said next to their name,
+      // where it reads as a fact about them rather than a button.
+      return null;
+    case 'pending-out':
+      return (
+        <PillButton
+          title={t('friendProfile.requestSentButton')}
+          variant="outline"
+          disabled
+          fullWidth
+          onPress={() => {}}
+          style={{ marginTop: 10 }}
+        />
+      );
+    case 'pending-in': {
+      // Always present for a relation that came back from the server, which
+      // is the only way this branch is reached.
+      const { friendshipId } = relation;
+      if (!friendshipId) return null;
+      return (
+        <PillButton
+          title={t('leaderboard.acceptRequest')}
+          variant="ink"
+          fullWidth
+          onPress={() => onAccept(friendshipId)}
+          style={{ marginTop: 10 }}
+        />
+      );
+    }
+    case 'none':
+      return (
+        <PillButton
+          title={t('friendProfile.addFriend')}
+          variant="ink"
+          fullWidth
+          onPress={onAdd}
+          style={{ marginTop: 10 }}
+        />
+      );
+  }
 }
 
 function makeStyles(theme: Theme) {
@@ -284,5 +386,12 @@ function makeStyles(theme: Theme) {
     },
     modalName: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.text },
     modalStatusText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
+    modalRelation: {
+      fontSize: 12,
+      fontFamily: fontFamily('700'),
+      color: theme.success,
+      marginTop: 6,
+      textAlign: 'center',
+    },
   });
 }

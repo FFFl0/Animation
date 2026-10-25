@@ -6,7 +6,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { Friendship, PlayerSummary, removeFriend, respondToRequest, sendFriendRequest } from '../friends/friendsApi';
+import { Friendship, PlayerSummary, friendState, removeFriend, respondToRequest, sendFriendRequest } from '../friends/friendsApi';
 import { levelFromTotalCorrect } from '../data/level';
 import { topCategories } from '../data/favoriteCategories';
 import { ACHIEVEMENTS } from '../data/achievements';
@@ -29,19 +29,13 @@ type Props = {
   onChallenge: () => void;
 };
 
-function initialStatus(friendship: Friendship | null): 'none' | 'pending-out' | 'pending-in' | 'accepted' {
-  if (!friendship) return 'none';
-  if (friendship.status === 'accepted') return 'accepted';
-  return friendship.isOutgoing ? 'pending-out' : 'pending-in';
-}
-
 export default function FriendProfileScreen({ player, friendship, onBack, onCompare, onOpenChat, onChallenge }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
   const t = useT();
-  const [status, setStatus] = useState(initialStatus(friendship));
+  const [status, setStatus] = useState(friendState(friendship));
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState(friendship?.friendshipId ?? null);
 
