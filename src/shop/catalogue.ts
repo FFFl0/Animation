@@ -326,6 +326,20 @@ export function itemsOf(section: ShopSection): ShopItem[] {
 
 export const POPULAR_ITEMS = SHOP_ITEMS.filter((item) => item.popular);
 
+/**
+ * The same items, with the popular ones first.
+ *
+ * A shelf used to show only its popular items, with the rest behind a "show
+ * everything" link — which meant four of the six frames were invisible until
+ * you found the link. Popularity now decides the order instead of what is on
+ * the shelf at all, so nothing is hidden and the pick of the shelf is still
+ * what you see first. The order within each half is left alone, so the
+ * catalogue's own sequence still shows through.
+ */
+export function byPopularity(items: ShopItem[]): ShopItem[] {
+  return [...items.filter((item) => item.popular), ...items.filter((item) => !item.popular)];
+}
+
 export function needsDelivery(item: ShopItem): boolean {
   return item.grant.kind === 'physical';
 }

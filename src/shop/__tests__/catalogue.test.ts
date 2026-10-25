@@ -1,6 +1,15 @@
 import { ANIMATED_AVATARS } from '../animatedAvatars';
 import { ANIMATED_FRAMES } from '../animatedFrames';
-import { POPULAR_ITEMS, SHOP_ITEMS, SHOP_SECTIONS, isStackable, itemsOf, needsDelivery, shopItem } from '../catalogue';
+import {
+  POPULAR_ITEMS,
+  SHOP_ITEMS,
+  SHOP_SECTIONS,
+  byPopularity,
+  isStackable,
+  itemsOf,
+  needsDelivery,
+  shopItem,
+} from '../catalogue';
 import { SHOP_IMAGES } from '../shopImages';
 
 describe('catalogue', () => {
@@ -72,5 +81,42 @@ describe('catalogue', () => {
   it('finds an item by id and nothing by a made-up one', () => {
     expect(shopItem('merch-tee')?.section).toBe('merch');
     expect(shopItem('nope')).toBeUndefined();
+  });
+
+  /**
+   * A shelf used to show only its popular items, which hid four of the six
+   * frames behind a link. Popularity orders a shelf now; it never shortens
+   * one.
+   */
+  describe('byPopularity', () => {
+    it('keeps every item on the shelf', () => {
+      for (const section of SHOP_SECTIONS) {
+        const items = itemsOf(section);
+        const ordered = byPopularity(items);
+        expect(ordered).toHaveLength(items.length);
+        expect(new Set(ordered.map((i) => i.id))).toEqual(new Set(items.map((i) => i.id)));
+      }
+    });
+
+    it('puts the popular ones first', () => {
+      for (const section of SHOP_SECTIONS) {
+        const flags = byPopularity(itemsOf(section)).map((item) => Boolean(item.popular));
+        const firstPlain = flags.indexOf(false);
+        if (firstPlain === -1) continue;
+        expect(flags.slice(firstPlain).some(Boolean)).toBe(false);
+      }
+    });
+
+    it('leaves the order within each half alone', () => {
+      const items = itemsOf('merch');
+      const ordered = byPopularity(items);
+      const plain = items.filter((i) => !i.popular).map((i) => i.id);
+      expect(ordered.filter((i) => !i.popular).map((i) => i.id)).toEqual(plain);
+    });
+
+    it('reaches every item in the shop through its own section', () => {
+      const reachable = SHOP_SECTIONS.flatMap((section) => byPopularity(itemsOf(section)).map((i) => i.id));
+      expect(new Set(reachable)).toEqual(new Set(SHOP_ITEMS.map((i) => i.id)));
+    });
   });
 });

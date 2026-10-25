@@ -45,8 +45,10 @@
     "@types/jest": "^30.0.0",
     "@types/node": "^22.20.2",
     "@types/react": "~19.2.18",
+    "@types/react-test-renderer": "^19.3.0",
     "babel-preset-expo": "^57.0.10",
     "jest-expo": "~57.0.5",
+    "react-test-renderer": "^19.2.3",
     "typescript": "~6.0.3"
   },
   "private": true,

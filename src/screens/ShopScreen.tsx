@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -13,7 +13,16 @@ import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
 import AnimatedAvatar from '../components/AnimatedAvatar';
 import WalletSheet from '../components/WalletSheet';
-import { SHOP_SECTIONS, SHOP_TABS, ShopItem, ShopSection, ShopTab, itemsOf, needsDelivery } from '../shop/catalogue';
+import {
+  SHOP_SECTIONS,
+  SHOP_TABS,
+  ShopItem,
+  ShopSection,
+  ShopTab,
+  byPopularity,
+  itemsOf,
+  needsDelivery,
+} from '../shop/catalogue';
 import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { SHOP_IMAGES } from '../shop/shopImages';
 import { formatRub, pointsPrice } from '../shop/economy';
@@ -32,10 +41,11 @@ type Props = {
    * the time the shopper came back. */
   tab: ShopTab;
   onChangeTab: (tab: ShopTab) => void;
-  /** Whether the open shelf is showing everything or only its popular items.
-   * Held by the navigator for the same reason as the tab. */
-  showAll: boolean;
-  onChangeShowAll: (showAll: boolean) => void;
+  /** Where the page was scrolled to. Held by the navigator for the same
+   * reason as the tab: opening an item unmounts this screen, and a shopper
+   * sent back to the top after every look is being punished for browsing. */
+  scrollY: number;
+  onChangeScrollY: (y: number) => void;
 };
 
 const GAP = 10;
@@ -49,8 +59,8 @@ export default function ShopScreen({
   onOpenOrders,
   tab,
   onChangeTab,
-  showAll,
-  onChangeShowAll,
+  scrollY,
+  onChangeScrollY,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -60,6 +70,11 @@ export default function ShopScreen({
   const insets = useSafeAreaInsets();
   const { balance, spent, medals, cart, orders, ownsItem } = useShop();
   const [walletOpen, setWalletOpen] = useState(false);
+  const scrollRef = useRef<ScrollView>(null);
+  // Restoring has to wait for the content to have a height, or there is
+  // nothing to scroll within yet; once done it must not repeat, or every
+  // image that finishes loading would yank the page back.
+  const restoredRef = useRef(false);
 
   /**
    * What the grid shows, as one or more blocks.
@@ -71,16 +86,11 @@ export default function ShopScreen({
   const blocks = useMemo(
     () =>
       (tab === 'all' ? SHOP_SECTIONS : [tab])
-        .map((key) => ({ key, items: itemsOf(key) }))
+        .map((key) => ({ key, items: byPopularity(itemsOf(key)) }))
         .filter((block) => block.items.length > 0),
     [tab]
   );
 
-  // The popular/everything toggle belongs to a single shelf; "all" is already
-  // everything, so it does not apply there.
-  const single = tab === 'all' ? null : itemsOf(tab);
-  const popular = single?.filter((item) => item.popular) ?? [];
-  const hasPopular = single !== null && popular.length > 0 && popular.length < single.length;
   const inCart = cartCount(cart);
 
   const widthFor = (key: ShopSection) => {
@@ -90,7 +100,20 @@ export default function ShopScreen({
 
   return (
     <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.scroll}>
+      <ScrollView
+        ref={scrollRef}
+        contentContainerStyle={styles.scroll}
+        onScroll={(e) => onChangeScrollY(e.nativeEvent.contentOffset.y)}
+        scrollEventThrottle={64}
+        onContentSizeChange={(_w, height) => {
+          if (restoredRef.current || scrollY <= 0) return;
+          // Only once the page is tall enough to hold the old position —
+          // before that the scroll would be clamped to the top and lost.
+          if (height < scrollY) return;
+          restoredRef.current = true;
+          scrollRef.current?.scrollTo({ y: scrollY, animated: false });
+        }}
+      >
         <View style={styles.hero}>
           {/* explicit size, not absoluteFill: without one the image lays out at
               its own pixel size and the parent just crops the top-left of it */}
@@ -143,8 +166,12 @@ export default function ShopScreen({
               key={key}
               style={[styles.tab, tab === key && styles.tabActive]}
               onPress={() => {
+                // A new shelf starts at its top; the remembered position
+                // belongs to the shelf it was taken from.
                 onChangeTab(key);
-                onChangeShowAll(false);
+                onChangeScrollY(0);
+                restoredRef.current = true;
+                scrollRef.current?.scrollTo({ y: 0, animated: false });
               }}
             >
               <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{t(`shop.section.${key}`)}</Text>
@@ -165,35 +192,17 @@ export default function ShopScreen({
 
           {blocks.map((block) => {
             const { columns, cardWidth } = widthFor(block.key);
-            const shown =
-              tab === 'all' ? block.items : hasPopular && !showAll ? popular : block.items;
             return (
               <View key={block.key}>
                 <View style={styles.rowHead}>
-                  {tab === 'all' ? (
-                    <>
-                      <Icon name="sparkles" size={17} color={theme.primary} />
-                      <Text style={styles.rowHeadTitle}>{t(`shop.section.${block.key}`)}</Text>
-                    </>
-                  ) : (
-                    <>
-                      <Icon name={hasPopular && !showAll ? 'flame' : 'shuffle'} size={17} color={theme.primary} />
-                      <Text style={styles.rowHeadTitle}>
-                        {t(hasPopular && !showAll ? 'shop.popular' : 'shop.everything')}
-                      </Text>
-                      {hasPopular && (
-                        <SoundTouchable onPress={() => onChangeShowAll(!showAll)} accessibilityRole="button">
-                          <Text style={styles.rowHeadLink}>
-                            {t(showAll ? 'shop.showPopular' : 'shop.showAll')}
-                          </Text>
-                        </SoundTouchable>
-                      )}
-                    </>
-                  )}
+                  <Icon name="sparkles" size={17} color={theme.primary} />
+                  <Text style={styles.rowHeadTitle}>
+                    {tab === 'all' ? t(`shop.section.${block.key}`) : t('shop.everything')}
+                  </Text>
                 </View>
 
                 <View style={styles.grid}>
-                  {shown.map((item) => (
+                  {block.items.map((item) => (
                     <ShopCard
                       key={item.id}
                       item={item}

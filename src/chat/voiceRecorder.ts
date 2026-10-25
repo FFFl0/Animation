@@ -84,16 +84,31 @@ export function useVoiceRecorder(): VoiceRecorder {
   // `stop()` resets the recorder's own state, so the length has to be taken
   // from the last poll before stopping rather than read back afterwards.
   const durationRef = useRef(0);
+  // Whether the microphone was ever opened in this screen's lifetime, so the
+  // cleanup above only undoes a session it actually changed.
+  const startedRef = useRef(false);
   if (state.isRecording) durationRef.current = state.durationMillis;
 
   const durationMs = recording ? state.durationMillis : 0;
 
-  // Leaving the screen mid-recording should not leave the microphone open.
+  /**
+   * Leaving the screen mid-recording must not leave the audio session in
+   * record mode — on iOS that makes everything played afterwards quiet.
+   *
+   * The recorder itself is deliberately not touched here. `useAudioRecorder`
+   * registers its own cleanup first, which releases the native object, and
+   * React runs cleanups in the order their effects were declared — so by the
+   * time this one runs the recorder is gone, and reading a property off it is
+   * a use-after-release that throws. Releasing it is what stops the capture
+   * anyway; all that is left to undo is the session, which is a module-level
+   * call and safe.
+   */
   useEffect(() => {
     return () => {
-      if (recorder.isRecording) void recorder.stop();
+      if (!startedRef.current) return;
+      void setAudioModeAsync({ allowsRecording: false, playsInSilentMode: true });
     };
-  }, [recorder]);
+  }, []);
 
   const start = useCallback(async () => {
     const permission = await requestRecordingPermissionsAsync();
@@ -105,6 +120,7 @@ export function useVoiceRecorder(): VoiceRecorder {
       await setAudioModeAsync({ allowsRecording: true, playsInSilentMode: true });
       await recorder.prepareToRecordAsync();
       durationRef.current = 0;
+      startedRef.current = true;
       recorder.record();
       setRecording(true);
       return true;

@@ -127,7 +127,7 @@ function AppShell() {
   // while an item is on top of it, so coming back would otherwise always
   // land on the first tab instead of the shelf the shopper was browsing.
   const [shopTab, setShopTab] = useState<ShopTab>('all');
-  const [shopShowAll, setShopShowAll] = useState(false);
+  const [shopScrollY, setShopScrollY] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
@@ -389,7 +389,7 @@ function AppShell() {
               onOpenTournament={() => setScreen('tournament')}
               onOpenShop={() => {
                 setShopTab('all');
-                setShopShowAll(false);
+                setShopScrollY(0);
                 setScreen('shop');
               }}
             />
@@ -398,8 +398,8 @@ function AppShell() {
             <ShopScreen
               tab={shopTab}
               onChangeTab={setShopTab}
-              showAll={shopShowAll}
-              onChangeShowAll={setShopShowAll}
+              scrollY={shopScrollY}
+              onChangeScrollY={setShopScrollY}
               onBack={() => setScreen('home')}
               onOpenItem={(id) => {
                 setShopItemId(id);
@@ -608,7 +608,7 @@ function AppShell() {
             <ProfileScreen
               onOpenShop={() => {
                 setShopTab('all');
-                setShopShowAll(false);
+                setShopScrollY(0);
                 setScreen('shop');
               }}
               onOpenAbout={() => setScreen('about')}
