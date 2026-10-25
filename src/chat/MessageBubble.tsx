@@ -86,6 +86,9 @@ type Props<T extends BubbleMessage> = {
   voiceProgress: number;
   /** Elapsed time while it plays, its full length otherwise. */
   voiceTimeLabel: string;
+  /** What the attachment's control does, for a screen reader — opening a
+   * photo, downloading a file, or playing and pausing a voice note. */
+  attachmentActionLabel: string;
   onToggleVoice: (message: T) => void;
   onReply: (message: T) => void;
   onQuickReact: (message: T) => void;
@@ -112,6 +115,7 @@ export default function MessageBubble<T extends BubbleMessage>({
   voicePlaying,
   voiceProgress,
   voiceTimeLabel,
+  attachmentActionLabel,
   onToggleVoice,
   onReply,
   onQuickReact,
@@ -216,6 +220,8 @@ export default function MessageBubble<T extends BubbleMessage>({
               // Android, so the bubble would be sized by the ratio alone.
               <Pressable
                 onPress={() => onOpenAttachment(message)}
+                accessibilityRole="button"
+                accessibilityLabel={attachmentActionLabel}
                 style={[
                   styles.photo,
                   !message.body && styles.photoAlone,
@@ -233,7 +239,12 @@ export default function MessageBubble<T extends BubbleMessage>({
             )}
 
             {message.attachment?.kind === 'voice' && (
-              <Pressable onPress={() => onToggleVoice(message)} style={styles.voice}>
+              <Pressable
+                onPress={() => onToggleVoice(message)}
+                accessibilityRole="button"
+                accessibilityLabel={attachmentActionLabel}
+                style={styles.voice}
+              >
                 <View style={[styles.voiceButton, isMine && styles.voiceButtonMine]}>
                   <Icon
                     name={voicePlaying ? 'pause' : 'play'}
@@ -261,6 +272,8 @@ export default function MessageBubble<T extends BubbleMessage>({
             {message.attachment?.kind === 'file' && (
               <Pressable
                 onPress={() => onOpenAttachment(message)}
+                accessibilityRole="button"
+                accessibilityLabel={attachmentActionLabel}
                 style={[styles.file, isMine ? styles.fileMine : styles.fileTheirs]}
               >
                 <View style={[styles.fileIcon, isMine && styles.fileIconMine]}>

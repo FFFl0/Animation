@@ -446,6 +446,16 @@ export default function ChatRoom<T extends BubbleMessage>({
 
   const nameFor = (senderId: string) => (senderId === meId ? t('chat.you') : labelFor(senderId));
 
+  /** What the attachment's one control does, so a screen reader announces
+   * something other than an unnamed button. */
+  const attachmentActionLabel = (message: T): string => {
+    const attachment = message.attachment;
+    if (!attachment) return '';
+    if (attachment.kind === 'image') return t('chat.openPhoto');
+    if (attachment.kind === 'file') return t('chat.downloadFile', attachment.name ?? t('chat.attachFile'));
+    return playingPath === attachment.path && playback.playing ? t('chat.voicePause') : t('chat.voicePlay');
+  };
+
   return (
     <SafeAreaView style={styles.safe}>
       <KeyboardAvoidingView style={styles.flex} behavior={Platform.OS === 'ios' ? 'padding' : 'height'}>
@@ -575,6 +585,7 @@ export default function ChatRoom<T extends BubbleMessage>({
                           : formatDuration(m.attachment?.durationMs ?? null)
                       }
                       onToggleVoice={toggleVoice}
+                      attachmentActionLabel={attachmentActionLabel(m)}
                       highlighted={highlightedId === m.id}
                       onReply={handleReply}
                       onQuickReact={(msg) => onToggleReaction(msg.id, QUICK_REACTIONS[0])}
