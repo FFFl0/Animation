@@ -50,11 +50,13 @@ type MessageRow = {
   attachment_size: number | null;
   attachment_width: number | null;
   attachment_height: number | null;
+  attachment_duration_ms: number | null;
 };
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
 const ATTACHMENT_COLUMNS =
-  'attachment_path, attachment_kind, attachment_name, attachment_size, attachment_width, attachment_height';
+  'attachment_path, attachment_kind, attachment_name, attachment_size, ' +
+  'attachment_width, attachment_height, attachment_duration_ms';
 
 const MESSAGE_COLUMNS =
   `id, group_id, sender_id, body, created_at, reply_to_id, edited_at, forwarded_from, ${ATTACHMENT_COLUMNS}`;
@@ -70,6 +72,7 @@ function toAttachment(row: MessageRow): Attachment | null {
     size: row.attachment_size ?? null,
     width: row.attachment_width ?? null,
     height: row.attachment_height ?? null,
+    durationMs: row.attachment_duration_ms ?? null,
   };
 }
 
@@ -230,6 +233,7 @@ export async function sendGroupMessage(
       attachment_size: attachment?.size ?? null,
       attachment_width: attachment?.width ?? null,
       attachment_height: attachment?.height ?? null,
+      attachment_duration_ms: attachment?.durationMs ?? null,
     })
     .select(MESSAGE_COLUMNS)
     .single();

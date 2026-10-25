@@ -46,6 +46,7 @@ export async function uploadAttachment(
     size: pending.size,
     width: pending.width,
     height: pending.height,
+    durationMs: pending.durationMs,
   };
 }
 

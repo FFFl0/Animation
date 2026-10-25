@@ -80,6 +80,13 @@ type Props<T extends BubbleMessage> = {
   attachmentSizeLabel: string;
   /** Opens a photo full screen, or hands a file to the system. */
   onOpenAttachment: (message: T) => void;
+  /** Whether this message's voice note is the one currently playing. */
+  voicePlaying: boolean;
+  /** How far through it playback is, 0 to 1. */
+  voiceProgress: number;
+  /** Elapsed time while it plays, its full length otherwise. */
+  voiceTimeLabel: string;
+  onToggleVoice: (message: T) => void;
   onReply: (message: T) => void;
   onQuickReact: (message: T) => void;
   onToggleReaction: (message: T, emoji: string) => void;
@@ -102,6 +109,10 @@ export default function MessageBubble<T extends BubbleMessage>({
   attachmentUrl,
   attachmentSizeLabel,
   onOpenAttachment,
+  voicePlaying,
+  voiceProgress,
+  voiceTimeLabel,
+  onToggleVoice,
   onReply,
   onQuickReact,
   onToggleReaction,
@@ -221,6 +232,32 @@ export default function MessageBubble<T extends BubbleMessage>({
               </Pressable>
             )}
 
+            {message.attachment?.kind === 'voice' && (
+              <Pressable onPress={() => onToggleVoice(message)} style={styles.voice}>
+                <View style={[styles.voiceButton, isMine && styles.voiceButtonMine]}>
+                  <Icon
+                    name={voicePlaying ? 'pause' : 'play'}
+                    size={14}
+                    color={isMine ? theme.primary : theme.onPrimary}
+                  />
+                </View>
+                <View style={styles.voiceTrack}>
+                  <View style={[styles.voiceTrackBase, isMine && styles.voiceTrackBaseMine]} />
+                  <View
+                    style={[
+                      styles.voiceTrackFill,
+                      isMine && styles.voiceTrackFillMine,
+                      // Clamped rather than trusted: a status update can
+                      // report a position past a duration that is still being
+                      // read, which would push the fill out of its track.
+                      { width: `${Math.min(100, Math.max(0, voiceProgress * 100))}%` },
+                    ]}
+                  />
+                </View>
+                <Text style={[styles.voiceTime, isMine && styles.voiceTimeMine]}>{voiceTimeLabel}</Text>
+              </Pressable>
+            )}
+
             {message.attachment?.kind === 'file' && (
               <Pressable
                 onPress={() => onOpenAttachment(message)}
@@ -326,6 +363,23 @@ function makeStyles(theme: Theme) {
     photoAlone: { marginBottom: 0 },
     photoImage: { width: '100%', height: '100%' },
     photoLoading: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+    voice: { flexDirection: 'row', alignItems: 'center', gap: 10, minWidth: 190, paddingVertical: 2, marginBottom: 2 },
+    voiceButton: {
+      width: 30,
+      height: 30,
+      borderRadius: 15,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.primary,
+    },
+    voiceButtonMine: { backgroundColor: theme.onPrimary },
+    voiceTrack: { flex: 1, height: 4, justifyContent: 'center' },
+    voiceTrackBase: { position: 'absolute', left: 0, right: 0, height: 4, borderRadius: 2, backgroundColor: theme.border },
+    voiceTrackBaseMine: { backgroundColor: 'rgba(255,255,255,0.35)' },
+    voiceTrackFill: { position: 'absolute', left: 0, height: 4, borderRadius: 2, backgroundColor: theme.primary },
+    voiceTrackFillMine: { backgroundColor: theme.onPrimary },
+    voiceTime: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 32, textAlign: 'right' },
+    voiceTimeMine: { color: 'rgba(255,255,255,0.85)' },
     file: {
       flexDirection: 'row',
       alignItems: 'center',

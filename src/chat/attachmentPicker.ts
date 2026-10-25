@@ -1,10 +1,9 @@
-import { Platform } from 'react-native';
 import * as DocumentPicker from 'expo-document-picker';
-import * as FileSystem from 'expo-file-system';
 import * as ImageManipulator from 'expo-image-manipulator';
 import * as ImagePicker from 'expo-image-picker';
 import { base64ToBytes } from '../avatar/base64';
 import { reportHandledError } from '../monitoring/sentry';
+import { readFileBytes } from './fileBytes';
 import { MAX_ATTACHMENT_BYTES, PendingAttachment, isImageMimeType, storedMimeType } from './attachments';
 
 /**
@@ -24,23 +23,6 @@ export type PickAttachmentResult =
   | { status: 'permissionDenied' }
   | { status: 'tooLarge'; size: number }
   | { status: 'failed' };
-
-/**
- * Reads a picked file into bytes.
- *
- * Two paths because the uri means different things per platform: on the web
- * the picker hands back a blob URL that `fetch` resolves, while on a device
- * it is a `file://` path, which React Native's `fetch` handles
- * inconsistently — expo-file-system reads those properly.
- */
-async function readBytes(uri: string): Promise<Uint8Array> {
-  if (Platform.OS === 'web') {
-    const response = await fetch(uri);
-    return new Uint8Array(await response.arrayBuffer());
-  }
-  const buffer = await new FileSystem.File(uri).arrayBuffer();
-  return new Uint8Array(buffer);
-}
 
 /** Picks a photo from the gallery, downscaled and re-encoded. */
 export async function pickChatPhoto(): Promise<PickAttachmentResult> {
@@ -84,6 +66,7 @@ export async function pickChatPhoto(): Promise<PickAttachmentResult> {
         size: bytes.length,
         width: saved.width ?? image.width,
         height: saved.height ?? image.height,
+        durationMs: null,
       },
     };
   } catch (error) {
@@ -115,7 +98,7 @@ export async function pickChatFile(): Promise<PickAttachmentResult> {
   }
 
   try {
-    const bytes = await readBytes(asset.uri);
+    const bytes = await readFileBytes(asset.uri);
     if (bytes.length > MAX_ATTACHMENT_BYTES) return { status: 'tooLarge', size: bytes.length };
 
     const kind = isImageMimeType(asset.mimeType) ? 'image' : 'file';
@@ -130,6 +113,7 @@ export async function pickChatFile(): Promise<PickAttachmentResult> {
         size: bytes.length,
         width: null,
         height: null,
+        durationMs: null,
       },
     };
   } catch (error) {

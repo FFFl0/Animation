@@ -137,7 +137,7 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
                 stamp={chat.lastMessage ? formatListStamp(chat.lastMessage.createdAt, language) : ''}
                 youPrefix={t('chats.youPrefix')}
                 noMessagesText={t('chats.noMessages')}
-                attachmentLabels={{ photo: t('chats.photo'), file: t('chats.file') }}
+                attachmentLabels={{ photo: t('chats.photo'), file: t('chats.file'), voice: t('chats.voice') }}
                 onPress={() => {
                   if (chat.kind === 'direct' && chat.player) onOpenDirect(chat.player);
                   else if (chat.group) onOpenGroup(chat.group);
@@ -159,8 +159,9 @@ type RowProps = {
   stamp: string;
   youPrefix: string;
   noMessagesText: string;
-  /** What a photo or an unnamed file reads as when it came with no caption. */
-  attachmentLabels: { photo: string; file: string };
+  /** What a photo, a voice note or an unnamed file reads as when it came
+   * with no caption. */
+  attachmentLabels: { photo: string; file: string; voice: string };
   onPress: () => void;
 };
 

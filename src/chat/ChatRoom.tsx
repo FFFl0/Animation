@@ -1,4 +1,4 @@
-import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
+import { ReactNode, useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import {
   ActivityIndicator,
   Image,
@@ -18,6 +18,7 @@ import {
 } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import * as Clipboard from 'expo-clipboard';
+import { useAudioPlayer, useAudioPlayerStatus } from 'expo-audio';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
@@ -35,8 +36,10 @@ import {
   MAX_ATTACHMENT_BYTES,
   MediaScope,
   PendingAttachment,
+  formatDuration,
   formatFileSize,
 } from './attachments';
+import { MAX_VOICE_MS, useVoiceRecorder } from './voiceRecorder';
 import { pickChatFile, pickChatPhoto } from './attachmentPicker';
 import { uploadAttachment } from './attachmentStorage';
 import { useAttachmentUrls } from './useAttachmentUrls';
@@ -131,6 +134,12 @@ export default function ChatRoom<T extends BubbleMessage>({
   const [attachSheet, setAttachSheet] = useState(false);
   const [uploading, setUploading] = useState(false);
   const [viewer, setViewer] = useState<{ url: string; name: string | null } | null>(null);
+  const [playingPath, setPlayingPath] = useState<string | null>(null);
+  const voice = useVoiceRecorder();
+  // One player for the whole conversation, so starting a second note stops
+  // the first instead of talking over it.
+  const player = useAudioPlayer();
+  const playback = useAudioPlayerStatus(player);
   const [toast, setToast] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -166,6 +175,9 @@ export default function ChatRoom<T extends BubbleMessage>({
     setPending(null);
     setAtBottom(true);
     positionsRef.current.clear();
+    setPlayingPath(null);
+    player.pause();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [conversationKey]);
 
   useEffect(() => {
@@ -288,6 +300,79 @@ export default function ChatRoom<T extends BubbleMessage>({
     }
     setToast(result.status === 'permissionDenied' ? t('chat.attachNoPermission') : t('chat.attachFailed'));
   };
+
+  /** Playback finishing leaves the button showing "play" again rather than a
+   * note that looks like it is still going. */
+  useEffect(() => {
+    if (playback.didJustFinish) setPlayingPath(null);
+  }, [playback.didJustFinish]);
+
+  const toggleVoice = (message: T) => {
+    const attachment = message.attachment;
+    if (!attachment || attachment.kind !== 'voice') return;
+
+    const url = attachmentUrls.get(attachment.path);
+    if (!url) {
+      setToast(t('chat.attachUnavailable'));
+      return;
+    }
+
+    if (playingPath === attachment.path) {
+      if (playback.playing) player.pause();
+      else player.play();
+      return;
+    }
+
+    setPlayingPath(attachment.path);
+    player.replace({ uri: url });
+    player.play();
+  };
+
+  const startRecording = async () => {
+    setShowEmoji(false);
+    setEditing(null);
+    const started = await voice.start();
+    if (!started) setToast(t('chat.voiceNoPermission'));
+  };
+
+  /**
+   * Stops the recording and sends it straight away. A voice note is finished
+   * the moment you stop talking — putting it in the composer to be confirmed
+   * would be a step nobody expects.
+   */
+  const finishRecording = useCallback(async () => {
+    const note = await voice.stop();
+    if (!note) {
+      setToast(t('chat.voiceTooShort'));
+      return;
+    }
+
+    setUploading(true);
+    const uploaded = await uploadAttachment(mediaScope, note);
+    setUploading(false);
+    if (!uploaded) {
+      setToast(t('chat.attachFailed'));
+      return;
+    }
+
+    const replyId = replyTo?.id ?? null;
+    setReplyTo(null);
+    onSend('', replyId, uploaded);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice, mediaScope, replyTo, onSend, t]);
+
+  const discardRecording = async () => {
+    await voice.cancel();
+  };
+
+  // Stops at the cap rather than refusing afterwards, so what was said is
+  // kept instead of thrown away.
+  useEffect(() => {
+    if (!voice.atLimit) return;
+    setToast(t('chat.voiceLimit'));
+    void finishRecording();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [voice.atLimit]);
 
   /**
    * A photo opens in the viewer; anything else is handed to the system by its
@@ -478,6 +563,18 @@ export default function ChatRoom<T extends BubbleMessage>({
                       attachmentUrl={m.attachment ? attachmentUrls.get(m.attachment.path) ?? null : null}
                       attachmentSizeLabel={formatFileSize(m.attachment?.size ?? null, language)}
                       onOpenAttachment={openAttachment}
+                      voicePlaying={playingPath === m.attachment?.path && playback.playing}
+                      voiceProgress={
+                        playingPath === m.attachment?.path && playback.duration > 0
+                          ? playback.currentTime / playback.duration
+                          : 0
+                      }
+                      voiceTimeLabel={
+                        playingPath === m.attachment?.path && playback.duration > 0
+                          ? formatDuration(playback.currentTime * 1000)
+                          : formatDuration(m.attachment?.durationMs ?? null)
+                      }
+                      onToggleVoice={toggleVoice}
                       highlighted={highlightedId === m.id}
                       onReply={handleReply}
                       onQuickReact={(msg) => onToggleReaction(msg.id, QUICK_REACTIONS[0])}
@@ -572,6 +669,38 @@ export default function ChatRoom<T extends BubbleMessage>({
           </View>
         )}
 
+        {voice.recording ? (
+          <View style={styles.inputRow}>
+            <SoundTouchable
+              style={styles.attachToggle}
+              onPress={discardRecording}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.voiceDiscard')}
+            >
+              <Icon name="trash" size={20} color={theme.danger} />
+            </SoundTouchable>
+
+            <View style={styles.recordBar}>
+              <View style={[styles.recordDot, { backgroundColor: theme.danger }]} />
+              <Text style={styles.recordLabel}>{t('chat.voiceRecording')}</Text>
+              <Text style={styles.recordTime}>{formatDuration(voice.durationMs)}</Text>
+            </View>
+
+            <SoundTouchable
+              style={styles.sendButton}
+              onPress={finishRecording}
+              disabled={uploading}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.voiceSend')}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={theme.onPrimary} />
+              ) : (
+                <Icon name="send" size={17} color={theme.onPrimary} />
+              )}
+            </SoundTouchable>
+          </View>
+        ) : (
         <View style={styles.inputRow}>
           <SoundTouchable
             style={styles.attachToggle}
@@ -609,20 +738,35 @@ export default function ChatRoom<T extends BubbleMessage>({
             onSubmitEditing={handleSend}
             multiline
           />
-          <SoundTouchable
-            style={styles.sendButton}
-            onPress={handleSend}
-            disabled={uploading}
-            accessibilityRole="button"
-            accessibilityLabel={editing ? t('chat.saveEdit') : t('chat.send')}
-          >
-            {uploading ? (
-              <ActivityIndicator size="small" color={theme.onPrimary} />
-            ) : (
-              <Icon name={editing ? 'check' : 'send'} size={17} color={theme.onPrimary} />
-            )}
-          </SoundTouchable>
+          {/* Nothing typed and nothing attached means the button has nothing
+              to send, so it offers to record instead — the same place a
+              messenger always keeps the microphone. */}
+          {draft.trim().length === 0 && !pending && !editing ? (
+            <SoundTouchable
+              style={styles.sendButton}
+              onPress={startRecording}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.voiceRecord')}
+            >
+              <Icon name="mic" size={18} color={theme.onPrimary} />
+            </SoundTouchable>
+          ) : (
+            <SoundTouchable
+              style={styles.sendButton}
+              onPress={handleSend}
+              disabled={uploading}
+              accessibilityRole="button"
+              accessibilityLabel={editing ? t('chat.saveEdit') : t('chat.send')}
+            >
+              {uploading ? (
+                <ActivityIndicator size="small" color={theme.onPrimary} />
+              ) : (
+                <Icon name={editing ? 'check' : 'send'} size={17} color={theme.onPrimary} />
+              )}
+            </SoundTouchable>
+          )}
         </View>
+        )}
 
         {showEmoji && <EmojiPicker onPick={(emoji) => setDraft((prev) => prev + emoji)} />}
       </KeyboardAvoidingView>
@@ -887,6 +1031,21 @@ function makeStyles(theme: Theme) {
       borderTopColor: theme.border,
     },
     attachToggle: { width: 38, height: 48, alignItems: 'center', justifyContent: 'center' },
+    recordBar: {
+      flex: 1,
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      height: 42,
+      backgroundColor: theme.card,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      borderRadius: radius.lg,
+      paddingHorizontal: 16,
+    },
+    recordDot: { width: 9, height: 9, borderRadius: 5 },
+    recordLabel: { flex: 1, fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted },
+    recordTime: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text, fontVariant: ['tabular-nums'] },
     emojiToggle: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center' },
     pendingThumb: { width: 34, height: 34, borderRadius: radius.sm },
     pendingIcon: {

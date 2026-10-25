@@ -45,6 +45,7 @@ export type IconName =
   | 'trash'
   | 'image'
   | 'file'
+  | 'mic'
   | 'paperclip'
   | 'download'
   | 'edit'
@@ -381,6 +382,15 @@ function renderIcon(name: IconName, common: any, color: string) {
         <>
           <Path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4z" {...common} />
           <Path d="M14 3v4h4" {...common} />
+        </>
+      );
+    case 'mic':
+      return (
+        <>
+          <Path d="M12 3a3 3 0 0 0-3 3v6a3 3 0 0 0 6 0V6a3 3 0 0 0-3-3z" {...common} />
+          <Path d="M5.5 11.5a6.5 6.5 0 0 0 13 0" {...common} />
+          <Line x1="12" y1="18" x2="12" y2="21" {...common} />
+          <Line x1="8.5" y1="21" x2="15.5" y2="21" {...common} />
         </>
       );
     case 'paperclip':

@@ -1,6 +1,6 @@
 import { Language } from '../i18n/LanguageContext';
 
-export type AttachmentKind = 'image' | 'file';
+export type AttachmentKind = 'image' | 'file' | 'voice';
 
 /** What a sent message carries. The bytes live in the `chat-media` bucket;
  * the row keeps only the path and enough metadata to draw the bubble before
@@ -15,6 +15,9 @@ export type Attachment = {
    * instead of jumping once the picture loads. Null for a file. */
   width: number | null;
   height: number | null;
+  /** Length of a voice note, so the bubble can show it before the audio has
+   * been fetched. Null for anything else. */
+  durationMs: number | null;
 };
 
 /** Something picked but not yet uploaded, held by the composer. */
@@ -29,6 +32,7 @@ export type PendingAttachment = {
   size: number;
   width: number | null;
   height: number | null;
+  durationMs: number | null;
 };
 
 /** The bucket's own limit is the same number; checking it here as well turns
@@ -37,25 +41,38 @@ export const MAX_ATTACHMENT_BYTES = 10 * 1024 * 1024;
 
 const IMAGE_MIME_TYPES = ['image/jpeg', 'image/png', 'image/webp', 'image/gif'];
 
+/** What a voice note may be stored as. A phone records m4a, a browser webm. */
+const AUDIO_MIME_TYPES = ['audio/mp4', 'audio/mpeg', 'audio/webm', 'audio/aac'];
+
 /**
  * What a file is stored as.
  *
- * Images keep their real type, because the bubble renders them and needs it.
- * Everything else is stored as `application/octet-stream` whatever it
- * actually is: a signed URL is served from the storage domain, and a browser
- * told it is being handed `text/html` would run that HTML there — on the
- * origin holding every conversation's files. Stored opaque, the same URL can
- * only ever be downloaded. The real type is not lost: it is implied by the
- * file name, which is what the system opens the file by.
+ * Pictures and voice notes keep their real type, because the app plays and
+ * renders them and needs to know what they are. Everything else is stored as
+ * `application/octet-stream` whatever it actually is: a signed URL is served
+ * from the storage domain, and a browser told it is being handed `text/html`
+ * would run that HTML there — on the origin holding every conversation's
+ * files. Stored opaque, the same URL can only ever be downloaded. The real
+ * type is not lost: it is implied by the file name, which is what the system
+ * opens the file by.
+ *
+ * Images and audio are exceptions because neither becomes code when a browser
+ * opens it — a picture is drawn and a recording is played. Which is also why
+ * the lists are closed rather than a blanket `image/*` and `audio/*`.
  */
 export function storedMimeType(mime: string | null | undefined, kind: AttachmentKind): string {
-  if (kind !== 'image') return 'application/octet-stream';
   const lower = (mime ?? '').toLowerCase();
-  return IMAGE_MIME_TYPES.includes(lower) ? lower : 'image/jpeg';
+  if (kind === 'image') return IMAGE_MIME_TYPES.includes(lower) ? lower : 'image/jpeg';
+  if (kind === 'voice') return AUDIO_MIME_TYPES.includes(lower) ? lower : 'audio/mp4';
+  return 'application/octet-stream';
 }
 
 export function isImageMimeType(mime: string | null | undefined): boolean {
   return IMAGE_MIME_TYPES.includes((mime ?? '').toLowerCase());
+}
+
+export function isAudioMimeType(mime: string | null | undefined): boolean {
+  return AUDIO_MIME_TYPES.includes((mime ?? '').toLowerCase());
 }
 
 /** Which conversation an attachment belongs to. Both halves of the union
@@ -99,7 +116,8 @@ export function extensionOf(name: string | null | undefined): string {
  */
 export function attachmentPath(scope: MediaScope, fileName: string | null, kind: AttachmentKind): string {
   const tail = `${Date.now().toString(36)}-${Math.random().toString(36).slice(2, 10)}`;
-  const extension = extensionOf(fileName) || (kind === 'image' ? '.jpg' : '');
+  const fallback = kind === 'image' ? '.jpg' : kind === 'voice' ? '.m4a' : '';
+  const extension = extensionOf(fileName) || fallback;
   return `${mediaFolder(scope)}/${tail}${extension}`;
 }
 
@@ -132,10 +150,25 @@ export function formatFileSize(bytes: number | null | undefined, lang: Language)
 export function attachmentPreview(
   body: string,
   attachment: Pick<Attachment, 'kind' | 'name'> | null,
-  labels: { photo: string; file: string }
+  labels: { photo: string; file: string; voice: string }
 ): string {
   if (body.trim().length > 0) return body;
   if (!attachment) return body;
   if (attachment.kind === 'image') return labels.photo;
+  if (attachment.kind === 'voice') return labels.voice;
   return attachment.name ?? labels.file;
+}
+
+/**
+ * A voice note's length, as a clock rather than a count of seconds — "1:05"
+ * is read at a glance where "65 с" has to be converted. Rounded down, so a
+ * note never claims to be longer than it is, and clamped at zero for a
+ * recording that was cut before anything was captured.
+ */
+export function formatDuration(durationMs: number | null | undefined): string {
+  if (durationMs === null || durationMs === undefined || !Number.isFinite(durationMs)) return '0:00';
+  const total = Math.max(0, Math.floor(durationMs / 1000));
+  const minutes = Math.floor(total / 60);
+  const seconds = total % 60;
+  return `${minutes}:${seconds.toString().padStart(2, '0')}`;
 }

@@ -1283,3 +1283,52 @@ drop policy if exists "Delete attachments you uploaded" on storage.objects;
 create policy "Delete attachments you uploaded"
   on storage.objects for delete
   using (bucket_id = 'chat-media' and owner = auth.uid() and public.can_use_chat_media(name));
+
+-- ============================================================
+-- ГОЛОСОВЫЕ СООБЩЕНИЯ.
+--
+-- Это третий вид вложения рядом с фото и файлом: те же колонки, то же
+-- ведро, те же политики — добавляется только длительность и разрешение
+-- на звуковые типы.
+-- ============================================================
+
+-- Длительность записи. Нужна в строке, а не вычисляется при открытии: пузырь
+-- рисует «0:07» и дорожку сразу, не дожидаясь, пока файл скачается.
+alter table public.messages add column if not exists attachment_duration_ms integer;
+alter table public.group_messages add column if not exists attachment_duration_ms integer;
+
+-- Ограничение пересоздаётся, а не добавляется: на базе, где файл уже
+-- прогоняли, оно существует и разрешает только 'image' и 'file', а
+-- `add constraint` в блоке с перехватом duplicate_object такую строку
+-- молча оставил бы как есть — и голосовые не вставлялись бы.
+alter table public.messages drop constraint if exists messages_attachment_kind_check;
+alter table public.messages add constraint messages_attachment_kind_check
+  check (attachment_kind is null or attachment_kind in ('image', 'file', 'voice'));
+
+alter table public.group_messages drop constraint if exists group_messages_attachment_kind_check;
+alter table public.group_messages add constraint group_messages_attachment_kind_check
+  check (attachment_kind is null or attachment_kind in ('image', 'file', 'voice'));
+
+-- Звуковые типы к разрешённым.
+--
+-- Голосовое, в отличие от остальных файлов, хранится под своим настоящим
+-- типом, а не как octet-stream — плееру он нужен, чтобы запись вообще
+-- заиграла. Это безопасно по той же причине, что и у картинок: браузер,
+-- открыв подписанную ссылку на аудио, его проигрывает, а не исполняет.
+-- Опасен был бы только тип, который на домене хранилища превращается в
+-- код, — поэтому список закрытый, а не `audio/*`.
+--
+-- Записывается m4a на телефоне и webm в вебе, отсюда два типа.
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'chat-media', 'chat-media', false, 10485760,
+  array[
+    'image/jpeg', 'image/png', 'image/webp', 'image/gif',
+    'audio/mp4', 'audio/mpeg', 'audio/webm', 'audio/aac',
+    'application/octet-stream'
+  ]
+)
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;

@@ -3,7 +3,9 @@ import {
   attachmentPath,
   attachmentPreview,
   extensionOf,
+  formatDuration,
   formatFileSize,
+  isAudioMimeType,
   isImageMimeType,
   mediaFolder,
   storedMimeType,
@@ -40,6 +42,12 @@ describe('attachmentPath', () => {
 
   it('gives a nameless photo a jpg extension', () => {
     expect(attachmentPath(scope, null, 'image').endsWith('.jpg')).toBe(true);
+  });
+
+  it('gives a voice note an m4a extension when it was not named', () => {
+    expect(attachmentPath(scope, null, 'voice').endsWith('.m4a')).toBe(true);
+    // A browser records webm, and the recorder names it so.
+    expect(attachmentPath(scope, 'voice.webm', 'voice').endsWith('.webm')).toBe(true);
   });
 
   it('leaves a nameless file without one rather than inventing a type', () => {
@@ -82,15 +90,27 @@ describe('storedMimeType', () => {
     expect(storedMimeType('IMAGE/WEBP', 'image')).toBe('image/webp');
   });
 
+  it('keeps a real audio type, which the player needs to play the note', () => {
+    expect(storedMimeType('audio/webm', 'voice')).toBe('audio/webm');
+    expect(storedMimeType('audio/mp4', 'voice')).toBe('audio/mp4');
+  });
+
   it('stores anything else opaque, so a signed URL can never render script', () => {
     expect(storedMimeType('text/html', 'file')).toBe('application/octet-stream');
     expect(storedMimeType('application/pdf', 'file')).toBe('application/octet-stream');
     expect(storedMimeType('image/png', 'file')).toBe('application/octet-stream');
+    // Even asked for as audio: only a voice note is stored playable.
+    expect(storedMimeType('audio/webm', 'file')).toBe('application/octet-stream');
   });
 
   it('falls back to jpeg for an image of an unsupported type', () => {
     expect(storedMimeType('image/heic', 'image')).toBe('image/jpeg');
     expect(storedMimeType(null, 'image')).toBe('image/jpeg');
+  });
+
+  it('falls back to mp4 audio for a recording of an unsupported type', () => {
+    expect(storedMimeType('audio/ogg', 'voice')).toBe('audio/mp4');
+    expect(storedMimeType(null, 'voice')).toBe('audio/mp4');
   });
 });
 
@@ -100,6 +120,35 @@ describe('isImageMimeType', () => {
     expect(isImageMimeType('image/gif')).toBe(true);
     expect(isImageMimeType('image/svg+xml')).toBe(false);
     expect(isImageMimeType(undefined)).toBe(false);
+  });
+});
+
+describe('isAudioMimeType', () => {
+  it('accepts only the types the bucket allows', () => {
+    expect(isAudioMimeType('audio/mp4')).toBe(true);
+    expect(isAudioMimeType('audio/webm')).toBe(true);
+    // Not on the list: it would be served inline and is not what we record.
+    expect(isAudioMimeType('audio/ogg')).toBe(false);
+    expect(isAudioMimeType(undefined)).toBe(false);
+  });
+});
+
+describe('formatDuration', () => {
+  it('reads as a clock', () => {
+    expect(formatDuration(7_000)).toBe('0:07');
+    expect(formatDuration(65_000)).toBe('1:05');
+    expect(formatDuration(600_000)).toBe('10:00');
+  });
+
+  it('rounds down, so a note never claims to be longer than it is', () => {
+    expect(formatDuration(7_900)).toBe('0:07');
+  });
+
+  it('falls back to zero rather than showing nothing', () => {
+    expect(formatDuration(null)).toBe('0:00');
+    expect(formatDuration(undefined)).toBe('0:00');
+    expect(formatDuration(-500)).toBe('0:00');
+    expect(formatDuration(Number.NaN)).toBe('0:00');
   });
 });
 
@@ -132,7 +181,7 @@ describe('formatFileSize', () => {
 });
 
 describe('attachmentPreview', () => {
-  const labels = { photo: 'Photo', file: 'File' };
+  const labels = { photo: 'Photo', file: 'File', voice: 'Voice message' };
 
   it('prefers the caption, which is what the person actually wrote', () => {
     expect(attachmentPreview('look at this', { kind: 'image', name: null }, labels)).toBe('look at this');
@@ -141,6 +190,10 @@ describe('attachmentPreview', () => {
   it('names the kind when a photo came with no caption', () => {
     expect(attachmentPreview('', { kind: 'image', name: null }, labels)).toBe('Photo');
     expect(attachmentPreview('   ', { kind: 'image', name: null }, labels)).toBe('Photo');
+  });
+
+  it('names a voice note, which has no name of its own worth showing', () => {
+    expect(attachmentPreview('', { kind: 'voice', name: 'voice.m4a' }, labels)).toBe('Voice message');
   });
 
   it('uses a file name when there is one, and falls back when there is not', () => {
