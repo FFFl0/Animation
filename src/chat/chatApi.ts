@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
+import { Attachment, AttachmentKind } from './attachments';
 
 export { isSupabaseConfigured };
 
@@ -14,6 +15,8 @@ export type ChatMessage = {
   editedAt: string | null;
   /** Display name of whoever wrote the message this was forwarded from. */
   forwardedFrom: string | null;
+  /** A photo or file sent with the message; the body is then its caption. */
+  attachment: Attachment | null;
 };
 
 export type MessageReaction = {
@@ -32,12 +35,35 @@ type MessageRow = {
   reply_to_id: string | null;
   edited_at: string | null;
   forwarded_from: string | null;
+  attachment_path: string | null;
+  attachment_kind: AttachmentKind | null;
+  attachment_name: string | null;
+  attachment_size: number | null;
+  attachment_width: number | null;
+  attachment_height: number | null;
 };
 
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
+const ATTACHMENT_COLUMNS =
+  'attachment_path, attachment_kind, attachment_name, attachment_size, attachment_width, attachment_height';
+
 const MESSAGE_COLUMNS =
-  'id, sender_id, recipient_id, body, created_at, read, reply_to_id, edited_at, forwarded_from';
+  `id, sender_id, recipient_id, body, created_at, read, reply_to_id, edited_at, forwarded_from, ${ATTACHMENT_COLUMNS}`;
+
+/** Null unless the row actually carries a file: the columns are always
+ * selected, so "no attachment" has to be told apart from "not loaded". */
+function toAttachment(row: MessageRow): Attachment | null {
+  if (!row.attachment_path || !row.attachment_kind) return null;
+  return {
+    path: row.attachment_path,
+    kind: row.attachment_kind,
+    name: row.attachment_name ?? null,
+    size: row.attachment_size ?? null,
+    width: row.attachment_width ?? null,
+    height: row.attachment_height ?? null,
+  };
+}
 
 function toMessage(row: MessageRow): ChatMessage {
   return {
@@ -50,6 +76,7 @@ function toMessage(row: MessageRow): ChatMessage {
     replyToId: row.reply_to_id ?? null,
     editedAt: row.edited_at ?? null,
     forwardedFrom: row.forwarded_from ?? null,
+    attachment: toAttachment(row),
   };
 }
 
@@ -75,11 +102,14 @@ export async function sendMessage(
   friendId: string,
   body: string,
   replyToId?: string | null,
-  forwardedFrom?: string | null
+  forwardedFrom?: string | null,
+  attachment?: Attachment | null
 ): Promise<ChatMessage | null> {
   if (!supabase) return null;
   const trimmed = body.trim();
-  if (!trimmed) return null;
+  // An attachment is a message in its own right — a photo with no caption is
+  // the usual case, not an empty send.
+  if (!trimmed && !attachment) return null;
 
   const { data, error } = await supabase
     .from('messages')
@@ -89,6 +119,12 @@ export async function sendMessage(
       body: trimmed,
       reply_to_id: replyToId ?? null,
       forwarded_from: forwardedFrom ?? null,
+      attachment_path: attachment?.path ?? null,
+      attachment_kind: attachment?.kind ?? null,
+      attachment_name: attachment?.name ?? null,
+      attachment_size: attachment?.size ?? null,
+      attachment_width: attachment?.width ?? null,
+      attachment_height: attachment?.height ?? null,
     })
     .select(MESSAGE_COLUMNS)
     .single();

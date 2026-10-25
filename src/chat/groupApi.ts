@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { reportHandledError } from '../monitoring/sentry';
+import { Attachment, AttachmentKind } from './attachments';
 
 export { isSupabaseConfigured };
 
@@ -23,6 +24,8 @@ export type GroupMessage = {
   editedAt: string | null;
   /** Display name of whoever wrote the message this was forwarded from. */
   forwardedFrom: string | null;
+  /** A photo or file sent with the message; the body is then its caption. */
+  attachment: Attachment | null;
 };
 
 export type GroupReaction = {
@@ -41,11 +44,34 @@ type MessageRow = {
   reply_to_id: string | null;
   edited_at: string | null;
   forwarded_from: string | null;
+  attachment_path: string | null;
+  attachment_kind: AttachmentKind | null;
+  attachment_name: string | null;
+  attachment_size: number | null;
+  attachment_width: number | null;
+  attachment_height: number | null;
 };
 type ReactionRow = { message_id: string; user_id: string; emoji: string };
 
+const ATTACHMENT_COLUMNS =
+  'attachment_path, attachment_kind, attachment_name, attachment_size, attachment_width, attachment_height';
+
 const MESSAGE_COLUMNS =
-  'id, group_id, sender_id, body, created_at, reply_to_id, edited_at, forwarded_from';
+  `id, group_id, sender_id, body, created_at, reply_to_id, edited_at, forwarded_from, ${ATTACHMENT_COLUMNS}`;
+
+/** Null unless the row actually carries a file — see the direct-message
+ * version of this in chatApi.ts. */
+function toAttachment(row: MessageRow): Attachment | null {
+  if (!row.attachment_path || !row.attachment_kind) return null;
+  return {
+    path: row.attachment_path,
+    kind: row.attachment_kind,
+    name: row.attachment_name ?? null,
+    size: row.attachment_size ?? null,
+    width: row.attachment_width ?? null,
+    height: row.attachment_height ?? null,
+  };
+}
 
 const GROUP_COLUMNS = 'id, name, owner_id, avatar_url, created_at';
 
@@ -69,6 +95,7 @@ function toMessage(row: MessageRow): GroupMessage {
     replyToId: row.reply_to_id ?? null,
     editedAt: row.edited_at ?? null,
     forwardedFrom: row.forwarded_from ?? null,
+    attachment: toAttachment(row),
   };
 }
 
@@ -182,11 +209,12 @@ export async function sendGroupMessage(
   senderId: string,
   body: string,
   replyToId?: string | null,
-  forwardedFrom?: string | null
+  forwardedFrom?: string | null,
+  attachment?: Attachment | null
 ): Promise<GroupMessage | null> {
   if (!supabase) return null;
   const trimmed = body.trim();
-  if (!trimmed) return null;
+  if (!trimmed && !attachment) return null;
 
   const { data, error } = await supabase
     .from('group_messages')
@@ -196,6 +224,12 @@ export async function sendGroupMessage(
       body: trimmed,
       reply_to_id: replyToId ?? null,
       forwarded_from: forwardedFrom ?? null,
+      attachment_path: attachment?.path ?? null,
+      attachment_kind: attachment?.kind ?? null,
+      attachment_name: attachment?.name ?? null,
+      attachment_size: attachment?.size ?? null,
+      attachment_width: attachment?.width ?? null,
+      attachment_height: attachment?.height ?? null,
     })
     .select(MESSAGE_COLUMNS)
     .single();

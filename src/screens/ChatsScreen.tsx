@@ -9,6 +9,7 @@ import { useAuth } from '../auth/AuthContext';
 import { ChatGroup } from '../chat/groupApi';
 import { PlayerSummary } from '../friends/friendsApi';
 import { ChatSummary, isSupabaseConfigured, listChats, subscribeChatList } from '../chat/chatsApi';
+import { attachmentPreview } from '../chat/attachments';
 import { formatListStamp } from '../chat/messageGroups';
 import { presenceOf } from '../chat/presence';
 import GroupAvatar from '../chat/GroupAvatar';
@@ -136,6 +137,7 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
                 stamp={chat.lastMessage ? formatListStamp(chat.lastMessage.createdAt, language) : ''}
                 youPrefix={t('chats.youPrefix')}
                 noMessagesText={t('chats.noMessages')}
+                attachmentLabels={{ photo: t('chats.photo'), file: t('chats.file') }}
                 onPress={() => {
                   if (chat.kind === 'direct' && chat.player) onOpenDirect(chat.player);
                   else if (chat.group) onOpenGroup(chat.group);
@@ -157,13 +159,27 @@ type RowProps = {
   stamp: string;
   youPrefix: string;
   noMessagesText: string;
+  /** What a photo or an unnamed file reads as when it came with no caption. */
+  attachmentLabels: { photo: string; file: string };
   onPress: () => void;
 };
 
-function ChatRow({ chat, meId, theme, styles, stamp, youPrefix, noMessagesText, onPress }: RowProps) {
+function ChatRow({
+  chat,
+  meId,
+  theme,
+  styles,
+  stamp,
+  youPrefix,
+  noMessagesText,
+  attachmentLabels,
+  onPress,
+}: RowProps) {
   const last = chat.lastMessage;
   const mine = last?.senderId === meId;
-  const preview = last ? `${mine ? youPrefix : ''}${last.body}` : noMessagesText;
+  const preview = last
+    ? `${mine ? youPrefix : ''}${attachmentPreview(last.body, last.attachment, attachmentLabels)}`
+    : noMessagesText;
   const online = chat.kind === 'direct' && presenceOf(chat.player?.lastSeenAt).online;
 
   return (

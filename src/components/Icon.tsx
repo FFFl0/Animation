@@ -44,6 +44,9 @@ export type IconName =
   | 'reply'
   | 'trash'
   | 'image'
+  | 'file'
+  | 'paperclip'
+  | 'download'
   | 'edit'
   | 'gem'
   | 'chevronRight'
@@ -371,6 +374,28 @@ function renderIcon(name: IconName, common: any, color: string) {
           <Path d="M6 4h12l4 6-10 10L2 10l4-6z" {...common} />
           <Path d="M2 10h20" {...common} />
           <Path d="M9.5 4 7.5 10l4.5 10 4.5-10-2-6" {...common} />
+        </>
+      );
+    case 'file':
+      return (
+        <>
+          <Path d="M14 3H7a1 1 0 0 0-1 1v16a1 1 0 0 0 1 1h10a1 1 0 0 0 1-1V7l-4-4z" {...common} />
+          <Path d="M14 3v4h4" {...common} />
+        </>
+      );
+    case 'paperclip':
+      return (
+        <Path
+          d="M16.5 8.5 9.9 15.1a2 2 0 0 0 2.8 2.8l6.6-6.6a4 4 0 0 0-5.6-5.6l-6.6 6.6a6 6 0 0 0 8.5 8.5l5.6-5.6"
+          {...common}
+        />
+      );
+    case 'download':
+      return (
+        <>
+          <Line x1="12" y1="4" x2="12" y2="15" {...common} />
+          <Path d="M8 11.5 12 15.5l4-4" {...common} />
+          <Path d="M5 17v2a1 1 0 0 0 1 1h12a1 1 0 0 0 1-1v-2" {...common} />
         </>
       );
     case 'edit':

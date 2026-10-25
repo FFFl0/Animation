@@ -1114,3 +1114,172 @@ select
 from public.profiles;
 
 grant select on public.leaderboard to authenticated;
+
+-- ============================================================
+-- ВЛОЖЕНИЯ В ПЕРЕПИСКЕ: фото и файлы.
+--
+-- Сами файлы лежат в Storage, в строке сообщения — только путь к ним.
+-- Ведро закрытое: ссылки на скачивание подписанные и живут час, так что
+-- чужую переписку нельзя прочитать, даже зная путь.
+-- ============================================================
+
+alter table public.messages add column if not exists attachment_path text;
+alter table public.messages add column if not exists attachment_kind text;
+alter table public.messages add column if not exists attachment_name text;
+alter table public.messages add column if not exists attachment_size integer;
+alter table public.messages add column if not exists attachment_width integer;
+alter table public.messages add column if not exists attachment_height integer;
+
+alter table public.group_messages add column if not exists attachment_path text;
+alter table public.group_messages add column if not exists attachment_kind text;
+alter table public.group_messages add column if not exists attachment_name text;
+alter table public.group_messages add column if not exists attachment_size integer;
+alter table public.group_messages add column if not exists attachment_width integer;
+alter table public.group_messages add column if not exists attachment_height integer;
+
+do $$ begin
+  alter table public.messages add constraint messages_attachment_kind_check
+    check (attachment_kind is null or attachment_kind in ('image', 'file'));
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter table public.group_messages add constraint group_messages_attachment_kind_check
+    check (attachment_kind is null or attachment_kind in ('image', 'file'));
+exception when duplicate_object then null;
+end $$;
+
+-- Текст перестаёт быть обязательным, когда к сообщению приложен файл:
+-- фото без подписи — это нормальное сообщение, а не пустое.
+--
+-- Старое ограничение ставил сам Postgres при создании таблицы, поэтому
+-- оно ищется по каталогу, а не по угаданному имени: на базе, созданной
+-- другой версией файла, оно могло называться иначе.
+do $$
+declare c record;
+begin
+  for c in
+    select conname
+      from pg_constraint
+     where conrelid = 'public.messages'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%char_length(body)%'
+  loop
+    execute format('alter table public.messages drop constraint %I', c.conname);
+  end loop;
+
+  for c in
+    select conname
+      from pg_constraint
+     where conrelid = 'public.group_messages'::regclass
+       and contype = 'c'
+       and pg_get_constraintdef(oid) ilike '%char_length(body)%'
+  loop
+    execute format('alter table public.group_messages drop constraint %I', c.conname);
+  end loop;
+end $$;
+
+do $$ begin
+  alter table public.messages add constraint messages_body_check
+    check (char_length(body) <= 1000 and (char_length(body) > 0 or attachment_path is not null));
+exception when duplicate_object then null;
+end $$;
+
+do $$ begin
+  alter table public.group_messages add constraint group_messages_body_check
+    check (char_length(body) <= 2000 and (char_length(body) > 0 or attachment_path is not null));
+exception when duplicate_object then null;
+end $$;
+
+-- ---------------------------------------------------------------------------
+-- Ведро для вложений.
+--
+-- В отличие от `avatars` оно закрытое: аватар видит кто угодно, а фото из
+-- личной переписки — только её участники. Читается оно подписанными
+-- ссылками, которые выдаёт сервер, проверив политику ниже.
+--
+-- Разрешены только картинки и `application/octet-stream`. Это не
+-- случайность: любой файл, кроме картинки, кладётся как octet-stream, даже
+-- если на самом деле это PDF или HTML. Иначе браузер, открыв подписанную
+-- ссылку, отрисовал бы присланный HTML прямо на домене хранилища — то есть
+-- чужой скрипт выполнился бы там, где лежат файлы всех переписок. Тип
+-- нужен клиенту только для картинок (их рисует <Image>), остальное он
+-- отдаёт системе по имени файла.
+-- ---------------------------------------------------------------------------
+
+insert into storage.buckets (id, name, public, file_size_limit, allowed_mime_types)
+values (
+  'chat-media', 'chat-media', false, 10485760,
+  array['image/jpeg', 'image/png', 'image/webp', 'image/gif', 'application/octet-stream']
+)
+on conflict (id) do update
+  set public = excluded.public,
+      file_size_limit = excluded.file_size_limit,
+      allowed_mime_types = excluded.allowed_mime_types;
+
+/**
+ * Кому можно трогать файл — решает его путь.
+ *
+ * `dm/<id1>_<id2>/<файл>` — личная переписка: доступ есть, если твой id
+ * один из двух в имени папки. Порядок id не проверяется, важно только
+ * попадание; одинаковый порядок с обеих сторон — забота клиента, он
+ * сортирует их, чтобы оба нашли одну и ту же папку.
+ *
+ * `group/<id группы>/<файл>` — группа: доступ есть у её участников.
+ *
+ * Функция, а не выражение прямо в политике, по двум причинам: членство в
+ * группе читается через `is_group_member` (она SECURITY DEFINER, иначе
+ * политики на самой таблице участников зациклились бы), и приведение
+ * имени папки к uuid нужно сначала проверить — иначе путь с мусором вместо
+ * id роняет запрос ошибкой приведения типа вместо тихого отказа.
+ */
+create or replace function public.can_use_chat_media(object_name text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  parts text[] := storage.foldername(object_name);
+  scope text;
+  key text;
+begin
+  if auth.uid() is null or coalesce(array_length(parts, 1), 0) < 2 then
+    return false;
+  end if;
+
+  scope := parts[1];
+  key := parts[2];
+
+  if scope = 'dm' then
+    return auth.uid()::text = any (string_to_array(key, '_'));
+  elsif scope = 'group' then
+    if key !~ '^[0-9a-f]{8}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{4}-[0-9a-f]{12}$' then
+      return false;
+    end if;
+    return public.is_group_member(key::uuid, auth.uid());
+  end if;
+
+  return false;
+end;
+$$;
+
+grant execute on function public.can_use_chat_media(text) to authenticated;
+
+drop policy if exists "Read attachments from your own chats" on storage.objects;
+create policy "Read attachments from your own chats"
+  on storage.objects for select
+  using (bucket_id = 'chat-media' and public.can_use_chat_media(name));
+
+drop policy if exists "Attach files to your own chats" on storage.objects;
+create policy "Attach files to your own chats"
+  on storage.objects for insert
+  with check (bucket_id = 'chat-media' and public.can_use_chat_media(name));
+
+-- Удалять — только своё: вложение уходит вместе с сообщением, а удалить
+-- сообщение может лишь тот, кто его написал. Без проверки владельца
+-- собеседник смог бы стереть присланный ему файл из чужого сообщения.
+drop policy if exists "Delete attachments you uploaded" on storage.objects;
+create policy "Delete attachments you uploaded"
+  on storage.objects for delete
+  using (bucket_id = 'chat-media' and owner = auth.uid() and public.can_use_chat_media(name));

@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { PlayerSummary, fetchPlayers } from '../friends/friendsApi';
+import { Attachment, AttachmentKind, MediaScope } from './attachments';
+import { copyAttachmentTo } from './attachmentStorage';
 import { ChatGroup, getGroupReadMarks, listMyGroups, sendGroupMessage } from './groupApi';
 import { getUnreadCountsByFriend, sendMessage } from './chatApi';
 
@@ -20,7 +22,14 @@ export type ChatSummary = {
   player: PlayerSummary | null;
   /** Set for a group, for the same reason. */
   group: ChatGroup | null;
-  lastMessage: { body: string; senderId: string; createdAt: string } | null;
+  lastMessage: {
+    body: string;
+    senderId: string;
+    createdAt: string;
+    /** Enough of an attachment to label the row when the body is empty — a
+     * photo with no caption still has to read as something. */
+    attachment: { kind: AttachmentKind; name: string | null } | null;
+  } | null;
   unread: number;
 };
 
@@ -37,8 +46,29 @@ export type ChatSummary = {
  */
 const LIST_WINDOW = 400;
 
-type DirectRow = { id: string; sender_id: string; recipient_id: string; body: string; created_at: string };
-type GroupRow = { id: string; group_id: string; sender_id: string; body: string; created_at: string };
+type PreviewRow = {
+  body: string;
+  created_at: string;
+  sender_id: string;
+  attachment_kind: AttachmentKind | null;
+  attachment_name: string | null;
+};
+
+type DirectRow = PreviewRow & { id: string; recipient_id: string };
+type GroupRow = PreviewRow & { id: string; group_id: string };
+
+/** Only the two fields a list row needs; the full attachment is read when the
+ * conversation itself is opened. */
+const PREVIEW_COLUMNS = 'attachment_kind, attachment_name';
+
+function toPreview(row: PreviewRow) {
+  return {
+    body: row.body,
+    senderId: row.sender_id,
+    createdAt: row.created_at,
+    attachment: row.attachment_kind ? { kind: row.attachment_kind, name: row.attachment_name ?? null } : null,
+  };
+}
 
 /** Newest message per conversation, plus the ids involved. Rows arrive newest
  * first, so the first one seen for a conversation is the one to keep. */
@@ -58,7 +88,7 @@ async function directChats(meId: string): Promise<ChatSummary[]> {
   // the caller is the sender or the recipient.
   const { data } = await supabase
     .from('messages')
-    .select('id, sender_id, recipient_id, body, created_at')
+    .select(`id, sender_id, recipient_id, body, created_at, ${PREVIEW_COLUMNS}`)
     .order('created_at', { ascending: false })
     .limit(LIST_WINDOW);
 
@@ -85,7 +115,7 @@ async function directChats(meId: string): Promise<ChatSummary[]> {
       title: player.username,
       player,
       group: null,
-      lastMessage: { body: row.body, senderId: row.sender_id, createdAt: row.created_at },
+      lastMessage: toPreview(row),
       unread: unread.get(peerId) ?? 0,
     });
   }
@@ -98,7 +128,7 @@ async function groupMessageWindow(): Promise<GroupRow[]> {
   if (!supabase) return [];
   const { data } = await supabase
     .from('group_messages')
-    .select('id, group_id, sender_id, body, created_at')
+    .select(`id, group_id, sender_id, body, created_at, ${PREVIEW_COLUMNS}`)
     .order('created_at', { ascending: false })
     .limit(LIST_WINDOW);
   return (data as GroupRow[] | null) ?? [];
@@ -139,7 +169,7 @@ async function groupChats(meId: string): Promise<ChatSummary[]> {
       title: group.name,
       player: null,
       group,
-      lastMessage: row ? { body: row.body, senderId: row.sender_id, createdAt: row.created_at } : null,
+      lastMessage: row ? toPreview(row) : null,
       unread: unread.get(group.id) ?? 0,
     };
   });
@@ -181,20 +211,43 @@ export async function countUnread(meId: string): Promise<number> {
   return total;
 }
 
-/** Sends into whichever kind of chat a summary points at. Used by forwarding,
+/** Where a chat's attachments live. Needed by a forward, which has to put a
+ * copy in the destination's folder before pointing a message at it. */
+export function scopeOf(chat: ChatSummary, meId: string): MediaScope {
+  return chat.kind === 'direct'
+    ? { kind: 'direct', meId, peerId: chat.id }
+    : { kind: 'group', groupId: chat.id };
+}
+
+/**
+ * Sends into whichever kind of chat a summary points at. Used by forwarding,
  * which picks a destination out of the list and so cannot know in advance
- * whether it is a person or a group. */
+ * whether it is a person or a group.
+ *
+ * An attachment is copied rather than referenced: the original object sits in
+ * a folder only the source conversation's people can read, so pointing the
+ * new message at it would hand the recipients a path they are not allowed to
+ * open. If the copy fails the whole forward does — a bubble promising a photo
+ * that will not load is worse than a plain failure.
+ */
 export async function sendToChat(
   chat: ChatSummary,
   meId: string,
   body: string,
-  forwardedFrom?: string | null
+  forwardedFrom?: string | null,
+  attachment?: Attachment | null
 ): Promise<boolean> {
+  let carried: Attachment | null = null;
+  if (attachment) {
+    carried = await copyAttachmentTo(scopeOf(chat, meId), attachment);
+    if (!carried) return false;
+  }
+
   if (chat.kind === 'direct') {
-    const sent = await sendMessage(meId, chat.id, body, null, forwardedFrom ?? null);
+    const sent = await sendMessage(meId, chat.id, body, null, forwardedFrom ?? null, carried);
     return sent !== null;
   }
-  const sent = await sendGroupMessage(chat.id, meId, body, null, forwardedFrom ?? null);
+  const sent = await sendGroupMessage(chat.id, meId, body, null, forwardedFrom ?? null, carried);
   return sent !== null;
 }
 

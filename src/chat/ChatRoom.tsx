@@ -1,7 +1,10 @@
 import { ReactNode, useEffect, useMemo, useRef, useState } from 'react';
 import {
+  ActivityIndicator,
+  Image,
   Keyboard,
   KeyboardAvoidingView,
+  Linking,
   Modal,
   NativeScrollEvent,
   NativeSyntheticEvent,
@@ -27,6 +30,16 @@ import MessageBubble, { BubbleMessage, ReactionGroup } from './MessageBubble';
 import EmojiPicker from './EmojiPicker';
 import ForwardSheet from './ForwardSheet';
 import { ChatSummary, sendToChat } from './chatsApi';
+import {
+  Attachment,
+  MAX_ATTACHMENT_BYTES,
+  MediaScope,
+  PendingAttachment,
+  formatFileSize,
+} from './attachments';
+import { pickChatFile, pickChatPhoto } from './attachmentPicker';
+import { uploadAttachment } from './attachmentStorage';
+import { useAttachmentUrls } from './useAttachmentUrls';
 import { buildChatItems, firstUnreadIdOf, formatDayLabel } from './messageGroups';
 
 /** Offered in the long-press menu and by double-tap (the first one). */
@@ -49,6 +62,8 @@ type Props<T extends BubbleMessage> = {
    * for a group.
    */
   conversationKey: string;
+  /** Which folder this conversation's attachments are stored under. */
+  mediaScope: MediaScope;
   messages: T[];
   meId: string;
   /** The current user's own display name, used when forwarding something
@@ -63,7 +78,7 @@ type Props<T extends BubbleMessage> = {
   emptyText: string;
   reactionsFor: (messageId: string) => ReactionGroup[];
   myReactionFor: (messageId: string) => string | null;
-  onSend: (text: string, replyToId: string | null) => void | Promise<void>;
+  onSend: (text: string, replyToId: string | null, attachment: Attachment | null) => void | Promise<void>;
   /** Rewrites a message in place. */
   onEdit: (message: T, text: string) => void | Promise<void>;
   canEdit: (message: T) => boolean;
@@ -85,6 +100,7 @@ export default function ChatRoom<T extends BubbleMessage>({
   subtitle,
   onBack,
   conversationKey,
+  mediaScope,
   messages,
   meId,
   myName,
@@ -111,6 +127,10 @@ export default function ChatRoom<T extends BubbleMessage>({
   const [editing, setEditing] = useState<T | null>(null);
   const [menuFor, setMenuFor] = useState<T | null>(null);
   const [forwarding, setForwarding] = useState<T | null>(null);
+  const [pending, setPending] = useState<PendingAttachment | null>(null);
+  const [attachSheet, setAttachSheet] = useState(false);
+  const [uploading, setUploading] = useState(false);
+  const [viewer, setViewer] = useState<{ url: string; name: string | null } | null>(null);
   const [toast, setToast] = useState<string | null>(null);
   const [highlightedId, setHighlightedId] = useState<string | null>(null);
   const [searching, setSearching] = useState(false);
@@ -143,6 +163,7 @@ export default function ChatRoom<T extends BubbleMessage>({
     setUnreadAnchor(null);
     setReplyTo(null);
     setEditing(null);
+    setPending(null);
     setAtBottom(true);
     positionsRef.current.clear();
   }, [conversationKey]);
@@ -171,6 +192,11 @@ export default function ChatRoom<T extends BubbleMessage>({
   const currentMatchId = orderedMatches[matchIndex] ?? null;
 
   const items = useMemo(() => buildChatItems(messages, unreadAnchor), [messages, unreadAnchor]);
+  const attachmentPaths = useMemo(
+    () => messages.map((m) => m.attachment?.path).filter((path): path is string => !!path),
+    [messages]
+  );
+  const attachmentUrls = useAttachmentUrls(attachmentPaths);
   const unreadCount = useMemo(
     () => messages.filter((m) => m.senderId !== meId && m.read === false).length,
     [messages, meId]
@@ -209,11 +235,11 @@ export default function ChatRoom<T extends BubbleMessage>({
     scrollRef.current?.scrollToEnd({ animated: true });
   };
 
-  const handleSend = () => {
+  const handleSend = async () => {
     const text = draft.trim();
-    if (!text) return;
 
     if (editing) {
+      if (!text) return;
       const target = editing;
       setDraft('');
       setEditing(null);
@@ -221,10 +247,66 @@ export default function ChatRoom<T extends BubbleMessage>({
       return;
     }
 
+    // Either half is enough to be a message: a photo needs no caption, and a
+    // caption needs no photo.
+    if (!text && !pending) return;
+    if (uploading) return;
+
+    let attachment: Attachment | null = null;
+    if (pending) {
+      setUploading(true);
+      attachment = await uploadAttachment(mediaScope, pending);
+      setUploading(false);
+      // The draft and the picked file are deliberately left in place, so a
+      // failed upload can be retried without picking it all over again.
+      if (!attachment) {
+        setToast(t('chat.attachFailed'));
+        return;
+      }
+    }
+
     const replyId = replyTo?.id ?? null;
     setDraft('');
     setReplyTo(null);
-    onSend(text, replyId);
+    setPending(null);
+    onSend(text, replyId, attachment);
+  };
+
+  const pickAttachment = async (what: 'photo' | 'file') => {
+    setAttachSheet(false);
+    const result = what === 'photo' ? await pickChatPhoto() : await pickChatFile();
+
+    if (result.status === 'ok') {
+      setEditing(null);
+      setPending(result.attachment);
+      return;
+    }
+    if (result.status === 'canceled') return;
+    if (result.status === 'tooLarge') {
+      setToast(t('chat.attachTooLarge', formatFileSize(MAX_ATTACHMENT_BYTES, language)));
+      return;
+    }
+    setToast(result.status === 'permissionDenied' ? t('chat.attachNoPermission') : t('chat.attachFailed'));
+  };
+
+  /**
+   * A photo opens in the viewer; anything else is handed to the system by its
+   * signed link, which downloads it — the app has no business rendering an
+   * arbitrary file, and the object is stored opaque for exactly that reason.
+   */
+  const openAttachment = (message: T) => {
+    const attachment = message.attachment;
+    if (!attachment) return;
+    const url = attachmentUrls.get(attachment.path);
+    if (!url) {
+      setToast(t('chat.attachUnavailable'));
+      return;
+    }
+    if (attachment.kind === 'image') {
+      setViewer({ url, name: attachment.name });
+      return;
+    }
+    Linking.openURL(url).catch(() => setToast(t('chat.attachOpenFailed')));
   };
 
   const handleDraftChange = (text: string) => {
@@ -264,7 +346,7 @@ export default function ChatRoom<T extends BubbleMessage>({
     setForwarding(null);
     if (!message) return;
     const origin = message.forwardedFrom ?? (message.senderId === meId ? myName : labelFor(message.senderId));
-    const ok = await sendToChat(chat, meId, message.body, origin);
+    const ok = await sendToChat(chat, meId, message.body, origin, message.attachment ?? null);
     setToast(ok ? t('chat.forwarded', chat.title) : t('chat.forwardFailed'));
   };
 
@@ -393,6 +475,9 @@ export default function ChatRoom<T extends BubbleMessage>({
                       isLastInGroup={item.isLastInGroup}
                       editedLabel={t('chat.edited')}
                       forwardedLabel={(name: string) => t('chat.forwardedFrom', name)}
+                      attachmentUrl={m.attachment ? attachmentUrls.get(m.attachment.path) ?? null : null}
+                      attachmentSizeLabel={formatFileSize(m.attachment?.size ?? null, language)}
+                      onOpenAttachment={openAttachment}
                       highlighted={highlightedId === m.id}
                       onReply={handleReply}
                       onQuickReact={(msg) => onToggleReaction(msg.id, QUICK_REACTIONS[0])}
@@ -429,12 +514,44 @@ export default function ChatRoom<T extends BubbleMessage>({
           )}
         </View>
 
+        {pending && (
+          <View style={styles.replyBar}>
+            {pending.kind === 'image' ? (
+              <Image source={{ uri: pending.uri }} style={styles.pendingThumb} resizeMode="cover" />
+            ) : (
+              <View style={styles.pendingIcon}>
+                <Icon name="file" size={18} color={theme.primary} />
+              </View>
+            )}
+            <View style={styles.replyBarText}>
+              <Text style={styles.replyBarTitle}>
+                {pending.kind === 'image' ? t('chat.attachPhoto') : t('chat.attachFile')}
+              </Text>
+              <Text style={styles.replyBarBody} numberOfLines={1}>
+                {[pending.name, formatFileSize(pending.size, language)].filter(Boolean).join(' · ')}
+              </Text>
+            </View>
+            <SoundTouchable
+              onPress={() => setPending(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.attachCancel')}
+            >
+              <Icon name="close" size={16} color={theme.textMuted} />
+            </SoundTouchable>
+          </View>
+        )}
+
         {editing && (
           <View style={styles.replyBar}>
             <View style={styles.replyBarAccent} />
             <View style={styles.replyBarText}>
               <Text style={styles.replyBarTitle}>{t('chat.editingTitle')}</Text>
-              <Text style={styles.replyBarBody} numberOfLines={1}>{editing.body}</Text>
+              <Text style={styles.replyBarBody} numberOfLines={1}>
+                {/* A photo sent without a caption has no body to preview, so
+                    the bar names the attachment instead of showing a gap. */}
+                {editing.body ||
+                  (editing.attachment?.kind === 'image' ? t('chat.attachPhoto') : t('chat.attachFile'))}
+              </Text>
             </View>
             <SoundTouchable onPress={cancelEditing} accessibilityRole="button" accessibilityLabel={t('chat.cancelEdit')}>
               <Icon name="close" size={16} color={theme.textMuted} />
@@ -456,6 +573,18 @@ export default function ChatRoom<T extends BubbleMessage>({
         )}
 
         <View style={styles.inputRow}>
+          <SoundTouchable
+            style={styles.attachToggle}
+            onPress={() => {
+              Keyboard.dismiss();
+              setShowEmoji(false);
+              setAttachSheet(true);
+            }}
+            accessibilityRole="button"
+            accessibilityLabel={t('chat.attachLabel')}
+          >
+            <Icon name="paperclip" size={21} color={theme.textMuted} />
+          </SoundTouchable>
           <SoundTouchable
             style={styles.emojiToggle}
             onPress={() =>
@@ -480,13 +609,65 @@ export default function ChatRoom<T extends BubbleMessage>({
             onSubmitEditing={handleSend}
             multiline
           />
-          <SoundTouchable style={styles.sendButton} onPress={handleSend} accessibilityRole="button">
-            <Icon name={editing ? 'check' : 'send'} size={17} color={theme.onPrimary} />
+          <SoundTouchable
+            style={styles.sendButton}
+            onPress={handleSend}
+            disabled={uploading}
+            accessibilityRole="button"
+          >
+            {uploading ? (
+              <ActivityIndicator size="small" color={theme.onPrimary} />
+            ) : (
+              <Icon name={editing ? 'check' : 'send'} size={17} color={theme.onPrimary} />
+            )}
           </SoundTouchable>
         </View>
 
         {showEmoji && <EmojiPicker onPick={(emoji) => setDraft((prev) => prev + emoji)} />}
       </KeyboardAvoidingView>
+
+      <Modal visible={attachSheet} transparent animationType="fade" onRequestClose={() => setAttachSheet(false)}>
+        <Pressable style={styles.attachBackdrop} onPress={() => setAttachSheet(false)}>
+          <Pressable style={styles.attachCard} onPress={() => {}}>
+            <SoundTouchable style={styles.menuAction} onPress={() => pickAttachment('photo')}>
+              <Icon name="image" size={18} color={theme.text} />
+              <Text style={styles.menuActionText}>{t('chat.attachPhoto')}</Text>
+            </SoundTouchable>
+            <SoundTouchable style={styles.menuAction} onPress={() => pickAttachment('file')}>
+              <Icon name="file" size={18} color={theme.text} />
+              <Text style={styles.menuActionText}>{t('chat.attachFile')}</Text>
+            </SoundTouchable>
+            <Text style={styles.attachHint}>{t('chat.attachLimit', formatFileSize(MAX_ATTACHMENT_BYTES, language))}</Text>
+          </Pressable>
+        </Pressable>
+      </Modal>
+
+      <Modal visible={!!viewer} transparent animationType="fade" onRequestClose={() => setViewer(null)}>
+        <View style={styles.viewerRoot}>
+          <Pressable style={styles.viewerBackdrop} onPress={() => setViewer(null)} />
+          {viewer && <Image source={{ uri: viewer.url }} style={styles.viewerImage} resizeMode="contain" />}
+          <View style={styles.viewerBar}>
+            <SoundTouchable
+              style={styles.viewerButton}
+              onPress={() => setViewer(null)}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.attachClose')}
+            >
+              <Icon name="close" size={18} color="#FFFFFF" />
+            </SoundTouchable>
+            <SoundTouchable
+              style={styles.viewerButton}
+              onPress={() => {
+                if (viewer) Linking.openURL(viewer.url).catch(() => setToast(t('chat.attachOpenFailed')));
+              }}
+              accessibilityRole="button"
+              accessibilityLabel={t('chat.attachSave')}
+            >
+              <Icon name="download" size={18} color="#FFFFFF" />
+            </SoundTouchable>
+          </View>
+        </View>
+      </Modal>
 
       <ForwardSheet
         visible={!!forwarding}
@@ -704,7 +885,52 @@ function makeStyles(theme: Theme) {
       borderTopWidth: 1,
       borderTopColor: theme.border,
     },
-    emojiToggle: { width: 48, height: 48, borderRadius: 24, alignItems: 'center', justifyContent: 'center' },
+    attachToggle: { width: 38, height: 48, alignItems: 'center', justifyContent: 'center' },
+    emojiToggle: { width: 42, height: 48, alignItems: 'center', justifyContent: 'center' },
+    pendingThumb: { width: 34, height: 34, borderRadius: radius.sm },
+    pendingIcon: {
+      width: 34,
+      height: 34,
+      borderRadius: radius.sm,
+      backgroundColor: theme.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    attachBackdrop: { flex: 1, backgroundColor: 'rgba(0,0,0,0.4)', alignItems: 'center', justifyContent: 'flex-end', padding: 20 },
+    attachCard: {
+      width: '100%',
+      maxWidth: 360,
+      backgroundColor: theme.card,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      paddingHorizontal: 18,
+      paddingTop: 6,
+      paddingBottom: 14,
+      marginBottom: 20,
+    },
+    attachHint: {
+      fontSize: 11,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      paddingTop: 10,
+      borderTopWidth: 1,
+      borderTopColor: theme.border,
+    },
+    viewerRoot: { flex: 1, backgroundColor: '#000000', alignItems: 'center', justifyContent: 'center' },
+    // Behind the picture rather than over it, so a tap on the image itself
+    // still dismisses while the buttons above stay reachable.
+    viewerBackdrop: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
+    viewerImage: { width: '100%', height: '82%' },
+    viewerBar: { position: 'absolute', top: 44, left: 16, right: 16, flexDirection: 'row', justifyContent: 'space-between' },
+    viewerButton: {
+      width: 40,
+      height: 40,
+      borderRadius: 20,
+      backgroundColor: 'rgba(255,255,255,0.18)',
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
     input: {
       flex: 1,
       backgroundColor: theme.card,

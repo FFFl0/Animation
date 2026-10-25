@@ -21,6 +21,8 @@ import {
   toggleReaction,
 } from '../chat/chatApi';
 import ChatRoom from '../chat/ChatRoom';
+import { Attachment, MediaScope } from '../chat/attachments';
+import { removeAttachment } from '../chat/attachmentStorage';
 import { useReactions } from '../chat/useReactions';
 import { useTyping, usePeerPresence } from '../chat/presence';
 import { formatLastSeen } from '../chat/messageGroups';
@@ -47,6 +49,10 @@ export default function ChatScreen({ friend, onBack }: Props) {
   const typingKey = useMemo(() => [meId, friend.id].sort().join('-'), [meId, friend.id]);
   const { typingNames, notifyTyping } = useTyping(typingKey, meId, profile?.username ?? '');
   const presence = usePeerPresence(friend.id, friend.lastSeenAt);
+  const mediaScope = useMemo<MediaScope>(
+    () => ({ kind: 'direct', meId, peerId: friend.id }),
+    [meId, friend.id]
+  );
 
   const toggle = useCallback(
     (messageId: string, userId: string, emoji: string, current: string | null) =>
@@ -99,8 +105,8 @@ export default function ChatScreen({ friend, onBack }: Props) {
 
   if (!profile) return null;
 
-  const handleSend = async (text: string, replyToId: string | null) => {
-    const sent = await sendMessage(meId, friend.id, text, replyToId);
+  const handleSend = async (text: string, replyToId: string | null, attachment: Attachment | null) => {
+    const sent = await sendMessage(meId, friend.id, text, replyToId, null, attachment);
     if (sent) setMessages((prev) => [...prev, sent]);
   };
 
@@ -113,6 +119,9 @@ export default function ChatScreen({ friend, onBack }: Props) {
   const handleDelete = async (message: ChatMessage) => {
     setMessages((prev) => prev.filter((m) => m.id !== message.id));
     await deleteMessage(message.id);
+    // After the row, not before: while the message still exists its bubble
+    // would be left pointing at an object that is already gone.
+    await removeAttachment(message.attachment?.path);
   };
 
   const subtitle = typingNames.length > 0 ? t('chat.typing') : formatLastSeen(presence.lastSeenAt, presence.online, language);
@@ -121,6 +130,7 @@ export default function ChatScreen({ friend, onBack }: Props) {
     <ChatRoom
       onBack={onBack}
       conversationKey={friend.id}
+      mediaScope={mediaScope}
       subtitle={subtitle}
       header={
         <View style={styles.headerRow}>

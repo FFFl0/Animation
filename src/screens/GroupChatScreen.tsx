@@ -28,6 +28,8 @@ import {
   toggleGroupReaction,
 } from '../chat/groupApi';
 import ChatRoom from '../chat/ChatRoom';
+import { Attachment, MediaScope } from '../chat/attachments';
+import { removeAttachment } from '../chat/attachmentStorage';
 import GroupAvatar from '../chat/GroupAvatar';
 import { useReactions } from '../chat/useReactions';
 import { useTyping } from '../chat/presence';
@@ -71,6 +73,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
   );
   const { refresh, grouped, mineFor, apply } = useReactions(meId, { fetch: getGroupReactions, toggle });
   const { typingNames, notifyTyping } = useTyping(group.id, meId, profile?.username ?? '');
+  const mediaScope = useMemo<MediaScope>(() => ({ kind: 'group', groupId: group.id }), [group.id]);
 
   const loadMembers = useCallback(async () => {
     const memberIds = await getGroupMemberIds(group.id);
@@ -121,8 +124,8 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
 
   if (!profile) return null;
 
-  const handleSend = async (text: string, replyToId: string | null) => {
-    const sent = await sendGroupMessage(group.id, meId, text, replyToId);
+  const handleSend = async (text: string, replyToId: string | null, attachment: Attachment | null) => {
+    const sent = await sendGroupMessage(group.id, meId, text, replyToId, null, attachment);
     if (sent) setMessages((prev) => [...prev, sent]);
   };
 
@@ -135,6 +138,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
   const handleDeleteMessage = async (message: GroupMessage) => {
     setMessages((prev) => prev.filter((m) => m.id !== message.id));
     await deleteGroupMessage(message.id);
+    await removeAttachment(message.attachment?.path);
   };
 
   const handlePickAvatar = async () => {
@@ -208,6 +212,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
       <ChatRoom
         onBack={onBack}
         conversationKey={group.id}
+        mediaScope={mediaScope}
         subtitle={typingNames.length > 0 ? t('chat.typingMany', typingNames) : null}
         header={
           <SoundTouchable style={styles.headerRow} onPress={() => setSheet('settings')} accessibilityRole="button">

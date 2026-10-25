@@ -1,10 +1,11 @@
 import { useMemo, useRef } from 'react';
-import { Animated, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Image, PanResponder, Pressable, StyleSheet, Text, View } from 'react-native';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import Icon from '../components/Icon';
+import { Attachment } from './attachments';
 import { formatClock } from './messageGroups';
 
 /** The shape a bubble needs. Direct messages and group messages both satisfy
@@ -22,6 +23,8 @@ export type BubbleMessage = {
   editedAt?: string | null;
   /** Name of the original author, when this is a forwarded copy. */
   forwardedFrom?: string | null;
+  /** A photo or file sent with the message; the body is then its caption. */
+  attachment?: Attachment | null;
 };
 
 /** How far the bubble must travel before releasing counts as "reply". */
@@ -30,6 +33,26 @@ const MAX_DRAG = 90;
 const DOUBLE_TAP_MS = 280;
 
 export type ReactionGroup = { emoji: string; count: number; mine: boolean };
+
+/** Shown when a file arrived without a name — rare, but a nameless row with
+ * nothing in it reads as broken. */
+const fileFallbackName = '\u2014';
+
+/**
+ * How tall a photo's bubble is drawn.
+ *
+ * The real ratio comes from the row, so the space is reserved before the
+ * picture arrives and the history does not jump when it does. A file picked
+ * through the document picker has no dimensions recorded, so it falls back to
+ * something close to a phone photo and is corrected by `resizeMode="cover"`.
+ * Very tall or very wide pictures are clamped: a panorama should not become a
+ * two-pixel strip, and a tower should not fill three screens.
+ */
+function aspectRatioOf(attachment: Attachment): number {
+  const { width, height } = attachment;
+  if (!width || !height) return 4 / 3;
+  return Math.min(Math.max(width / height, 0.6), 2.2);
+}
 
 type Props<T extends BubbleMessage> = {
   message: T;
@@ -50,6 +73,13 @@ type Props<T extends BubbleMessage> = {
   editedLabel: string;
   /** Localised "Forwarded from <name>" line. */
   forwardedLabel: (name: string) => string;
+  /** Signed link to the attachment, or null while it is still being fetched
+   * (or when it could not be signed at all). */
+  attachmentUrl: string | null;
+  /** Size under a file's name, already localised. */
+  attachmentSizeLabel: string;
+  /** Opens a photo full screen, or hands a file to the system. */
+  onOpenAttachment: (message: T) => void;
   onReply: (message: T) => void;
   onQuickReact: (message: T) => void;
   onToggleReaction: (message: T, emoji: string) => void;
@@ -69,6 +99,9 @@ export default function MessageBubble<T extends BubbleMessage>({
   isLastInGroup,
   editedLabel,
   forwardedLabel,
+  attachmentUrl,
+  attachmentSizeLabel,
+  onOpenAttachment,
   onReply,
   onQuickReact,
   onToggleReaction,
@@ -166,7 +199,49 @@ export default function MessageBubble<T extends BubbleMessage>({
               </Pressable>
             )}
 
-            <Text style={[styles.body, isMine && styles.textOnPrimary]}>{message.body}</Text>
+            {message.attachment?.kind === 'image' && (
+              // The ratio goes on the wrapper and the picture fills it: an
+              // aspectRatio set on an Image is read as its whole size on
+              // Android, so the bubble would be sized by the ratio alone.
+              <Pressable
+                onPress={() => onOpenAttachment(message)}
+                style={[
+                  styles.photo,
+                  !message.body && styles.photoAlone,
+                  { aspectRatio: aspectRatioOf(message.attachment) },
+                ]}
+              >
+                {attachmentUrl ? (
+                  <Image source={{ uri: attachmentUrl }} style={styles.photoImage} resizeMode="cover" />
+                ) : (
+                  <View style={styles.photoLoading}>
+                    <ActivityIndicator color={isMine ? theme.onPrimary : theme.primary} />
+                  </View>
+                )}
+              </Pressable>
+            )}
+
+            {message.attachment?.kind === 'file' && (
+              <Pressable
+                onPress={() => onOpenAttachment(message)}
+                style={[styles.file, isMine ? styles.fileMine : styles.fileTheirs]}
+              >
+                <View style={[styles.fileIcon, isMine && styles.fileIconMine]}>
+                  <Icon name="file" size={17} color={isMine ? theme.onPrimary : theme.primary} />
+                </View>
+                <View style={styles.fileText}>
+                  <Text style={[styles.fileName, isMine && styles.textOnPrimary]} numberOfLines={1}>
+                    {message.attachment.name ?? fileFallbackName}
+                  </Text>
+                  {!!attachmentSizeLabel && (
+                    <Text style={[styles.fileSize, isMine && styles.fileSizeMine]}>{attachmentSizeLabel}</Text>
+                  )}
+                </View>
+                <Icon name="download" size={16} color={isMine ? theme.onPrimary : theme.textMuted} />
+              </Pressable>
+            )}
+
+            {!!message.body && <Text style={[styles.body, isMine && styles.textOnPrimary]}>{message.body}</Text>}
 
             <View style={styles.metaRow}>
               {!!message.editedAt && (
@@ -237,6 +312,45 @@ function makeStyles(theme: Theme) {
     quoteBody: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
     body: { fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, lineHeight: 19 },
     textOnPrimary: { color: theme.onPrimary },
+    // A fixed width, not a share of the bubble: the bubble shrinks to fit its
+    // content, so an aspect-ratio box inside it has no width to be a share of
+    // and would collapse. 232 is the widest photo that still leaves the
+    // bubble inside its 78% cap on a phone.
+    photo: {
+      width: 232,
+      marginBottom: 6,
+      borderRadius: radius.md,
+      overflow: 'hidden',
+      backgroundColor: theme.background,
+    },
+    photoAlone: { marginBottom: 0 },
+    photoImage: { width: '100%', height: '100%' },
+    photoLoading: { width: '100%', height: '100%', alignItems: 'center', justifyContent: 'center' },
+    file: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      borderRadius: radius.md,
+      paddingHorizontal: 10,
+      paddingVertical: 8,
+      marginBottom: 4,
+      minWidth: 180,
+    },
+    fileTheirs: { backgroundColor: theme.background },
+    fileMine: { backgroundColor: 'rgba(255,255,255,0.18)' },
+    fileIcon: {
+      width: 32,
+      height: 32,
+      borderRadius: 16,
+      alignItems: 'center',
+      justifyContent: 'center',
+      backgroundColor: theme.primaryLight,
+    },
+    fileIconMine: { backgroundColor: 'rgba(255,255,255,0.22)' },
+    fileText: { flex: 1 },
+    fileName: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.text },
+    fileSize: { fontSize: 10, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
+    fileSizeMine: { color: 'rgba(255,255,255,0.8)' },
     forwarded: { fontSize: 10, fontFamily: fontFamily('700'), color: theme.primary, marginBottom: 3 },
     forwardedMine: { color: 'rgba(255,255,255,0.9)' },
     metaRow: { flexDirection: 'row', alignItems: 'center', justifyContent: 'flex-end', gap: 4, marginTop: 2 },
