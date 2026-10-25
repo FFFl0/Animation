@@ -36,6 +36,10 @@ export function useTyping(key: string, meId: string, myName: string) {
   useEffect(() => {
     if (!isSupabaseConfigured || !supabase || !key || !meId) return;
 
+    // Shared topic on purpose, unlike the postgres_changes channels, which
+    // each get a unique one: broadcast only reaches people on the same topic,
+    // so both sides of a conversation have to name it the same way.
+    //
     // self: false — the sender already knows they are typing, and echoing it
     // back would put the indicator up in their own header.
     const channel = supabase.channel(`typing-${key}`, { config: { broadcast: { self: false } } });

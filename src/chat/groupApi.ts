@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { reportHandledError } from '../monitoring/sentry';
 import { Attachment, AttachmentKind } from './attachments';
+import { uniqueChannelTopic } from './channelTopic';
 
 export { isSupabaseConfigured };
 
@@ -317,7 +318,7 @@ export async function toggleGroupReaction(
 export function subscribeGroupMessages(groupId: string, onMessage: (m: GroupMessage) => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`group-${groupId}`)
+    .channel(uniqueChannelTopic(`group-${groupId}`))
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
@@ -334,7 +335,7 @@ export function subscribeGroupMessages(groupId: string, onMessage: (m: GroupMess
 export function subscribeGroupMessageUpdates(groupId: string, onUpdate: (m: GroupMessage) => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`group-upd-${groupId}`)
+    .channel(uniqueChannelTopic(`group-upd-${groupId}`))
     .on(
       'postgres_changes',
       { event: 'UPDATE', schema: 'public', table: 'group_messages', filter: `group_id=eq.${groupId}` },
@@ -351,7 +352,7 @@ export function subscribeGroupMessageUpdates(groupId: string, onUpdate: (m: Grou
 export function subscribeGroupMessageDeletes(groupId: string, onDelete: (messageId: string) => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`group-del-${groupId}`)
+    .channel(uniqueChannelTopic(`group-del-${groupId}`))
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'group_messages' }, (payload) => {
       const row = payload.old as Partial<MessageRow>;
       if (row.id && row.group_id === groupId) onDelete(row.id);
@@ -365,7 +366,7 @@ export function subscribeGroupMessageDeletes(groupId: string, onDelete: (message
 export function subscribeGroupReactions(onChange: () => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel('group-reactions')
+    .channel(uniqueChannelTopic('group-reactions'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_message_reactions' }, () => onChange())
     .subscribe();
   return () => {

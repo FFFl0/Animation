@@ -1,5 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { Attachment, AttachmentKind } from './attachments';
+import { uniqueChannelTopic } from './channelTopic';
 
 export { isSupabaseConfigured };
 
@@ -199,7 +200,7 @@ export async function toggleReaction(
 export function subscribeIncomingMessages(meId: string, friendId: string, onMessage: (m: ChatMessage) => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`chat-${meId}-${friendId}`)
+    .channel(uniqueChannelTopic(`chat-${meId}-${friendId}`))
     .on(
       'postgres_changes',
       { event: 'INSERT', schema: 'public', table: 'messages', filter: `recipient_id=eq.${meId}` },
@@ -224,7 +225,7 @@ export function subscribeMessageUpdates(
 ): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`chat-upd-${meId}-${friendId}`)
+    .channel(uniqueChannelTopic(`chat-upd-${meId}-${friendId}`))
     .on('postgres_changes', { event: 'UPDATE', schema: 'public', table: 'messages' }, (payload) => {
       const row = payload.new as MessageRow;
       const involvesThisChat =
@@ -244,7 +245,7 @@ export function subscribeMessageUpdates(
 export function subscribeMessageDeletes(meId: string, friendId: string, onDelete: (messageId: string) => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel(`chat-del-${meId}-${friendId}`)
+    .channel(uniqueChannelTopic(`chat-del-${meId}-${friendId}`))
     .on('postgres_changes', { event: 'DELETE', schema: 'public', table: 'messages' }, (payload) => {
       const row = payload.old as Partial<MessageRow>;
       const involvesThisChat =
@@ -264,7 +265,7 @@ export function subscribeMessageDeletes(meId: string, friendId: string, onDelete
 export function subscribeReactions(onChange: () => void): () => void {
   if (!supabase) return () => {};
   const channel = supabase
-    .channel('chat-reactions')
+    .channel(uniqueChannelTopic('chat-reactions'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'message_reactions' }, () => onChange())
     .subscribe();
   return () => {

@@ -1,6 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { PlayerSummary, fetchPlayers } from '../friends/friendsApi';
 import { Attachment, AttachmentKind, MediaScope } from './attachments';
+import { uniqueChannelTopic } from './channelTopic';
 import { copyAttachmentTo } from './attachmentStorage';
 import { ChatGroup, getGroupReadMarks, listMyGroups, sendGroupMessage } from './groupApi';
 import { getUnreadCountsByFriend, sendMessage } from './chatApi';
@@ -270,7 +271,7 @@ export function subscribeChatList(onChange: () => void): () => void {
   };
 
   const channel = supabase
-    .channel('chat-list')
+    .channel(uniqueChannelTopic('chat-list'))
     .on('postgres_changes', { event: '*', schema: 'public', table: 'messages' }, nudge)
     .on('postgres_changes', { event: '*', schema: 'public', table: 'group_messages' }, nudge)
     .subscribe();
