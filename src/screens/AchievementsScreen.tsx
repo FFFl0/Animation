@@ -46,8 +46,10 @@ export default function AchievementsScreen() {
   const cardWidth = (width - 40 - GAP * (COLUMNS - 1)) / COLUMNS;
   const shown = filter === 'all' ? ACHIEVEMENTS : ACHIEVEMENTS.filter((a) => a.group === filter);
 
+  // The tab bar below pays the bottom inset, so this screen must not:
+  // claiming it twice leaves a dead band above the bar that crops the content.
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <Icon name="sparkles" size={26} color={theme.primary} />

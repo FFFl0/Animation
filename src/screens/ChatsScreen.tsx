@@ -83,8 +83,10 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
 
   const emptyText = !isSupabaseConfigured ? t('chats.emptyLocal') : needle ? t('chats.searchEmpty') : t('chats.empty');
 
+  // The tab bar below pays the bottom inset, so this screen must not:
+  // claiming it twice leaves a dead band above the bar that crops the content.
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <View style={styles.header}>
         <Text style={styles.title}>{t('chats.title')}</Text>
         <SoundTouchable

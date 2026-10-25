@@ -101,8 +101,10 @@ export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props
   const rows = grouping === 'categories' ? categoryRows : modeRows;
   const best = Math.max(1, ...rows.map((r) => r.stat.bestScore));
 
+  // The tab bar below pays the bottom inset, so this screen must not:
+  // claiming it twice leaves a dead band above the bar that crops the content.
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.hero}>
           <Image source={STATS_HEADER} style={styles.heroImage} resizeMode="cover" />

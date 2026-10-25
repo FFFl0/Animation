@@ -1,6 +1,6 @@
 import { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
-import { SafeAreaView } from 'react-native-safe-area-context';
+import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -39,6 +39,7 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
   const t = useT();
   const { language } = useLanguage();
   const { width } = useWindowDimensions();
+  const insets = useSafeAreaInsets();
   const { balance, spent, medals, cart, orders, ownsItem } = useShop();
   const [section, setSection] = useState<ShopSection>('avatars');
   const [showAll, setShowAll] = useState(false);
@@ -61,7 +62,10 @@ export default function ShopScreen({ onBack, onOpenItem, onOpenCart, onOpenOrder
               its own pixel size and the parent just crops the top-left of it */}
           <Image source={HERO} style={styles.heroImage} resizeMode="cover" />
           <HeroFade theme={theme} />
-          <View style={styles.heroTop}>
+          {/* The artwork deliberately runs under the status bar — the screen
+              takes no top inset — but the controls on top of it must not, or
+              they land under the clock and the battery. */}
+          <View style={[styles.heroTop, { paddingTop: insets.top + 14 }]}>
             <SoundTouchable onPress={onBack} style={styles.heroButton} accessibilityRole="button">
               <Text style={styles.heroBack}>‹</Text>
             </SoundTouchable>
@@ -321,7 +325,9 @@ function makeStyles(theme: Theme) {
     scroll: { paddingBottom: 40 },
     hero: { height: 300, overflow: 'hidden' },
     heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
-    heroTop: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16, paddingTop: 14 },
+    // paddingTop is applied at the call site, which is where the device's
+    // status-bar inset is known.
+    heroTop: { flexDirection: 'row', alignItems: 'center', paddingHorizontal: 16 },
     heroButton: {
       width: 38,
       height: 38,

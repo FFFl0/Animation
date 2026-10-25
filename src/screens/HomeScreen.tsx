@@ -62,8 +62,10 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
 
   const dailyDone = profile.dailyChallenge?.date === todayDateStr() ? profile.dailyChallenge : null;
 
+  // The tab bar below pays the bottom inset, so this screen must not:
+  // claiming it twice leaves a dead band above the bar that crops the content.
   return (
-    <SafeAreaView style={styles.safe}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
       <ScrollView contentContainerStyle={styles.container}>
         <View style={styles.header}>
           <View>
