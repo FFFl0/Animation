@@ -1,5 +1,6 @@
 import { CHARACTERS, Character, characterName, localizeCharacter } from '../data/characters';
 import { ANIME_SERIES, AnimeSeries, seriesTitleById } from '../data/animeSeries';
+import { openingVideoFor } from '../data/openingVideos';
 import { OPENINGS } from '../data/openings';
 import { QuestionType, getCategory } from '../data/categories';
 import { RoundConfig } from './types';
@@ -62,6 +63,21 @@ function buildOptions(correct: string, pool: string[], rng: Rng): { options: str
   const options = shuffle([correct, ...distractors], rng);
   return { options, correctIndex: options.indexOf(correct) };
 }
+
+/**
+ * The series a theme-clip question may be about.
+ *
+ * The catalogue has grown past the clips that ship with the app, and a
+ * question that asks you to name the opening while the player shows "no clip
+ * yet" cannot be answered by watching — only guessed. So the clip-backed
+ * series are the pool, and the rest still appear everywhere else: as answer
+ * options, and as the series their characters come from.
+ *
+ * The fallback keeps a round from coming back empty if the clips ever go
+ * missing entirely; the catalogue test is what notices that they have.
+ */
+const SERIES_WITH_CLIPS = ANIME_SERIES.filter((series) => openingVideoFor(series.id) !== undefined);
+const VIDEO_SERIES = SERIES_WITH_CLIPS.length > 0 ? SERIES_WITH_CLIPS : ANIME_SERIES;
 
 /**
  * What a question is about. Most types ask about a character; the theme-clip
@@ -180,7 +196,7 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
   // Series get their own cycle: difficulty tiers describe characters, so a
   // tier filter says nothing about which openings to play, and drawing the
   // series from the character just picked would repeat the popular ones.
-  let seriesCycle = shuffle(ANIME_SERIES, rng);
+  let seriesCycle = shuffle(VIDEO_SERIES, rng);
   let seriesIndex = 0;
 
   for (let i = 0; i < config.questionCount; i++) {
@@ -189,7 +205,7 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
       cycleIndex = 0;
     }
     if (seriesIndex >= seriesCycle.length) {
-      seriesCycle = shuffle(ANIME_SERIES, rng);
+      seriesCycle = shuffle(VIDEO_SERIES, rng);
       seriesIndex = 0;
     }
     const type = types[Math.floor(rng() * types.length)];
