@@ -33,6 +33,7 @@ import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
+import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
 import TournamentScreen, { WEEKLY_MATCH_CONFIG } from './src/screens/TournamentScreen';
 import ShopScreen from './src/screens/ShopScreen';
 import { ShopTab } from './src/shop/catalogue';
@@ -141,6 +142,15 @@ function AppShell() {
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
   const [challengeFriend, setChallengeFriend] = useState<PlayerSummary | null>(null);
   const [autoJoinRoomCode, setAutoJoinRoomCode] = useState<string | null>(null);
+  // A battle is reachable from home, a friend's profile, the leaderboard, an
+  // accepted invite and an invite link, so Back has to return to whichever
+  // one it actually came from — the link especially, which has no friend
+  // profile behind it to go back to.
+  const [battleFrom, setBattleFrom] = useState<Screen>('home');
+  const [invitedRoomCode, setInvitedRoomCode] = useState<string | null>(null);
+  // Bumped every time an invite link is opened, so the battle screen is
+  // rebuilt even when the link points at the room it is already set to.
+  const [battleMountKey, setBattleMountKey] = useState(0);
   const [selectedGroup, setSelectedGroup] = useState<ChatGroup | null>(null);
   const [privacyFrom, setPrivacyFrom] = useState<Screen>('profile');
   // A conversation is reachable from the chat list and from a friend's
@@ -154,10 +164,28 @@ function AppShell() {
   // "online" in chat instead of a timestamp from last week.
   useLastSeenHeartbeat(profile?.id ?? null);
 
+  // An invite link can land before there is anyone to join as — tapping it is
+  // often what makes somebody install the app in the first place — so the code
+  // is held here and spent once the sign-in is done.
+  useBattleInviteLink(setInvitedRoomCode);
+
   useEffect(() => {
     setScreen('home');
     setPreAuthScreen('welcome');
   }, [profile?.id]);
+
+  // Declared after the reset above on purpose: switching accounts sends the
+  // app back to home, and an invite waiting to be opened has to be applied
+  // after that, not before it.
+  useEffect(() => {
+    if (!invitedRoomCode || !profile) return;
+    setInvitedRoomCode(null);
+    setChallengeFriend(null);
+    setAutoJoinRoomCode(invitedRoomCode);
+    setBattleFrom('home');
+    setBattleMountKey((n) => n + 1);
+    setScreen('battle');
+  }, [invitedRoomCode, profile]);
 
   // Only the opaque account id, never the username — the policy says reports
   // carry nothing personal, and this is where that has to hold.
@@ -196,13 +224,11 @@ function AppShell() {
       }
 
       switch (screen) {
-        case 'battle': {
-          const cameFromFriendProfile = !!challengeFriend || !!autoJoinRoomCode;
+        case 'battle':
           setChallengeFriend(null);
           setAutoJoinRoomCode(null);
-          setScreen(cameFromFriendProfile ? 'friendProfile' : 'home');
+          setScreen(battleFrom);
           return true;
-        }
         case 'tournament':
         case 'shop':
           setScreen('home');
@@ -271,7 +297,7 @@ function AppShell() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [profile, preAuthScreen, screen, challengeFriend, autoJoinRoomCode, chatFrom, groupChatFrom, t]);
+  }, [profile, preAuthScreen, screen, battleFrom, chatFrom, groupChatFrom, t]);
 
   if (loading) {
     return (
@@ -388,7 +414,10 @@ function AppShell() {
               }}
               onStartMode={startMode}
               onOpenSettings={() => setScreen('profile')}
-              onOpenBattle={() => setScreen('battle')}
+              onOpenBattle={() => {
+                setBattleFrom('home');
+                setScreen('battle');
+              }}
               onOpenTournament={() => setScreen('tournament')}
               onOpenShop={() => {
                 setShopTab('all');
@@ -459,11 +488,14 @@ function AppShell() {
 
           {screen === 'battle' && (
             <BattleScreen
+              // Keyed by the invite it was opened for, so a link tapped
+              // while a battle is already on screen joins the room it points
+              // at instead of being swallowed by the mounted one.
+              key={`${autoJoinRoomCode ?? 'fresh'}-${battleMountKey}`}
               onBack={() => {
-                const cameFromFriendProfile = !!challengeFriend || !!autoJoinRoomCode;
                 setChallengeFriend(null);
                 setAutoJoinRoomCode(null);
-                setScreen(cameFromFriendProfile ? 'friendProfile' : 'home');
+                setScreen(battleFrom);
               }}
               challengeFriend={challengeFriend ?? undefined}
               autoJoinRoomCode={autoJoinRoomCode ?? undefined}
@@ -496,6 +528,7 @@ function AppShell() {
               }}
               onAcceptBattleInvite={(roomCode) => {
                 setAutoJoinRoomCode(roomCode);
+                setBattleFrom('friends');
                 setScreen('battle');
               }}
               onOpenGroups={() => setScreen('groups')}
@@ -547,6 +580,7 @@ function AppShell() {
               }}
               onChallenge={() => {
                 setChallengeFriend(selectedFriend);
+                setBattleFrom('friendProfile');
                 setScreen('battle');
               }}
             />
@@ -560,6 +594,7 @@ function AppShell() {
               onBack={() => setScreen('friendProfile')}
               onChallenge={() => {
                 setChallengeFriend(selectedFriend);
+                setBattleFrom('compare');
                 setScreen('battle');
               }}
             />
@@ -602,6 +637,7 @@ function AppShell() {
                 setSelectedFriend(player);
                 setSelectedFriendship(null);
                 setChallengeFriend(player);
+                setBattleFrom('leaderboard');
                 setScreen('battle');
               }}
             />

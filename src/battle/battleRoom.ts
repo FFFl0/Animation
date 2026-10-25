@@ -4,8 +4,11 @@ import { RoundConfig } from '../quiz/types';
 
 const CODE_ALPHABET = 'ABCDEFGHJKLMNPQRSTUVWXYZ23456789';
 
+/** Short enough to read aloud, long enough that two rooms are unlikely to collide. */
+export const ROOM_CODE_LENGTH = 5;
+
 /** Avoids visually ambiguous characters (0/O, 1/I) since players read this aloud or type it in. */
-export function generateRoomCode(length = 5): string {
+export function generateRoomCode(length = ROOM_CODE_LENGTH): string {
   let code = '';
   for (let i = 0; i < length; i++) {
     code += CODE_ALPHABET[Math.floor(Math.random() * CODE_ALPHABET.length)];

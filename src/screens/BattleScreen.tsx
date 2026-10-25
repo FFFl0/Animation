@@ -1,5 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { ActivityIndicator, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -19,8 +20,8 @@ import {
   BattleRoom,
   BattleStartPayload,
   generateRoomCode,
-  normalizeRoomCode,
 } from '../battle/battleRoom';
+import { battleInviteUrl, looksLikeInviteLink, roomCodeFromInput } from '../battle/battleLink';
 import { useT } from '../i18n/strings';
 import { sendBattleInvite } from '../notifications/notificationsApi';
 
@@ -29,10 +30,11 @@ type Props = {
   /** Set when arriving here via a friend's "Бросить вызов" button — skips
    * the menu, immediately creates a room, notifies the friend in-app (a
    * `battle_invites` row, picked up by NotificationsContext), and opens the
-   * share sheet with the code too as a fallback delivery path. */
+   * share sheet with the invite link as a second delivery path. */
   challengeFriend?: { id: string; username: string };
-  /** Set when arriving here by accepting an incoming battle invite — skips
-   * the menu and joins this room code directly instead of creating one. */
+  /** Set when arriving here by accepting an incoming battle invite, or by
+   * opening an invite link — skips the menu and joins this room code
+   * directly instead of creating one. */
   autoJoinRoomCode?: string;
 };
 
@@ -59,16 +61,23 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
   const [battleConfig, setBattleConfig] = useState<RoundConfig | null>(null);
   const [countdown, setCountdown] = useState(0);
   const [localResult, setLocalResult] = useState<{ score: number; total: number } | null>(null);
+  const [copied, setCopied] = useState<'link' | 'code' | null>(null);
 
   const roomRef = useRef<BattleRoom | null>(null);
   const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
+  const copiedTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   useEffect(() => {
     return () => {
       if (countdownTimer.current) clearInterval(countdownTimer.current);
+      if (copiedTimer.current) clearTimeout(copiedTimer.current);
       roomRef.current?.leave();
     };
   }, []);
+
+  /** The link that drops a friend straight into this room. */
+  const inviteUrl = useMemo(() => (roomCode ? battleInviteUrl(roomCode) : ''), [roomCode]);
+  const joinInputIsLink = looksLikeInviteLink(joinCodeInput);
 
   // Falls back to an empty id only in the impossible case profile is still
   // null here — the JSX that could actually invoke these callbacks is gated
@@ -148,13 +157,47 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
 
   const handleCreate = () => connect(generateRoomCode(), true);
 
+  /** Left exactly as typed or pasted: the field holds either a code or a
+   * whole link, and rewriting the text as it goes in mangles one of them.
+   * Whitespace and case are sorted out when it is read, not while it is
+   * being entered. */
+  const handleJoinInputChange = (text: string) => {
+    setJoinCodeInput(text);
+    if (error) setError(null);
+  };
+
   const handleJoinSubmit = () => {
-    const code = normalizeRoomCode(joinCodeInput);
-    if (code.length !== 5) {
-      setError(t('battle.codeLengthError'));
+    const code = roomCodeFromInput(joinCodeInput);
+    if (!code) {
+      setError(t('battle.inviteInputError'));
       return;
     }
     connect(code, false);
+  };
+
+  /** One tap for the common case: the link is already in the clipboard,
+   * because the friend who sent it is in the chat app next door. */
+  const handlePasteInvite = async () => {
+    const clipboard = await Clipboard.getStringAsync().catch(() => '');
+    const code = roomCodeFromInput(clipboard);
+    if (!code) {
+      // Whatever is already in the field is the player's own typing — the
+      // clipboard turning out to hold something else is no reason to lose it.
+      setError(t('battle.clipboardNoInvite'));
+      return;
+    }
+    connect(code, false);
+  };
+
+  const copyToClipboard = async (what: 'link' | 'code', value: string) => {
+    await Clipboard.setStringAsync(value).catch(() => {});
+    setCopied(what);
+    if (copiedTimer.current) clearTimeout(copiedTimer.current);
+    copiedTimer.current = setTimeout(() => setCopied(null), 2200);
+  };
+
+  const shareInvite = () => {
+    Share.share({ message: t('battle.shareMessage', roomCode, inviteUrl) }).catch(() => {});
   };
 
   const handleFinish = (score: number, total: number) => {
@@ -173,9 +216,7 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
     if (phase === 'waiting' && isHost && challengeFriend && !sharedForChallenge.current) {
       sharedForChallenge.current = true;
       sendBattleInvite(me.userId, challengeFriend.id, roomCode).catch(() => {});
-      Share.share({
-        message: t('battle.shareMessage', roomCode),
-      }).catch(() => {});
+      shareInvite();
     }
   }, [phase, isHost, roomCode, challengeFriend]);
 
@@ -233,7 +274,12 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
             <Text style={styles.subtitle}>{t('battle.menuSubtitle')}</Text>
             {error && <Text style={styles.error}>{error}</Text>}
             <PillButton title={t('battle.createBattle')} variant="ink" onPress={handleCreate} style={{ marginTop: 8 }} />
-            <PillButton title={t('battle.joinByCode')} variant="outline" onPress={() => setPhase('joinInput')} style={{ marginTop: 12 }} />
+            <PillButton
+              title={t('battle.joinByLinkOrCode')}
+              variant="outline"
+              onPress={() => setPhase('joinInput')}
+              style={{ marginTop: 12 }}
+            />
           </>
         )}
 
@@ -244,16 +290,25 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
             <Text style={styles.subtitle}>{t('battle.roomCodeSubtitle')}</Text>
             {error && <Text style={styles.error}>{error}</Text>}
             <TextInput
-              style={styles.codeInput}
-              placeholder="ABCDE"
+              style={[styles.codeInput, joinInputIsLink && styles.linkInput]}
+              placeholder={t('battle.codeOrLinkPlaceholder')}
               placeholderTextColor={theme.textMuted}
-              autoCapitalize="characters"
+              // A pasted link must not be auto-capitalized, and it is longer
+              // than a code, so neither setting can be fixed up front.
+              autoCapitalize={joinInputIsLink ? 'none' : 'characters'}
               autoCorrect={false}
-              maxLength={5}
               value={joinCodeInput}
-              onChangeText={setJoinCodeInput}
+              onChangeText={handleJoinInputChange}
+              onSubmitEditing={handleJoinSubmit}
+              returnKeyType="go"
             />
             <PillButton title={t('battle.joinRoom')} variant="ink" onPress={handleJoinSubmit} style={{ marginTop: 8 }} />
+            <PillButton
+              title={t('battle.pasteLink')}
+              variant="outline"
+              onPress={handlePasteInvite}
+              style={{ marginTop: 10 }}
+            />
           </>
         )}
 
@@ -266,18 +321,32 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
 
         {phase === 'waiting' && (
           <>
-            <Text style={styles.subtitle}>{isHost ? t('battle.shareCodeHint') : t('battle.waitingForStart')}</Text>
+            <Text style={styles.subtitle}>{isHost ? t('battle.shareInviteHint') : t('battle.waitingForStart')}</Text>
             {isHost && (
               <>
-                <View style={styles.codeBox}>
-                  <Text style={styles.codeText}>{roomCode}</Text>
-                </View>
+                <PillButton title={t('battle.shareLinkButton')} variant="ink" onPress={shareInvite} />
                 <PillButton
-                  title={t('battle.shareCodeButton')}
+                  title={copied === 'link' ? t('battle.linkCopied') : t('battle.copyLinkButton')}
                   variant="outline"
-                  onPress={() => Share.share({ message: t('battle.shareMessage', roomCode) }).catch(() => {})}
-                  style={{ marginTop: 14 }}
+                  onPress={() => copyToClipboard('link', inviteUrl)}
+                  style={{ marginTop: 10 }}
                 />
+                <Text style={styles.linkText} numberOfLines={1}>
+                  {inviteUrl}
+                </Text>
+                {/* The code stays for the cases a link cannot cover: reading
+                    it out over voice chat, or a messenger that mangles URLs. */}
+                <SoundTouchable
+                  style={styles.codeBox}
+                  onPress={() => copyToClipboard('code', roomCode)}
+                  accessibilityRole="button"
+                  accessibilityLabel={t('battle.copyCodeButton')}
+                >
+                  <Text style={styles.codeText}>{roomCode}</Text>
+                </SoundTouchable>
+                <Text style={styles.codeHint}>
+                  {copied === 'code' ? t('battle.codeCopied') : t('battle.tapCodeToCopy')}
+                </Text>
               </>
             )}
             <ActivityIndicator size="large" color={theme.primary} style={{ marginTop: 20 }} />
@@ -381,14 +450,29 @@ function makeStyles(theme: Theme) {
       color: theme.text,
       marginBottom: 4,
     },
+    linkInput: { fontSize: 13, letterSpacing: 0, textAlign: 'left', fontFamily: fontFamily('500') },
+    linkText: {
+      fontSize: 11,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      marginTop: 12,
+      maxWidth: '100%',
+    },
     codeBox: {
       backgroundColor: theme.primaryLight,
       borderRadius: radius.lg,
-      paddingVertical: 18,
+      paddingVertical: 14,
       paddingHorizontal: 32,
-      marginTop: 12,
+      marginTop: 16,
     },
-    codeText: { fontSize: 34, fontFamily: fontFamily('800'), color: theme.text, letterSpacing: 8 },
+    codeText: { fontSize: 28, fontFamily: fontFamily('800'), color: theme.text, letterSpacing: 8 },
+    codeHint: {
+      fontSize: 11,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      marginTop: 8,
+      textAlign: 'center',
+    },
     countdownNumber: { fontSize: 56, fontFamily: fontFamily('800'), color: theme.primary, marginTop: 12 },
     resultRow: { flexDirection: 'row', gap: 14, marginTop: 18, width: '100%' },
     resultCard: {
