@@ -7,6 +7,7 @@ import { useSound } from '../sound/SoundContext';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { ACHIEVEMENT_IMAGES } from '../data/achievementImages';
+import Burst from './Burst';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { achievementTitle } from '../data/achievements';
@@ -68,8 +69,13 @@ export default function AchievementToastHost({ queue, onShown }: Props) {
           },
         ]}
       >
-        <View style={styles.artWrap}>
-          <Image source={ACHIEVEMENT_IMAGES[current.id]} style={styles.art} resizeMode="cover" />
+        <View style={styles.artSlot}>
+          {/* Keyed by the achievement so each one in the queue gets its own
+              burst rather than only the first. */}
+          <Burst key={current.id} color={theme.primary} size={92} count={9} delay={120} />
+          <View style={styles.artWrap}>
+            <Image source={ACHIEVEMENT_IMAGES[current.id]} style={styles.art} resizeMode="cover" />
+          </View>
         </View>
         <View style={styles.textWrap}>
           <Text style={[styles.label, { color: theme.primary }]}>{t('achievementToast.label')}</Text>
@@ -105,6 +111,9 @@ const styles = StyleSheet.create({
     shadowRadius: 12,
     elevation: 6,
   },
+  // Holds the burst, which has to be free to spill past the artwork's own
+  // rounded, clipped box.
+  artSlot: { width: 52, height: 38, alignItems: 'center', justifyContent: 'center' },
   artWrap: {
     width: 52,
     height: 38,

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Modal, Pressable, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -22,6 +22,7 @@ import AnimeAvatar from '../components/AnimeAvatar';
 import PillButton from '../components/PillButton';
 import Icon from '../components/Icon';
 import { useT } from '../i18n/strings';
+import SkeletonList from '../components/Skeleton';
 
 type Props = {
   onBack: () => void;
@@ -141,9 +142,7 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
           <Text style={styles.emptyText}>{t('leaderboard.unavailableText')}</Text>
         </View>
       ) : rows === null ? (
-        <View style={styles.emptyWrap}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
+        <SkeletonList count={7} trailing />
       ) : rows.length === 0 ? (
         <View style={styles.emptyWrap}>
           <Icon name="trophy" size={32} color={theme.textMuted} />

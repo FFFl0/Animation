@@ -41,7 +41,9 @@ export default function CategoryTile({ id, title, subtitle, startLabel, onPress 
 
 const styles = StyleSheet.create({
   card: {
-    width: '48%',
+    // The grid cell around it sets the width; filling that cell keeps the
+    // tile the same size whether or not something is wrapped around it.
+    width: '100%',
     aspectRatio: 1.12,
     borderRadius: radius.lg,
     overflow: 'hidden',

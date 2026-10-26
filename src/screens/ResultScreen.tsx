@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -9,6 +9,7 @@ import { useSound } from '../sound/SoundContext';
 import { useAuth } from '../auth/AuthContext';
 import FadeIn from '../components/FadeIn';
 import FallingPetals from '../components/FallingPetals';
+import Burst from '../components/Burst';
 import ScoreRing from '../components/ScoreRing';
 import PillButton from '../components/PillButton';
 import ShareCard from '../share/ShareCard';
@@ -17,6 +18,10 @@ import { useT } from '../i18n/strings';
 
 /** From this share of correct answers the round counts as a celebration. */
 const CELEBRATE_AT = 0.8;
+
+/** When the record banner lands — after the ring has swept, so the screen
+ * does not try to say two things at once. */
+const RECORD_DELAY_MS = 420;
 
 type Props = {
   score: number;
@@ -100,13 +105,7 @@ export default function ResultScreen({ score, total, isRecord, contextLabel, onR
           <Text style={styles.title}>{ratio >= 0.7 ? t('result.titleGreat') : t('result.titleGoodStart')}</Text>
         </FadeIn>
 
-        {isRecord && (
-          <FadeIn delay={260}>
-            <View style={styles.recordPill}>
-              <Text style={styles.recordText}>{t('result.newRecord')}</Text>
-            </View>
-          </FadeIn>
-        )}
+        {isRecord && <RecordBanner label={t('result.newRecord')} styles={styles} theme={theme} />}
 
         <FadeIn delay={200}>
           <Text style={styles.subtitle}>{t('result.answered', score, total)}</Text>
@@ -161,6 +160,44 @@ export default function ResultScreen({ score, total, isRecord, contextLabel, onR
   );
 }
 
+/**
+ * A record is the one thing on this screen worth more than a fade: it pops
+ * in with a burst behind it, after the ring has had a moment to sweep, so
+ * the two do not happen on top of each other.
+ */
+function RecordBanner({
+  label,
+  styles,
+  theme,
+}: {
+  label: string;
+  styles: ReturnType<typeof makeStyles>;
+  theme: Theme;
+}) {
+  const pop = useRef(new Animated.Value(0)).current;
+
+  useEffect(() => {
+    Animated.sequence([
+      Animated.delay(RECORD_DELAY_MS),
+      Animated.spring(pop, { toValue: 1, friction: 5, tension: 140, useNativeDriver: Platform.OS !== 'web' }),
+    ]).start();
+  }, [pop]);
+
+  return (
+    <View style={styles.recordWrap}>
+      <Burst color={theme.primary} size={140} delay={RECORD_DELAY_MS} />
+      <Animated.View
+        style={[
+          styles.recordPill,
+          { opacity: pop, transform: [{ scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.55, 1] }) }] },
+        ]}
+      >
+        <Text style={styles.recordText}>{label}</Text>
+      </Animated.View>
+    </View>
+  );
+}
+
 function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
@@ -172,6 +209,7 @@ function makeStyles(theme: Theme) {
       paddingVertical: 24,
     },
     title: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, marginTop: 18, textAlign: 'center' },
+    recordWrap: { alignItems: 'center', justifyContent: 'center' },
     recordPill: {
       backgroundColor: theme.primaryLight,
       borderRadius: radius.pill,

@@ -23,6 +23,7 @@ import SoundTouchable from '../sound/SoundTouchable';
 import Icon from '../components/Icon';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import SkeletonList from '../components/Skeleton';
 import { useNotifications } from '../notifications/NotificationsContext';
 import { getUnreadCountsByFriend } from '../chat/chatApi';
 
@@ -223,9 +224,7 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
           </View>
 
           {friendships === null ? (
-            <View style={styles.emptyWrap}>
-              <ActivityIndicator size="large" color={theme.primary} />
-            </View>
+            <SkeletonList count={6} />
           ) : (
             <ScrollView contentContainerStyle={styles.list}>
               {tab === 'friends' &&

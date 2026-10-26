@@ -17,6 +17,8 @@ import { ModeStat, ZERO_STAT } from '../auth/types';
 import Icon, { IconName } from '../components/Icon';
 import ImageScrim from '../components/ImageScrim';
 import StatRing from '../components/StatRing';
+import FadeIn from '../components/FadeIn';
+import { useCountUp } from '../components/useCountUp';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
@@ -56,11 +58,15 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
   const [grouping, setGrouping] = useState<Grouping>('categories');
   const [pickerOpen, setPickerOpen] = useState(false);
   const { scrollProps } = useRememberedScroll(scrollY, onChangeScrollY);
+  const overall = sumStats(Object.values(profile?.stats ?? {}));
+  const overallAccuracy = accuracyOf(overall);
+  // The three figures at the top land rather than appear. Worked out before
+  // the signed-out return below, like every other hook on this screen.
+  const games = useCountUp(overall.gamesPlayed);
+  const accuracy = useCountUp(overallAccuracy);
+  const streakDays = useCountUp(profile?.streak.count ?? 0);
 
   if (!profile) return null;
-
-  const overall = sumStats(Object.values(profile.stats));
-  const overallAccuracy = accuracyOf(overall);
 
   const categoryRows: Row[] = CATEGORIES.map((cat) => ({
     key: cat.id,
@@ -112,7 +118,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
         <View style={styles.tiles}>
           <View style={styles.tile}>
             <Icon name="play" size={20} color={theme.primary} />
-            <Text style={styles.tileValue}>{overall.gamesPlayed}</Text>
+            <Text style={styles.tileValue}>{games}</Text>
             <Text style={styles.tileLabel}>{t('stats.gamesPlayed')}</Text>
             <View style={styles.tileCorner}>
               <Icon name="stats" size={14} color={theme.textMuted} />
@@ -121,7 +127,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
 
           <View style={styles.tile}>
             <Icon name="target" size={20} color={theme.primary} />
-            <Text style={styles.tileValue}>{overallAccuracy}%</Text>
+            <Text style={styles.tileValue}>{accuracy}%</Text>
             <Text style={styles.tileLabel}>{t('stats.accuracy')}</Text>
             <View style={styles.tileCorner}>
               <StatRing percent={overallAccuracy} size={26} color={theme.primary} trackColor={theme.border} />
@@ -130,7 +136,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
 
           <View style={styles.tile}>
             <Icon name="flame" size={20} color={theme.primary} />
-            <Text style={styles.tileValue}>{profile.streak.count}</Text>
+            <Text style={styles.tileValue}>{streakDays}</Text>
             <Text style={styles.tileLabel}>{t('stats.streakDays')}</Text>
             <View style={styles.pips}>
               {Array.from({ length: STREAK_PIPS }, (_, i) => (
@@ -155,16 +161,20 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
           </SoundTouchable>
         </View>
 
-        {rows.map((row) => (
-          <StatRow
-            key={row.key}
-            row={row}
-            best={best}
-            styles={styles}
-            theme={theme}
-            t={t}
-            onPress={row.art ? () => onOpenCategory(row.art as CategoryId) : undefined}
-          />
+        {rows.map((row, i) => (
+          // Keyed by the grouping as well as the row, so switching between
+          // categories and modes deals the new list out rather than
+          // swapping the labels in place.
+          <FadeIn key={`${grouping}-${row.key}`} delay={i * 45}>
+            <StatRow
+              row={row}
+              best={best}
+              styles={styles}
+              theme={theme}
+              t={t}
+              onPress={row.art ? () => onOpenCategory(row.art as CategoryId) : undefined}
+            />
+          </FadeIn>
         ))}
 
         <View style={styles.quoteCard}>

@@ -18,6 +18,7 @@ import ImageScrim from '../components/ImageScrim';
 import ProgressBar from '../components/ProgressBar';
 import StatRing from '../components/StatRing';
 import Icon from '../components/Icon';
+import { useCountUp } from '../components/useCountUp';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 
@@ -45,11 +46,16 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
   const t = useT();
   const insets = useSafeAreaInsets();
 
+  const category = getCategory(categoryId);
+  const total = profile ? categoryStat(profile, categoryId) : ZERO_STAT;
+  const accuracy = accuracyOf(total);
+  // Hooks before the signed-out return below, so they run on every render.
+  const countedRounds = useCountUp(total.gamesPlayed);
+  const countedAccuracy = useCountUp(accuracy);
+  const countedCorrect = useCountUp(total.totalCorrect);
+
   if (!profile) return null;
 
-  const category = getCategory(categoryId);
-  const total = categoryStat(profile, categoryId);
-  const accuracy = accuracyOf(total);
   const share = Math.round(categoryShare(profile, categoryId) * 100);
   const played = total.gamesPlayed > 0;
   // The same two categories that record under one key are the ones with no
@@ -97,17 +103,17 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
             <View style={styles.tiles}>
               <View style={styles.tile}>
                 <Icon name="target" size={16} color={category.color} />
-                <Text style={styles.tileValue}>{total.gamesPlayed}</Text>
+                <Text style={styles.tileValue}>{countedRounds}</Text>
                 <Text style={styles.tileLabel}>{t('categoryStats.rounds')}</Text>
               </View>
               <View style={styles.tile}>
                 <StatRing percent={accuracy} size={22} color={category.color} trackColor={theme.border} />
-                <Text style={styles.tileValue}>{accuracy}%</Text>
+                <Text style={styles.tileValue}>{countedAccuracy}%</Text>
                 <Text style={styles.tileLabel}>{t('categoryStats.accuracy')}</Text>
               </View>
               <View style={styles.tile}>
                 <Icon name="check" size={16} color={category.color} />
-                <Text style={styles.tileValue}>{total.totalCorrect}</Text>
+                <Text style={styles.tileValue}>{countedCorrect}</Text>
                 <Text style={styles.tileLabel}>{t('categoryStats.correct')}</Text>
               </View>
             </View>

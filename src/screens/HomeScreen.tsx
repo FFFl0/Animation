@@ -15,6 +15,7 @@ import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
 import StreakCard from '../components/StreakCard';
+import FadeIn from '../components/FadeIn';
 import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
@@ -116,15 +117,18 @@ export default function HomeScreen({
 
         <Text style={styles.sectionTitle}>{t('home.sectionCategory')}</Text>
         <View style={styles.grid}>
-          {CATEGORIES.map((cat) => (
-            <CategoryTile
-              key={cat.id}
-              id={cat.id}
-              title={categoryTitle(cat, language)}
-              subtitle={categoryCount(cat.id, t)}
-              startLabel={t('home.start')}
-              onPress={() => onOpenCategory(cat.id)}
-            />
+          {CATEGORIES.map((cat, i) => (
+            // Arriving one after another rather than all together: the grid
+            // reads as being dealt out instead of simply appearing.
+            <FadeIn key={cat.id} delay={i * 55} style={styles.gridCell}>
+              <CategoryTile
+                id={cat.id}
+                title={categoryTitle(cat, language)}
+                subtitle={categoryCount(cat.id, t)}
+                startLabel={t('home.start')}
+                onPress={() => onOpenCategory(cat.id)}
+              />
+            </FadeIn>
           ))}
         </View>
 
@@ -248,6 +252,7 @@ function makeStyles(theme: Theme) {
       rowGap: 12,
       marginBottom: 24,
     },
+    gridCell: { width: '48%' },
     modesRow: { gap: 12, paddingRight: 12 },
     modeCard: {
       width: 190,

@@ -1,5 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { ActivityIndicator, RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
+import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
 import { fontFamily } from '../theme/fonts';
@@ -18,6 +18,7 @@ import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import SkeletonList from '../components/Skeleton';
 import { useNotifications } from '../notifications/NotificationsContext';
 
 type Props = {
@@ -118,9 +119,7 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
       </View>
 
       {chats === null ? (
-        <View style={styles.loadingWrap}>
-          <ActivityIndicator size="large" color={theme.primary} />
-        </View>
+        <SkeletonList count={7} />
       ) : (
         <ScrollView
           contentContainerStyle={styles.list}
@@ -265,7 +264,6 @@ function makeStyles(theme: Theme) {
       paddingVertical: 9,
     },
     searchInput: { flex: 1, fontSize: 14, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
-    loadingWrap: { flex: 1, alignItems: 'center', justifyContent: 'center' },
     list: { paddingHorizontal: 16, paddingTop: 6, paddingBottom: 28 },
     emptyText: {
       fontSize: 13,
