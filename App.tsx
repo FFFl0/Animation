@@ -458,6 +458,23 @@ function AppShell() {
     setScreen('quiz');
   };
 
+  /**
+   * Going to a tab from the bar starts that page at the top.
+   *
+   * The remembered offset exists for coming back out of something opened
+   * from the page — a category, a shop item, a quiz — where losing your
+   * place is the annoyance. Reaching for a tab is the other thing: it is
+   * going somewhere, and somewhere starts at the beginning. Only the taps
+   * on the bar come through here, so the Back buttons and the Android back
+   * gesture keep their place as before.
+   */
+  const openTab = (tab: TabKey) => {
+    if (tab === 'home') setHomeScrollY(0);
+    else if (tab === 'stats') setStatsScrollY(0);
+    else if (tab === 'shop') setShopScrollY(0);
+    setScreen(tab);
+  };
+
   const showTabBar = TAB_SCREENS.includes(screen);
   const transitionKey = screen === 'quiz' ? `quiz-${quizKey}` : screen;
 
@@ -733,7 +750,13 @@ function AppShell() {
         </ScreenTransition>
       </View>
       {showTabBar && (
-        <BottomTabBar active={screen as TabKey} onChange={(tab: TabKey) => setScreen(tab)} theme={theme} />
+        <BottomTabBar
+          active={screen as TabKey}
+          onChange={(tab: TabKey) => {
+            openTab(tab);
+          }}
+          theme={theme}
+        />
       )}
       <AchievementToastHost queue={achievementQueue} onShown={() => setAchievementQueue((q) => q.slice(1))} />
       <OnboardingTour profileId={profile.id} />

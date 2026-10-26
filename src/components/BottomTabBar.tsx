@@ -167,7 +167,15 @@ function TabButton({
           </View>
         )}
       </Animated.View>
-      <Animated.Text style={[styles.label, isActive && styles.labelActive, { opacity: labelOpacity }]}>
+      <Animated.Text
+        // Six tabs leave about sixty points each, and the longest label
+        // only just fits: it must not wrap, and it must not grow with the
+        // phone's font-size setting either, which is what pushed it onto a
+        // second line.
+        numberOfLines={1}
+        allowFontScaling={false}
+        style={[styles.label, isActive && styles.labelActive, { opacity: labelOpacity }]}
+      >
         {label}
       </Animated.Text>
     </SoundTouchable>
@@ -191,8 +199,16 @@ function makeStyles(theme: Theme, bottomInset: number) {
     // line inside it only has to be centred to land under the right icon.
     indicatorSlot: { position: 'absolute', top: 0, left: 0, alignItems: 'center' },
     indicator: { width: 26, height: 3, borderBottomLeftRadius: 3, borderBottomRightRadius: 3 },
-    tab: { flex: 1, alignItems: 'center', gap: 3, paddingHorizontal: 2 },
-    label: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted },
+    tab: { flex: 1, alignItems: 'center', gap: 3 },
+    label: {
+      fontSize: 10,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      // Cyrillic at this weight runs wide; a hair of negative tracking is
+      // what keeps the longest label on one line without shrinking the type.
+      letterSpacing: -0.2,
+      textAlign: 'center',
+    },
     labelActive: { color: theme.primary },
     badge: {
       position: 'absolute',
