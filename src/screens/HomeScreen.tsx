@@ -20,14 +20,19 @@ import Icon from '../components/Icon';
 import { todayDateStr } from '../quiz/today';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import { useRememberedScroll } from '../components/useRememberedScroll';
 
 type Props = {
+  /** Where the page was left, and a way to report where it is now. Held by
+   * the navigator because this screen is unmounted whenever a quiz, a mode
+   * or a category is on top of it. */
+  scrollY: number;
+  onChangeScrollY: (y: number) => void;
   onOpenCategory: (id: CategoryId) => void;
   onStartMode: (id: ModeId) => void;
   onOpenSettings: () => void;
   onOpenBattle: () => void;
   onOpenTournament: () => void;
-  onOpenShop: () => void;
 };
 
 function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
@@ -51,12 +56,21 @@ function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
   }
 }
 
-export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings, onOpenBattle, onOpenTournament, onOpenShop }: Props) {
+export default function HomeScreen({
+  scrollY,
+  onChangeScrollY,
+  onOpenCategory,
+  onStartMode,
+  onOpenSettings,
+  onOpenBattle,
+  onOpenTournament,
+}: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
   const t = useT();
+  const { scrollProps } = useRememberedScroll(scrollY, onChangeScrollY);
 
   if (!profile) return null;
 
@@ -66,7 +80,7 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
   // claiming it twice leaves a dead band above the bar that crops the content.
   return (
     <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} {...scrollProps}>
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{t('home.greeting', profile.username)}</Text>
@@ -89,18 +103,13 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           <View style={styles.battleContent}>
             <Text style={styles.battleTitle}>{t('home.tournamentTitle')}</Text>
             <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.tournamentSubtitle')}</Text>
+            {/* Part of the same touchable as the banner, like the category
+                tiles: the whole card already opens it, and a nested button
+                would only be a second tap target doing the same thing. */}
+            <View style={styles.startPill}>
+              <Text style={styles.startText}>{t('home.start')}</Text>
+            </View>
           </View>
-        </SoundTouchable>
-
-        <SoundTouchable style={styles.shopRow} onPress={onOpenShop} activeOpacity={0.85}>
-          <View style={styles.shopIcon}>
-            <Icon name="gem" size={17} color={theme.primary} />
-          </View>
-          <View style={{ flex: 1 }}>
-            <Text style={styles.shopTitle}>{t('home.shopTitle')}</Text>
-            <Text style={styles.shopSubtitle} numberOfLines={1}>{t('home.shopSubtitle')}</Text>
-          </View>
-          <Icon name="chevronRight" size={15} color={theme.textMuted} />
         </SoundTouchable>
 
         <StreakCard days={profile.streak.count} />
@@ -126,6 +135,9 @@ export default function HomeScreen({ onOpenCategory, onStartMode, onOpenSettings
           <View style={styles.battleContent}>
             <Text style={styles.battleTitle}>{t('home.battleTitle')}</Text>
             <Text style={styles.battleSubtitle} numberOfLines={2}>{t('home.battleSubtitle')}</Text>
+            <View style={styles.startPill}>
+              <Text style={styles.startText}>{t('home.start')}</Text>
+            </View>
           </View>
         </SoundTouchable>
 
@@ -188,31 +200,9 @@ function makeStyles(theme: Theme) {
       overflow: 'hidden',
       marginBottom: 24,
     },
-    shopRow: {
-      flexDirection: 'row',
-      alignItems: 'center',
-      gap: 12,
-      backgroundColor: theme.card,
-      borderWidth: 1.5,
-      borderColor: theme.border,
-      borderRadius: radius.lg,
-      paddingHorizontal: 14,
-      paddingVertical: 12,
-      marginBottom: 12,
-    },
-    shopIcon: {
-      width: 36,
-      height: 36,
-      borderRadius: 13,
-      alignItems: 'center',
-      justifyContent: 'center',
-      backgroundColor: theme.primaryLight,
-    },
-    shopTitle: { fontSize: 14, fontFamily: fontFamily('800'), color: theme.text },
-    shopSubtitle: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
     tournamentCard: {
       width: '100%',
-      aspectRatio: 3.5,
+      aspectRatio: 2.6,
       borderRadius: radius.lg,
       overflow: 'hidden',
       marginBottom: 12,
@@ -221,11 +211,18 @@ function makeStyles(theme: Theme) {
       flex: 1,
       justifyContent: 'center',
       paddingHorizontal: 16,
-      // Sits a touch below the middle: centred, the text collided with the
-      // brightest part of the artwork behind it.
-      paddingTop: 20,
+      paddingVertical: 12,
       maxWidth: '62%',
     },
+    startPill: {
+      alignSelf: 'flex-start',
+      backgroundColor: '#FFFFFF',
+      borderRadius: radius.pill,
+      paddingHorizontal: 16,
+      paddingVertical: 6,
+      marginTop: 8,
+    },
+    startText: { fontSize: 12, fontFamily: fontFamily('800'), color: '#1F2937' },
     battleTitle: {
       fontSize: 16,
       fontFamily: fontFamily('800'),

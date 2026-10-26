@@ -46,6 +46,36 @@ export function tierForStreak(days: number): StreakTier {
   return tier;
 }
 
+/**
+ * How lively the card should look at this tier: 0 for a streak that has not
+ * started and 1 at the top of the table.
+ *
+ * It lives here, next to the table it is derived from, so "the longer the
+ * run, the more it moves" is one ordered list rather than a pile of
+ * thresholds inside the card — and so it can be checked without rendering
+ * anything. Adding a tier re-spaces the scale on its own.
+ */
+export function streakIntensity(days: number): number {
+  const tier = tierForStreak(days);
+  const index = STREAK_TIERS.findIndex((candidate) => candidate.id === tier.id);
+  if (index <= 0) return 0;
+  return index / (STREAK_TIERS.length - 1);
+}
+
+/**
+ * How far along the player is between the tier they have reached and the
+ * next one, 0..1. Already past the last tier counts as full.
+ */
+export function progressToNextTier(days: number): number {
+  const safe = Math.max(0, Math.floor(days));
+  const next = nextTier(safe);
+  if (!next) return 1;
+  const current = tierForStreak(safe);
+  const span = next.minDays - current.minDays;
+  if (span <= 0) return 1;
+  return Math.max(0, Math.min(1, (safe - current.minDays) / span));
+}
+
 /** The next milestone to aim at, or null once the last one is passed. */
 export function nextTier(days: number): StreakTier | null {
   return STREAK_TIERS.find((tier) => tier.minDays > Math.max(0, Math.floor(days))) ?? null;

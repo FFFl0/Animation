@@ -7,7 +7,7 @@ import Icon, { IconName } from './Icon';
 import { useT } from '../i18n/strings';
 import { useNotifications } from '../notifications/NotificationsContext';
 
-export type TabKey = 'home' | 'chats' | 'stats' | 'achievements' | 'profile';
+export type TabKey = 'home' | 'chats' | 'stats' | 'shop' | 'achievements' | 'profile';
 
 type Props = {
   active: TabKey;
@@ -28,6 +28,7 @@ export default function BottomTabBar({ active, onChange, theme }: Props) {
     // rides along here so a friend request is still visible from the bar.
     { key: 'chats', label: t('tabs.chats'), icon: 'chat', badge: unreadMessages + badgeCount },
     { key: 'stats', label: t('tabs.stats'), icon: 'stats' },
+    { key: 'shop', label: t('tabs.shop'), icon: 'gem' },
     { key: 'achievements', label: t('tabs.achievements'), icon: 'medal' },
     { key: 'profile', label: t('tabs.profile'), icon: 'user' },
   ];
@@ -67,7 +68,7 @@ function makeStyles(theme: Theme, bottomInset: number) {
       // hardcoded 22 was tuned for that case and is kept as the floor.
       paddingBottom: Math.max(bottomInset, 8) + 14,
     },
-    tab: { flex: 1, alignItems: 'center', gap: 3 },
+    tab: { flex: 1, alignItems: 'center', gap: 3, paddingHorizontal: 2 },
     label: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted },
     labelActive: { color: theme.primary },
     badge: {

@@ -1,4 +1,4 @@
-import { useMemo, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { Image, ScrollView, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView, useSafeAreaInsets } from 'react-native-safe-area-context';
 import Svg, { Defs, LinearGradient, Rect, Stop } from 'react-native-svg';
@@ -8,6 +8,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useT } from '../i18n/strings';
+import { useRememberedScroll } from '../components/useRememberedScroll';
 import { useLanguage } from '../i18n/LanguageContext';
 import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
@@ -70,11 +71,7 @@ export default function ShopScreen({
   const insets = useSafeAreaInsets();
   const { balance, spent, medals, cart, orders, ownsItem } = useShop();
   const [walletOpen, setWalletOpen] = useState(false);
-  const scrollRef = useRef<ScrollView>(null);
-  // Restoring has to wait for the content to have a height, or there is
-  // nothing to scroll within yet; once done it must not repeat, or every
-  // image that finishes loading would yank the page back.
-  const restoredRef = useRef(false);
+  const { scrollProps, jumpToTop } = useRememberedScroll(scrollY, onChangeScrollY);
 
   /**
    * What the grid shows, as one or more blocks.
@@ -99,21 +96,10 @@ export default function ShopScreen({
   };
 
   return (
-    <SafeAreaView style={styles.safe} edges={['bottom', 'left', 'right']}>
-      <ScrollView
-        ref={scrollRef}
-        contentContainerStyle={styles.scroll}
-        onScroll={(e) => onChangeScrollY(e.nativeEvent.contentOffset.y)}
-        scrollEventThrottle={64}
-        onContentSizeChange={(_w, height) => {
-          if (restoredRef.current || scrollY <= 0) return;
-          // Only once the page is tall enough to hold the old position —
-          // before that the scroll would be clamped to the top and lost.
-          if (height < scrollY) return;
-          restoredRef.current = true;
-          scrollRef.current?.scrollTo({ y: scrollY, animated: false });
-        }}
-      >
+    // The shop is a tab now, and the bar below it already pays the bottom
+    // inset — claiming it here too leaves a dead band above the bar.
+    <SafeAreaView style={styles.safe} edges={['left', 'right']}>
+      <ScrollView contentContainerStyle={styles.scroll} {...scrollProps}>
         <View style={styles.hero}>
           {/* explicit size, not absoluteFill: without one the image lays out at
               its own pixel size and the parent just crops the top-left of it */}
@@ -169,9 +155,7 @@ export default function ShopScreen({
                 // A new shelf starts at its top; the remembered position
                 // belongs to the shelf it was taken from.
                 onChangeTab(key);
-                onChangeScrollY(0);
-                restoredRef.current = true;
-                scrollRef.current?.scrollTo({ y: 0, animated: false });
+                jumpToTop();
               }}
             >
               <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{t(`shop.section.${key}`)}</Text>

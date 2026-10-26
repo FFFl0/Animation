@@ -95,7 +95,7 @@ type Screen =
   | 'about'
   | 'privacy';
 
-const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'achievements', 'profile'];
+const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'shop', 'achievements', 'profile'];
 
 function ScreenTransition({ children, transitionKey }: { children: React.ReactNode; transitionKey: string }) {
   const opacity = useRef(new Animated.Value(0)).current;
@@ -134,6 +134,11 @@ function AppShell() {
   // land on the first tab instead of the shelf the shopper was browsing.
   const [shopTab, setShopTab] = useState<ShopTab>('all');
   const [shopScrollY, setShopScrollY] = useState(0);
+  // Home and stats are unmounted whenever a quiz, a mode or a category page
+  // is on top of them, so where the player had scrolled to has to be kept
+  // out here with the rest of the navigation state.
+  const [homeScrollY, setHomeScrollY] = useState(0);
+  const [statsScrollY, setStatsScrollY] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
   // A category's difficulty picker is reached from the home grid and from
   // its own stats page, so Back has to return to the one that opened it.
@@ -418,6 +423,8 @@ function AppShell() {
         <ScreenTransition transitionKey={transitionKey}>
           {screen === 'home' && (
             <HomeScreen
+              scrollY={homeScrollY}
+              onChangeScrollY={setHomeScrollY}
               onOpenCategory={(id) => {
                 setSelectedCategory(id);
                 setCategoryFrom('home');
@@ -430,11 +437,6 @@ function AppShell() {
                 setScreen('battle');
               }}
               onOpenTournament={() => setScreen('tournament')}
-              onOpenShop={() => {
-                setShopTab('all');
-                setShopScrollY(0);
-                setScreen('shop');
-              }}
             />
           )}
           {screen === 'shop' && (
@@ -642,6 +644,8 @@ function AppShell() {
           )}
           {screen === 'stats' && (
             <StatsScreen
+              scrollY={statsScrollY}
+              onChangeScrollY={setStatsScrollY}
               onOpenLeaderboard={() => setScreen('leaderboard')}
               onOpenCategory={(id) => {
                 setSelectedCategory(id);

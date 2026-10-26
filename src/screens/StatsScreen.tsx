@@ -20,6 +20,7 @@ import StatRing from '../components/StatRing';
 import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import { useRememberedScroll } from '../components/useRememberedScroll';
 
 /** How many flames the streak row draws before it just shows the number. */
 const STREAK_PIPS = 5;
@@ -38,11 +39,15 @@ type Row = {
 };
 
 type Props = {
+  /** Held by the navigator: this screen is unmounted while a category page
+   * or the leaderboard is on top of it, so the offset cannot live here. */
+  scrollY: number;
+  onChangeScrollY: (y: number) => void;
   onOpenLeaderboard: () => void;
   onOpenCategory: (id: CategoryId) => void;
 };
 
-export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props) {
+export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboard, onOpenCategory }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -50,6 +55,7 @@ export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props
   const t = useT();
   const [grouping, setGrouping] = useState<Grouping>('categories');
   const [pickerOpen, setPickerOpen] = useState(false);
+  const { scrollProps } = useRememberedScroll(scrollY, onChangeScrollY);
 
   if (!profile) return null;
 
@@ -82,7 +88,7 @@ export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props
   // claiming it twice leaves a dead band above the bar that crops the content.
   return (
     <SafeAreaView style={styles.safe} edges={['left', 'right']}>
-      <ScrollView contentContainerStyle={styles.container}>
+      <ScrollView contentContainerStyle={styles.container} {...scrollProps}>
         <View style={styles.hero}>
           <Image source={STATS_HEADER} style={styles.heroImage} resizeMode="cover" />
           <ImageScrim direction="left" />
