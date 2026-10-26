@@ -1,5 +1,5 @@
 import { useEffect, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, BackHandler, Modal, Platform, ToastAndroid, View } from 'react-native';
+import { ActivityIndicator, Animated, BackHandler, Easing, Modal, Platform, ToastAndroid, View } from 'react-native';
 import { StatusBar } from 'expo-status-bar';
 import * as Linking from 'expo-linking';
 import { useFonts } from '@expo-google-fonts/manrope/useFonts';
@@ -68,51 +68,90 @@ import ErrorBoundary from './src/monitoring/ErrorBoundary';
 import CrashScreen from './src/monitoring/CrashScreen';
 import BareCrashScreen from './src/monitoring/BareCrashScreen';
 import { useT } from './src/i18n/strings';
+import { Screen, TAB_SCREENS, TransitionDirection, transitionDirection } from './src/navigation/screens';
 
-type Screen =
-  | 'home'
-  | 'categoryDetail'
-  | 'categoryStats'
-  | 'quiz'
-  | 'result'
-  | 'stats'
-  | 'achievements'
-  | 'profile'
-  | 'leaderboard'
-  | 'battle'
-  | 'tournament'
-  | 'shop'
-  | 'shopItem'
-  | 'cart'
-  | 'orders'
-  | 'chats'
-  | 'friends'
-  | 'friendProfile'
-  | 'compare'
-  | 'chat'
-  | 'groups'
-  | 'groupChat'
-  | 'about'
-  | 'privacy';
 
-const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'shop', 'achievements', 'profile'];
 
-function ScreenTransition({ children, transitionKey }: { children: React.ReactNode; transitionKey: string }) {
-  const opacity = useRef(new Animated.Value(0)).current;
-  const translateY = useRef(new Animated.Value(10)).current;
+/** How far the incoming screen travels, in points. */
+const SLIDE_DISTANCE = 30;
+
+/**
+ * The movement between screens.
+ *
+ * Only the arriving screen is animated: the one being left is already gone,
+ * because screens here are mounted one at a time. Keeping the old one around
+ * to slide it out would mean two screens subscribed to the same realtime
+ * channels at once, which is exactly the thing that used to close the app.
+ *
+ * What it does have is a direction. Going deeper, the new screen comes in
+ * from the right; coming back out, from the left; and a move between two
+ * screens at the same level is a cross-fade with a small lift, because
+ * neither of them is on top of the other.
+ */
+function ScreenTransition({
+  children,
+  transitionKey,
+  direction,
+}: {
+  children: React.ReactNode;
+  transitionKey: string;
+  direction: TransitionDirection;
+}) {
+  const progress = useRef(new Animated.Value(1)).current;
   const useNative = Platform.OS !== 'web';
 
   useEffect(() => {
-    opacity.setValue(0);
-    translateY.setValue(10);
-    Animated.parallel([
-      Animated.timing(opacity, { toValue: 1, duration: 220, useNativeDriver: useNative }),
-      Animated.timing(translateY, { toValue: 0, duration: 220, useNativeDriver: useNative }),
-    ]).start();
+    progress.setValue(0);
+    Animated.timing(progress, {
+      toValue: 1,
+      duration: 260,
+      // Quick off the mark and settling at the end, the way a page being
+      // pushed into place behaves.
+      easing: Easing.out(Easing.cubic),
+      useNativeDriver: useNative,
+    }).start();
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [transitionKey]);
 
-  return <Animated.View style={{ flex: 1, opacity, transform: [{ translateY }] }}>{children}</Animated.View>;
+  const fromX = direction === 'forward' ? SLIDE_DISTANCE : direction === 'back' ? -SLIDE_DISTANCE : 0;
+  const fromY = direction === 'swap' ? 10 : 0;
+
+  return (
+    <Animated.View
+      style={{
+        flex: 1,
+        // Fully opaque before it has finished moving, so the screen is
+        // readable while it is still settling.
+        opacity: progress.interpolate({ inputRange: [0, 0.6, 1], outputRange: [0, 1, 1] }),
+        transform: [
+          { translateX: progress.interpolate({ inputRange: [0, 1], outputRange: [fromX, 0] }) },
+          { translateY: progress.interpolate({ inputRange: [0, 1], outputRange: [fromY, 0] }) },
+        ],
+      }}
+    >
+      {children}
+    </Animated.View>
+  );
+}
+
+/**
+ * Which way the app moved to reach the screen now showing.
+ *
+ * Worked out during render and cached, rather than recomputed from a ref
+ * that an effect updates later: an unrelated re-render in the middle of the
+ * animation would otherwise change the direction under it and make the
+ * screen jump sideways halfway through.
+ */
+function useTransitionDirection(screen: Screen): TransitionDirection {
+  const previous = useRef<Screen | null>(null);
+  const direction = useRef<TransitionDirection>('swap');
+
+  if (previous.current !== screen) {
+    direction.current = transitionDirection(previous.current, screen);
+    previous.current = screen;
+  }
+
+  return direction.current;
 }
 
 function AppShell() {
@@ -173,6 +212,11 @@ function AppShell() {
   // Marks the account as present while the app is open, so friends see
   // "online" in chat instead of a timestamp from last week.
   useLastSeenHeartbeat(profile?.id ?? null);
+
+  // Up here with the other hooks, not down beside the render that uses it:
+  // the loading and signed-out screens below return early, and a hook after
+  // them would not run on every render.
+  const direction = useTransitionDirection(screen);
 
   // An invite link can land before there is anyone to join as — tapping it is
   // often what makes somebody install the app in the first place — so the code
@@ -420,7 +464,7 @@ function AppShell() {
   return (
     <View style={{ flex: 1, backgroundColor: theme.background }}>
       <View style={{ flex: 1 }}>
-        <ScreenTransition transitionKey={transitionKey}>
+        <ScreenTransition transitionKey={transitionKey} direction={direction}>
           {screen === 'home' && (
             <HomeScreen
               scrollY={homeScrollY}
