@@ -21,6 +21,11 @@ on:
           - preview
           - production
           - simulator
+      wait:
+        description: 'Wait for the build to finish (off = just queue it and link to it)'
+        required: false
+        default: true
+        type: boolean
 
 jobs:
   build:
@@ -38,6 +43,11 @@ jobs:
 
     name: build (${{ matrix.platform }})
     runs-on: ubuntu-latest
+    # The runner only submits the build and then watches EAS do it, so a long
+    # queue over there would otherwise hold a runner for hours. Past builds
+    # take about ten minutes; this is loose enough to survive a busy queue and
+    # tight enough to stop rather than hang.
+    timeout-minutes: 45
     steps:
       - uses: actions/checkout@v4
 
@@ -62,6 +72,7 @@ jobs:
           npx eas-cli build \
             --platform ${{ matrix.platform }} \
             --profile ${{ github.event.inputs.profile }} \
+            ${{ github.event.inputs.wait == 'false' && '--no-wait' || '' }} \
             --non-interactive --json > build-output.json
 
       - name: Publish download link to job summary
@@ -74,10 +85,17 @@ jobs:
               const parsed = JSON.parse(fs.readFileSync('build-output.json', 'utf8'));
               const b = Array.isArray(parsed) ? parsed[0] : parsed;
               const write = (line) => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
-              const url = b && b.artifacts && b.artifacts.buildUrl;
+              if (!b) { write('\nNo build info captured — check the log above.'); process.exit(0); }
+              const url = b.artifacts && b.artifacts.buildUrl;
               if (url) write('\n**Ready:** [Download](' + url + ')');
-              else if (b) write('\nStatus: ' + b.status + '. See the log above or your expo.dev dashboard.');
-              else write('\nNo build info captured — check the log above.');
+              // Queued or still running: the page on expo.dev is where it is
+              // actually happening, and the link is the point of the summary.
+              else if (b.id) {
+                const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+                write('\nStatus: **' + b.status + '**');
+                write('\n[Follow it on expo.dev](https://expo.dev/accounts/' + app.owner + '/projects/' + app.slug + '/builds/' + b.id + ')');
+              }
+              else write('\nStatus: ' + b.status + '. See the log above or your expo.dev dashboard.');
             "
           else
             echo "Build output was empty — check the log above for the error." >> "$GITHUB_STEP_SUMMARY"
