@@ -3,6 +3,14 @@ import { Language, useLanguage } from './LanguageContext';
 type StringValue = string | ((...args: any[]) => string);
 type StringDict = { [key: string]: StringValue | StringDict };
 
+/** 1 раунд, 2 раунда, 5 раундов — the Russian form a count takes. */
+function plural(n: number, one: string, few: string, many: string): string {
+  const inTeens = n % 100 >= 11 && n % 100 <= 14;
+  const last = n % 10;
+  if (inTeens || last === 0 || last >= 5) return many;
+  return last === 1 ? one : few;
+}
+
 /** 1st, 2nd, 3rd, 4th — the English suffix for a place. */
 function ordinal(n: number): string {
   if (n % 100 >= 11 && n % 100 <= 13) return 'th';
@@ -93,6 +101,24 @@ const ru: StringDict = {
     back: '‹ Назад',
     startQuiz: 'Начать квиз',
     lockedDesc: 'Пройди предыдущий уровень',
+  },
+  categoryStats: {
+    back: '‹ Статистика',
+    rounds: 'Раундов',
+    accuracy: 'Точность',
+    correct: 'Верных ответов',
+    answersTitle: 'Правильные ответы',
+    answersOf: (correct: number, total: number) => `${correct} из ${total}`,
+    shareLine: (percent: number) => `Это ${percent}% всех сыгранных вами раундов по категориям`,
+    byDifficulty: 'По сложности',
+    tierLine: (games: number, acc: number) =>
+      `${games} ${plural(games, 'раунд', 'раунда', 'раундов')} · точность ${acc}%`,
+    tierUnplayed: 'Ещё не играли на этой сложности',
+    tierLocked: 'Откроется после предыдущего уровня',
+    best: 'рекорд',
+    emptyTitle: 'Здесь пока пусто',
+    emptyText: 'Сыграйте раунд в этой категории — и тут появятся ваши раунды, точность и рекорды по каждой сложности.',
+    play: 'Играть',
   },
   quiz: {
     questionOf: (i: number, total: number) => `Вопрос ${i} из ${total}`,
@@ -763,6 +789,23 @@ const en: StringDict = {
     back: '‹ Back',
     startQuiz: 'Start Quiz',
     lockedDesc: 'Complete the previous level first',
+  },
+  categoryStats: {
+    back: '‹ Stats',
+    rounds: 'Rounds',
+    accuracy: 'Accuracy',
+    correct: 'Correct answers',
+    answersTitle: 'Correct answers',
+    answersOf: (correct: number, total: number) => `${correct} of ${total}`,
+    shareLine: (percent: number) => `That is ${percent}% of every category round you have played`,
+    byDifficulty: 'By difficulty',
+    tierLine: (games: number, acc: number) => `${games} ${games === 1 ? 'round' : 'rounds'} · ${acc}% accuracy`,
+    tierUnplayed: 'Not played at this difficulty yet',
+    tierLocked: 'Unlocks after the previous level',
+    best: 'best',
+    emptyTitle: 'Nothing here yet',
+    emptyText: 'Play a round in this category and your rounds, accuracy and best scores per difficulty will show up here.',
+    play: 'Play',
   },
   quiz: {
     questionOf: (i: number, total: number) => `Question ${i} of ${total}`,

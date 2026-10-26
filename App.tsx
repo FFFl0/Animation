@@ -31,6 +31,7 @@ import StatsScreen from './src/screens/StatsScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
 import ProfileScreen from './src/screens/ProfileScreen';
 import LeaderboardScreen from './src/screens/LeaderboardScreen';
+import CategoryStatsScreen from './src/screens/CategoryStatsScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
 import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
@@ -71,6 +72,7 @@ import { useT } from './src/i18n/strings';
 type Screen =
   | 'home'
   | 'categoryDetail'
+  | 'categoryStats'
   | 'quiz'
   | 'result'
   | 'stats'
@@ -133,6 +135,9 @@ function AppShell() {
   const [shopTab, setShopTab] = useState<ShopTab>('all');
   const [shopScrollY, setShopScrollY] = useState(0);
   const [selectedCategory, setSelectedCategory] = useState<CategoryId | null>(null);
+  // A category's difficulty picker is reached from the home grid and from
+  // its own stats page, so Back has to return to the one that opened it.
+  const [categoryFrom, setCategoryFrom] = useState<Screen>('home');
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
@@ -264,6 +269,11 @@ function AppShell() {
           setScreen('profile');
           return true;
         case 'categoryDetail':
+          setScreen(categoryFrom);
+          return true;
+        case 'categoryStats':
+          setScreen('stats');
+          return true;
         case 'quiz':
         case 'result':
           setScreen('home');
@@ -297,7 +307,7 @@ function AppShell() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [profile, preAuthScreen, screen, battleFrom, chatFrom, groupChatFrom, t]);
+  }, [profile, preAuthScreen, screen, battleFrom, categoryFrom, chatFrom, groupChatFrom, t]);
 
   if (loading) {
     return (
@@ -410,6 +420,7 @@ function AppShell() {
             <HomeScreen
               onOpenCategory={(id) => {
                 setSelectedCategory(id);
+                setCategoryFrom('home');
                 setScreen('categoryDetail');
               }}
               onStartMode={startMode}
@@ -600,7 +611,21 @@ function AppShell() {
             />
           )}
           {screen === 'categoryDetail' && selectedCategory && (
-            <CategoryDetailScreen categoryId={selectedCategory} onBack={() => setScreen('home')} onStartTier={startTier} />
+            <CategoryDetailScreen
+              categoryId={selectedCategory}
+              onBack={() => setScreen(categoryFrom)}
+              onStartTier={startTier}
+            />
+          )}
+          {screen === 'categoryStats' && selectedCategory && (
+            <CategoryStatsScreen
+              categoryId={selectedCategory}
+              onBack={() => setScreen('stats')}
+              onPlay={() => {
+                setCategoryFrom('categoryStats');
+                setScreen('categoryDetail');
+              }}
+            />
           )}
           {screen === 'quiz' && roundConfig && (
             <QuizScreen key={quizKey} config={roundConfig} onFinish={finishQuiz} onClose={() => setScreen('home')} />
@@ -620,7 +645,7 @@ function AppShell() {
               onOpenLeaderboard={() => setScreen('leaderboard')}
               onOpenCategory={(id) => {
                 setSelectedCategory(id);
-                setScreen('categoryDetail');
+                setScreen('categoryStats');
               }}
             />
           )}

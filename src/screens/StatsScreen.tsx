@@ -10,10 +10,10 @@ import { useAuth } from '../auth/AuthContext';
 import { CATEGORIES, CategoryId, categoryTitle } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { STATS_HEADER, STATS_QUOTE } from '../data/statsImages';
-import { TIERS } from '../data/difficulty';
 import { GAME_MODES, modeTitle } from '../data/modes';
-import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
-import { ModeStat } from '../auth/types';
+import { modeStatsKey } from '../quiz/statsKey';
+import { accuracyOf, categoryStat, sumStats } from '../quiz/statsSummary';
+import { ModeStat, ZERO_STAT } from '../auth/types';
 import Icon, { IconName } from '../components/Icon';
 import ImageScrim from '../components/ImageScrim';
 import StatRing from '../components/StatRing';
@@ -21,25 +21,8 @@ import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 
-const EMPTY: ModeStat = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
 /** How many flames the streak row draws before it just shows the number. */
 const STREAK_PIPS = 5;
-
-function sumStats(stats: ModeStat[]): ModeStat {
-  return stats.reduce(
-    (acc, s) => ({
-      gamesPlayed: acc.gamesPlayed + s.gamesPlayed,
-      bestScore: Math.max(acc.bestScore, s.bestScore),
-      totalCorrect: acc.totalCorrect + s.totalCorrect,
-      totalQuestions: acc.totalQuestions + s.totalQuestions,
-    }),
-    EMPTY
-  );
-}
-
-function accuracyOf(stat: ModeStat): number {
-  return stat.totalQuestions > 0 ? Math.round((stat.totalCorrect / stat.totalQuestions) * 100) : 0;
-}
 
 /** What the list under "by category" is showing. */
 type Grouping = 'categories' | 'modes';
@@ -73,21 +56,15 @@ export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props
   const overall = sumStats(Object.values(profile.stats));
   const overallAccuracy = accuracyOf(overall);
 
-  const categoryRows: Row[] = CATEGORIES.map((cat) => {
-    const keys =
-      cat.hardOnly || cat.id === 'mixed'
-        ? [categoryStatsKey(cat.id)]
-        : TIERS.map((tier) => categoryStatsKey(cat.id, tier.id));
-    return {
-      key: cat.id,
-      title: categoryTitle(cat, language),
-      icon: cat.icon,
-      color: cat.color,
-      colorBg: cat.colorBg,
-      art: cat.id,
-      stat: sumStats(keys.map((k) => profile.stats[k] ?? EMPTY)),
-    };
-  });
+  const categoryRows: Row[] = CATEGORIES.map((cat) => ({
+    key: cat.id,
+    title: categoryTitle(cat, language),
+    icon: cat.icon,
+    color: cat.color,
+    colorBg: cat.colorBg,
+    art: cat.id,
+    stat: categoryStat(profile, cat.id),
+  }));
 
   const modeRows: Row[] = GAME_MODES.map((mode) => ({
     key: mode.id,
@@ -95,7 +72,7 @@ export default function StatsScreen({ onOpenLeaderboard, onOpenCategory }: Props
     icon: mode.icon,
     color: theme.primary,
     colorBg: theme.primaryLight,
-    stat: profile.stats[modeStatsKey(mode.id)] ?? EMPTY,
+    stat: profile.stats[modeStatsKey(mode.id)] ?? ZERO_STAT,
   }));
 
   const rows = grouping === 'categories' ? categoryRows : modeRows;
