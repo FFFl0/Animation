@@ -9,6 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question } from '../quiz/generateQuiz';
 import { RoundConfig } from '../quiz/types';
+import { answerSample, averageAnswerMs } from '../quiz/answerTiming';
 import AnimeAvatar from '../components/AnimeAvatar';
 import ProgressBar, { ProgressDots } from '../components/ProgressBar';
 import LivesIndicator from '../components/LivesIndicator';
@@ -22,9 +23,19 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { useShop } from '../shop/ShopContext';
 
+/** What the round turned out to be, beyond the score. */
+export type RoundOutcome = {
+  /** Mean thinking time over the questions that were answered, or null when
+   * none were. */
+  averageAnswerMs: number | null;
+  /** The round ended early because the player ran out of lives — a loss,
+   * however many of the questions reached were right. */
+  lost: boolean;
+};
+
 type Props = {
   config: RoundConfig;
-  onFinish: (score: number, total: number) => void;
+  onFinish: (score: number, total: number, outcome: RoundOutcome) => void;
   onClose: () => void;
   /** Fired right when an answer registers — lets a battle room broadcast live progress. */
   onAnswer?: (correct: boolean, answeredCount: number, score: number) => void;
@@ -55,6 +66,11 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const { countOf, spendConsumable } = useShop();
   const timeoutRef = useRef<ReturnType<typeof setInterval> | null>(null);
   const promptEnter = useRef(new Animated.Value(1)).current;
+  /** When the question now on screen was put there, and how long each
+   * answered question took. Refs, not state: nothing renders from them, and
+   * a re-render per tick is exactly what a quiz does not need. */
+  const askedAt = useRef(Date.now());
+  const answerTimes = useRef<number[]>([]);
 
   const question = questions[index];
   const isLast = index === questions.length - 1;
@@ -63,10 +79,25 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const hasLives = !!config.lives;
   const hasTimer = !!config.timerSeconds;
 
+  const stopTimer = () => {
+    if (timeoutRef.current) clearInterval(timeoutRef.current);
+    timeoutRef.current = null;
+  };
+
+  /** Records how long the question on screen took. Called once per question,
+   * by whichever came first: the answer or the clock. */
+  const recordAnswerTime = () => {
+    answerTimes.current.push(answerSample(Date.now() - askedAt.current, config.timerSeconds));
+  };
+
+  useEffect(() => {
+    askedAt.current = Date.now();
+  }, [index]);
+
   useEffect(() => {
     if (!hasTimer) return;
     setTimeLeft(config.timerSeconds!);
-    if (timeoutRef.current) clearInterval(timeoutRef.current);
+    stopTimer();
     timeoutRef.current = setInterval(() => {
       setTimeLeft((t) => {
         if (t <= 1) {
@@ -76,9 +107,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
         return t - 1;
       });
     }, 1000);
-    return () => {
-      if (timeoutRef.current) clearInterval(timeoutRef.current);
-    };
+    return stopTimer;
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [index]);
 
@@ -89,16 +118,25 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   }, [index]);
 
   useEffect(() => {
-    if (hasTimer && timeLeft === 0 && selected === null) {
-      setSelected(-1);
-      playWrong();
-      if (hasLives) setLives((l) => Math.max(0, l - 1));
-    }
+    if (!hasTimer || timeLeft > 0 || selected !== null) return;
+    // Out of time is a wrong answer: the score does not move, the question
+    // still counts towards the total, and the round hears about it like any
+    // other answer so a battle opponent sees the progress.
+    stopTimer();
+    recordAnswerTime();
+    setSelected(-1);
+    playWrong();
+    if (hasLives) setLives((l) => Math.max(0, l - 1));
+    onAnswer?.(false, index + 1, score);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]);
 
   const handleSelect = (optionIndex: number) => {
     if (selected !== null) return;
+    // Nothing is riding on the clock once the answer is in, and a countdown
+    // still ticking under a revealed answer only reads as a bug.
+    stopTimer();
+    recordAnswerTime();
     setSelected(optionIndex);
     const correct = optionIndex === question.correctIndex;
     const nextScore = correct ? score + 1 : score;
@@ -115,7 +153,10 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const handleNext = () => {
     const outOfLives = hasLives && lives <= 0;
     if (isLast || outOfLives) {
-      onFinish(score, index + 1 - skipped);
+      onFinish(score, index + 1 - skipped, {
+        averageAnswerMs: averageAnswerMs(answerTimes.current),
+        lost: outOfLives,
+      });
       return;
     }
     setIndex((i) => i + 1);
@@ -137,7 +178,10 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     if (selected !== null || !spendConsumable('skipQuestion')) return;
     buzz('tap');
     if (isLast) {
-      onFinish(score, index - skipped);
+      onFinish(score, index - skipped, {
+        averageAnswerMs: averageAnswerMs(answerTimes.current),
+        lost: false,
+      });
       return;
     }
     setSkipped((n) => n + 1);

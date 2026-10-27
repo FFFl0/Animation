@@ -21,6 +21,8 @@ import WalletSheet from '../components/WalletSheet';
 import { useShop } from '../shop/ShopContext';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
+import RareAchievements from '../components/RareAchievements';
+import { unlockedIds } from '../data/achievements';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
 import { USERNAME_MAX } from '../auth/validation';
 import { Language, useLanguage } from '../i18n/LanguageContext';
@@ -239,6 +241,11 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
         <Text style={styles.photoHint}>{t('profile.photoHint')}</Text>
         {photoError && <Text style={styles.photoError}>{photoError}</Text>}
       </View>
+
+      {/* The first thing on your own profile that is about how you play
+          rather than how it looks. */}
+      <Text style={styles.sectionTitle}>{t('profile.rareAchievementsTitle')}</Text>
+      <RareAchievements unlocked={unlockedIds(profile)} emptyText={t('profile.rareAchievementsEmpty')} />
 
       <Text style={styles.sectionTitle}>{t('profile.presetsTitle')}</Text>
       <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={styles.favRow}>

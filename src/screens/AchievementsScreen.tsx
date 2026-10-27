@@ -32,7 +32,13 @@ const GAP = 8;
 const ART_RATIO = 420 / 224;
 const ART_BACKDROP = '#FDFAF9';
 
-export default function AchievementsScreen() {
+type Props = {
+  /** It lives behind the stats page now rather than in the tab bar, so it
+   * needs a way back. */
+  onBack: () => void;
+};
+
+export default function AchievementsScreen({ onBack }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -49,8 +55,11 @@ export default function AchievementsScreen() {
   // The tab bar below pays the bottom inset, so this screen must not:
   // claiming it twice leaves a dead band above the bar that crops the content.
   return (
-    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right']}>
+    <SafeAreaView style={styles.safe} edges={['top', 'left', 'right', 'bottom']}>
       <ScrollView contentContainerStyle={styles.container}>
+        <SoundTouchable onPress={onBack} style={styles.backButton} accessibilityRole="button">
+          <Text style={styles.backText}>{t('achievements.back')}</Text>
+        </SoundTouchable>
         <View style={styles.header}>
           <Icon name="sparkles" size={26} color={theme.primary} />
           <View style={{ flex: 1 }}>
@@ -160,6 +169,8 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     container: { paddingHorizontal: 20, paddingTop: 20, paddingBottom: 40 },
+    backButton: { marginBottom: 12 },
+    backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     header: { flexDirection: 'row', alignItems: 'center', gap: 10 },
     pageTitle: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text },
     pageSub: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2 },

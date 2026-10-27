@@ -144,6 +144,9 @@ const ru: StringDict = {
     messageGreat: 'Отличный результат! Ещё немного до совершенства ✨',
     messageOk: 'Неплохо! Пересмотри пару серий и попробуй снова 📺',
     messageLow: 'Есть куда расти — новая попытка не помешает 🍥',
+    titleLost: 'Поражение',
+    messageLost: 'Серия прервалась — ошибки в этом режиме не прощаются',
+    averageTime: (seconds: string) => `Среднее время ответа: ${seconds.replace('.', ',')} с`,
     titleGreat: 'Отлично!',
     titleGoodStart: 'Хороший старт!',
     answered: (score: number, total: number) => `Ты ответил на ${score} из ${total}`,
@@ -172,6 +175,8 @@ const ru: StringDict = {
   },
   stats: {
     pageTitle: 'Статистика',
+    achievementsTitle: 'Достижения',
+    achievementsSub: (n: number, total: number) => `Открыто ${n} из ${total}`,
     leaderboardTitle: 'Глобальный рейтинг',
     leaderboardSub: 'Сравни свой счёт с другими игроками',
     gamesPlayed: 'Игр сыграно',
@@ -186,6 +191,7 @@ const ru: StringDict = {
   },
   achievements: {
     pageTitle: 'Достижения',
+    back: '‹ Статистика',
     unlockedOf: (n: number, total: number) => `Открыто ${n} из ${total}`,
     secretTitle: 'Секретное достижение',
     done: 'Выполнено',
@@ -197,6 +203,12 @@ const ru: StringDict = {
       special: 'Особые',
       secret: 'Секретные',
     },
+  },
+  rarity: {
+    common: 'Обычное',
+    rare: 'Редкое',
+    epic: 'Эпическое',
+    legendary: 'Легендарное',
   },
   profile: {
     pageTitle: 'Профиль',
@@ -211,6 +223,8 @@ const ru: StringDict = {
     renameSave: 'Сохранить',
     renameCancel: 'Отмена',
     renameHint: 'Имя видят другие игроки в чатах и таблице лидеров. Входить вы будете уже под новым именем.',
+    rareAchievementsTitle: 'Редкие достижения',
+    rareAchievementsEmpty: 'Пока ничего не открыто — сыграйте пару квизов, и здесь появится лучшее из вашего.',
     presetsTitle: 'Готовые аватарки',
     presetNames: { manga: 'Манга', ramen: 'Рамен', pixel: 'Пиксели' },
     photoPermissionDenied: 'Нет доступа к галерее — разрешите его в настройках телефона.',
@@ -546,7 +560,6 @@ const ru: StringDict = {
     friends: 'Друзья',
     stats: 'Статистика',
     shop: 'Магазин',
-    achievements: 'Достижения',
     profile: 'Профиль',
   },
   notifications: {
@@ -830,6 +843,9 @@ const en: StringDict = {
     messageGreat: 'Great result! Just a bit more to perfection ✨',
     messageOk: 'Not bad! Rewatch a couple episodes and try again 📺',
     messageLow: "There's room to grow — give it another try 🍥",
+    titleLost: 'Defeat',
+    messageLost: 'The run is over — this mode forgives nothing',
+    averageTime: (seconds: string) => `Average answer time: ${seconds}s`,
     titleGreat: 'Great job!',
     titleGoodStart: 'Good start!',
     answered: (score: number, total: number) => `You answered ${score} out of ${total}`,
@@ -858,6 +874,8 @@ const en: StringDict = {
   },
   stats: {
     pageTitle: 'Statistics',
+    achievementsTitle: 'Achievements',
+    achievementsSub: (n: number, total: number) => `${n} of ${total} unlocked`,
     leaderboardTitle: 'Global Leaderboard',
     leaderboardSub: 'Compare your score with other players',
     gamesPlayed: 'Games Played',
@@ -872,6 +890,7 @@ const en: StringDict = {
   },
   achievements: {
     pageTitle: 'Achievements',
+    back: '‹ Stats',
     unlockedOf: (n: number, total: number) => `Unlocked ${n} of ${total}`,
     secretTitle: 'Secret achievement',
     done: 'Unlocked',
@@ -883,6 +902,12 @@ const en: StringDict = {
       special: 'Special',
       secret: 'Secret',
     },
+  },
+  rarity: {
+    common: 'Common',
+    rare: 'Rare',
+    epic: 'Epic',
+    legendary: 'Legendary',
   },
   profile: {
     pageTitle: 'Profile',
@@ -897,6 +922,8 @@ const en: StringDict = {
     renameSave: 'Save',
     renameCancel: 'Cancel',
     renameHint: 'Other players see this name in chats and on the leaderboard. You will sign in with the new name from now on.',
+    rareAchievementsTitle: 'Rarest achievements',
+    rareAchievementsEmpty: 'Nothing unlocked yet — play a couple of quizzes and your best will show up here.',
     presetsTitle: 'Ready-made avatars',
     presetNames: { manga: 'Manga', ramen: 'Ramen', pixel: 'Pixels' },
     photoPermissionDenied: 'No access to the gallery — allow it in your phone settings.',
@@ -1231,7 +1258,6 @@ const en: StringDict = {
     friends: 'Friends',
     stats: 'Stats',
     shop: 'Shop',
-    achievements: 'Achievements',
     profile: 'Profile',
   },
   notifications: {

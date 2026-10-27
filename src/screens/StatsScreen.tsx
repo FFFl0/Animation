@@ -11,6 +11,7 @@ import { CATEGORIES, CategoryId, categoryTitle } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { STATS_HEADER, STATS_QUOTE } from '../data/statsImages';
 import { GAME_MODES, modeTitle } from '../data/modes';
+import { ACHIEVEMENTS, unlockedCount } from '../data/achievements';
 import { modeStatsKey } from '../quiz/statsKey';
 import { accuracyOf, categoryStat, sumStats } from '../quiz/statsSummary';
 import { ModeStat, ZERO_STAT } from '../auth/types';
@@ -45,11 +46,12 @@ type Props = {
    * or the leaderboard is on top of it, so the offset cannot live here. */
   scrollY: number;
   onChangeScrollY: (y: number) => void;
+  onOpenAchievements: () => void;
   onOpenLeaderboard: () => void;
   onOpenCategory: (id: CategoryId) => void;
 };
 
-export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboard, onOpenCategory }: Props) {
+export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievements, onOpenLeaderboard, onOpenCategory }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -103,6 +105,19 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenLeaderboar
             <Text style={styles.heroNote}>{t('stats.heroNote')}</Text>
           </View>
         </View>
+
+        {/* Achievements used to be a tab of their own; they are a reading of
+            the player's record, which is what this page is for. */}
+        <SoundTouchable style={styles.leaderboardCard} onPress={onOpenAchievements} activeOpacity={0.85}>
+          <View style={styles.leaderboardIcon}>
+            <Icon name="medal" size={22} color={theme.primary} />
+          </View>
+          <View style={{ flex: 1 }}>
+            <Text style={styles.leaderboardTitle}>{t('stats.achievementsTitle')}</Text>
+            <Text style={styles.leaderboardSub}>{t('stats.achievementsSub', unlockedCount(profile), ACHIEVEMENTS.length)}</Text>
+          </View>
+          <Icon name="chevronRight" size={18} color={theme.textMuted} />
+        </SoundTouchable>
 
         <SoundTouchable style={styles.leaderboardCard} onPress={onOpenLeaderboard} activeOpacity={0.85}>
           <View style={styles.leaderboardIcon}>

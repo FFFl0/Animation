@@ -14,6 +14,7 @@ import ScoreRing from '../components/ScoreRing';
 import PillButton from '../components/PillButton';
 import ShareCard from '../share/ShareCard';
 import { canShareImage, shareViewAsImage } from '../share/shareImage';
+import { formatSeconds } from '../quiz/answerTiming';
 import { useT } from '../i18n/strings';
 
 /** From this share of correct answers the round counts as a celebration. */
@@ -28,6 +29,12 @@ type Props = {
   total: number;
   /** Beat the previous best for this category and tier. */
   isRecord: boolean;
+  /** Mean thinking time over the questions answered, or null when the round
+   * has none to report. */
+  averageAnswerMs?: number | null;
+  /** The round ended on a lost life rather than running out of questions.
+   * However many were right, it is a loss and should not be congratulated. */
+  lost?: boolean;
   /** Category, tier or mode this round was — shown on the shared image. */
   contextLabel: string;
   onRestart: () => void;
@@ -41,7 +48,16 @@ function getMessage(ratio: number, t: ReturnType<typeof useT>) {
   return t('result.messageLow');
 }
 
-export default function ResultScreen({ score, total, isRecord, contextLabel, onRestart, onChooseCategory }: Props) {
+export default function ResultScreen({
+  score,
+  total,
+  isRecord,
+  averageAnswerMs = null,
+  lost = false,
+  contextLabel,
+  onRestart,
+  onChooseCategory,
+}: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { buzz } = useSound();
@@ -54,7 +70,9 @@ export default function ResultScreen({ score, total, isRecord, contextLabel, onR
   const wrong = Math.max(total - score, 0);
   const ratio = total > 0 ? score / total : 0;
   const percent = Math.round(ratio * 100);
-  const celebrate = ratio >= CELEBRATE_AT;
+  // A round that ran out of lives is never celebrated, however much of it
+  // was right: the petals and the heavy buzz would be congratulating a loss.
+  const celebrate = ratio >= CELEBRATE_AT && !lost;
 
   useEffect(() => {
     canShareImage().then(setCanShare);
@@ -102,14 +120,19 @@ export default function ResultScreen({ score, total, isRecord, contextLabel, onR
         </FadeIn>
 
         <FadeIn delay={140}>
-          <Text style={styles.title}>{ratio >= 0.7 ? t('result.titleGreat') : t('result.titleGoodStart')}</Text>
+          <Text style={[styles.title, lost && styles.titleLost]}>
+            {lost ? t('result.titleLost') : ratio >= 0.7 ? t('result.titleGreat') : t('result.titleGoodStart')}
+          </Text>
         </FadeIn>
 
         {isRecord && <RecordBanner label={t('result.newRecord')} styles={styles} theme={theme} />}
 
         <FadeIn delay={200}>
           <Text style={styles.subtitle}>{t('result.answered', score, total)}</Text>
-          <Text style={styles.message}>{getMessage(ratio, t)}</Text>
+          <Text style={styles.message}>{lost ? t('result.messageLost') : getMessage(ratio, t)}</Text>
+          {averageAnswerMs !== null && (
+            <Text style={styles.averageTime}>{t('result.averageTime', formatSeconds(averageAnswerMs))}</Text>
+          )}
         </FadeIn>
 
         <View style={styles.statsRow}>
@@ -209,6 +232,14 @@ function makeStyles(theme: Theme) {
       paddingVertical: 24,
     },
     title: { fontSize: 26, fontFamily: fontFamily('800'), color: theme.text, marginTop: 18, textAlign: 'center' },
+    titleLost: { color: theme.danger },
+    averageTime: {
+      fontSize: 13,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: 6,
+    },
     recordWrap: { alignItems: 'center', justifyContent: 'center' },
     recordPill: {
       backgroundColor: theme.primaryLight,

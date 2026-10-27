@@ -39,10 +39,13 @@ export const GAME_MODES: GameMode[] = [
   },
   {
     id: 'perfect10',
+    // One life is what "no room for error" means: the first wrong answer
+    // ends the round, rather than leaving the player to finish a run they
+    // have already lost.
     title: '10 из 10',
     subtitle: 'Без права на ошибку',
     icon: 'target',
-    config: { categoryId: 'mixed', questionCount: 10 },
+    config: { categoryId: 'mixed', questionCount: 10, lives: 1 },
   },
   {
     id: 'silhouette',

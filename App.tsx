@@ -25,7 +25,7 @@ import WelcomeScreen from './src/screens/WelcomeScreen';
 import AuthScreen from './src/screens/AuthScreen';
 import HomeScreen from './src/screens/HomeScreen';
 import CategoryDetailScreen from './src/screens/CategoryDetailScreen';
-import QuizScreen from './src/screens/QuizScreen';
+import QuizScreen, { RoundOutcome } from './src/screens/QuizScreen';
 import ResultScreen from './src/screens/ResultScreen';
 import StatsScreen from './src/screens/StatsScreen';
 import AchievementsScreen from './src/screens/AchievementsScreen';
@@ -185,7 +185,14 @@ function AppShell() {
   const [roundConfig, setRoundConfig] = useState<RoundConfig | null>(null);
   const [activeModeId, setActiveModeId] = useState<ModeId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
-  const [result, setResult] = useState({ score: 0, total: 0, isRecord: false, contextLabel: '' });
+  const [result, setResult] = useState<{
+    score: number;
+    total: number;
+    isRecord: boolean;
+    contextLabel: string;
+    averageAnswerMs: number | null;
+    lost: boolean;
+  }>({ score: 0, total: 0, isRecord: false, contextLabel: '', averageAnswerMs: null, lost: false });
   const [achievementQueue, setAchievementQueue] = useState<Achievement[]>([]);
   const [selectedFriend, setSelectedFriend] = useState<PlayerSummary | null>(null);
   const [selectedFriendship, setSelectedFriendship] = useState<Friendship | null>(null);
@@ -321,6 +328,7 @@ function AppShell() {
           setScreen(categoryFrom);
           return true;
         case 'categoryStats':
+        case 'achievements':
           setScreen('stats');
           return true;
         case 'quiz':
@@ -335,7 +343,6 @@ function AppShell() {
           return true;
         case 'chats':
         case 'stats':
-        case 'achievements':
         case 'profile':
           setScreen('home');
           return true;
@@ -424,7 +431,7 @@ function AppShell() {
     return config.tier ? `${category} · ${tierLabel(getTier(config.tier), language)}` : category;
   };
 
-  const finishQuiz = async (score: number, total: number) => {
+  const finishQuiz = async (score: number, total: number, outcome: RoundOutcome) => {
     // Read the old best before recording, or the round just played would
     // already have overwritten what we are comparing against.
     const previousBest =
@@ -433,8 +440,12 @@ function AppShell() {
     setResult({
       score,
       total,
-      isRecord: score > previousBest && score > 0,
+      // A run that ended on a lost life is not a record whatever the score:
+      // it did not finish.
+      isRecord: score > previousBest && score > 0 && !outcome.lost,
       contextLabel: roundConfig ? describeRound(roundConfig, activeModeId) : '',
+      averageAnswerMs: outcome.averageAnswerMs,
+      lost: outcome.lost,
     });
 
     if (roundConfig) {
@@ -699,6 +710,8 @@ function AppShell() {
               total={result.total}
               isRecord={result.isRecord}
               contextLabel={result.contextLabel}
+              averageAnswerMs={result.averageAnswerMs}
+              lost={result.lost}
               onRestart={restart}
               onChooseCategory={() => setScreen('home')}
             />
@@ -707,6 +720,7 @@ function AppShell() {
             <StatsScreen
               scrollY={statsScrollY}
               onChangeScrollY={setStatsScrollY}
+              onOpenAchievements={() => setScreen('achievements')}
               onOpenLeaderboard={() => setScreen('leaderboard')}
               onOpenCategory={(id) => {
                 setSelectedCategory(id);
@@ -732,7 +746,7 @@ function AppShell() {
               }}
             />
           )}
-          {screen === 'achievements' && <AchievementsScreen />}
+          {screen === 'achievements' && <AchievementsScreen onBack={() => setScreen('stats')} />}
           {screen === 'profile' && (
             <ProfileScreen
               onOpenShop={() => {

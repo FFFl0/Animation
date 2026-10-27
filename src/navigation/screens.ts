@@ -24,7 +24,7 @@ export type Screen =
   | 'about'
   | 'privacy';
 
-export const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'shop', 'achievements', 'profile'];
+export const TAB_SCREENS: Screen[] = ['home', 'chats', 'stats', 'shop', 'profile'];
 
 /**
  * How deep into the app a screen sits.
@@ -42,12 +42,12 @@ export const SCREEN_DEPTH: Record<Screen, number> = {
   chats: 0,
   stats: 0,
   shop: 0,
-  achievements: 0,
   profile: 0,
 
   // One step in from a tab.
   categoryDetail: 1,
   categoryStats: 1,
+  achievements: 1,
   leaderboard: 1,
   friends: 1,
   groups: 1,

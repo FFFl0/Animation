@@ -9,15 +9,14 @@ import { useAuth } from '../auth/AuthContext';
 import { Friendship, PlayerSummary, friendState, removeFriend, respondToRequest, sendFriendRequest } from '../friends/friendsApi';
 import { levelFromTotalCorrect } from '../data/level';
 import { topCategories } from '../data/favoriteCategories';
-import { ACHIEVEMENTS } from '../data/achievements';
 import { getCategory } from '../data/categories';
 import AnimeAvatar from '../components/AnimeAvatar';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
 import Icon from '../components/Icon';
+import RareAchievements from '../components/RareAchievements';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
-import { achievementTitle } from '../data/achievements';
 import { categoryTitle } from '../data/categories';
 
 type Props = {
@@ -43,7 +42,6 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
 
   const { level, title } = levelFromTotalCorrect(player.totalCorrect, language);
   const accuracy = player.totalQuestions > 0 ? Math.round((player.totalCorrect / player.totalQuestions) * 100) : 0;
-  const unlockedAchievements = ACHIEVEMENTS.filter((a) => player.achievements.includes(a.id));
   const favoriteCategories = topCategories(player.stats);
 
   const handleAdd = async () => {
@@ -120,21 +118,10 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
           </View>
         </View>
 
+        {/* Their best three rather than everything they own: a stranger's
+            full shelf says less about them than its top of it. */}
         <Text style={styles.sectionTitle}>{t('friendProfile.achievementsTitle')}</Text>
-        {unlockedAchievements.length === 0 ? (
-          <Text style={styles.emptyText}>{t('friendProfile.noAchievements')}</Text>
-        ) : (
-          <ScrollView horizontal showsHorizontalScrollIndicator={false} contentContainerStyle={{ gap: 10 }}>
-            {unlockedAchievements.map((a) => (
-              <View key={a.id} style={styles.achievementTile}>
-                <View style={styles.achievementIconWrap}>
-                  <Icon name={a.icon} size={18} color={theme.primary} />
-                </View>
-                <Text style={styles.achievementLabel} numberOfLines={2}>{achievementTitle(a, language)}</Text>
-              </View>
-            ))}
-          </ScrollView>
-        )}
+        <RareAchievements unlocked={player.achievements} emptyText={t('friendProfile.noAchievements')} />
 
         {favoriteCategories.length > 0 && (
           <>
@@ -187,17 +174,6 @@ function makeStyles(theme: Theme) {
     statLabel: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 4 },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginBottom: 10 },
     emptyText: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginBottom: 8 },
-    achievementTile: { width: 78, alignItems: 'center' },
-    achievementIconWrap: {
-      width: 42,
-      height: 42,
-      borderRadius: 14,
-      backgroundColor: theme.primaryLight,
-      alignItems: 'center',
-      justifyContent: 'center',
-      marginBottom: 6,
-    },
-    achievementLabel: { fontSize: 10, fontFamily: fontFamily('600'), color: theme.textMuted, textAlign: 'center' },
     categoryRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 10 },
     categoryTile: { alignItems: 'center', width: 64 },
     categoryIconWrap: { width: 38, height: 38, borderRadius: 12, alignItems: 'center', justifyContent: 'center', marginBottom: 4 },

@@ -12,7 +12,7 @@ jest.mock('../../monitoring/sentry', () => ({
 
 import { TabKey, activeTabIndex } from '../BottomTabBar';
 
-const KEYS: TabKey[] = ['home', 'chats', 'stats', 'shop', 'achievements', 'profile'];
+const KEYS: TabKey[] = ['home', 'chats', 'stats', 'shop', 'profile'];
 
 describe('activeTabIndex', () => {
   it('finds each tab where it sits in the bar', () => {
@@ -22,7 +22,7 @@ describe('activeTabIndex', () => {
   // The bar is only drawn for screens that have a tab, but an unknown key
   // must not send the indicator off the left edge.
   it('falls back to the first tab for a key the bar does not have', () => {
-    expect(activeTabIndex(KEYS, 'leaderboard' as TabKey)).toBe(0);
+    expect(activeTabIndex(KEYS, 'achievements' as TabKey)).toBe(0);
     expect(activeTabIndex([], 'home')).toBe(0);
   });
 

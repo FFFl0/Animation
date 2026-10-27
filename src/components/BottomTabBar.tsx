@@ -8,7 +8,7 @@ import Icon, { IconName } from './Icon';
 import { useT } from '../i18n/strings';
 import { useNotifications } from '../notifications/NotificationsContext';
 
-export type TabKey = 'home' | 'chats' | 'stats' | 'shop' | 'achievements' | 'profile';
+export type TabKey = 'home' | 'chats' | 'stats' | 'shop' | 'profile';
 
 type Props = {
   active: TabKey;
@@ -44,7 +44,6 @@ export default function BottomTabBar({ active, onChange, theme }: Props) {
     { key: 'chats', label: t('tabs.chats'), icon: 'chat', badge: unreadMessages + badgeCount },
     { key: 'stats', label: t('tabs.stats'), icon: 'stats' },
     { key: 'shop', label: t('tabs.shop'), icon: 'gem' },
-    { key: 'achievements', label: t('tabs.achievements'), icon: 'medal' },
     { key: 'profile', label: t('tabs.profile'), icon: 'user' },
   ];
 
