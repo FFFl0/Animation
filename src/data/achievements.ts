@@ -1,5 +1,6 @@
 import { Profile, bestShare } from '../auth/types';
 import { categoryStatsKey, getStat, modeStatsKey } from '../quiz/statsKey';
+import { categoryStatsKeys, roundStats } from '../quiz/statsSummary';
 import { CLEAR_SHARE, TIERS, TierId, getTier } from './difficulty';
 import { CATEGORIES, CategoryId } from './categories';
 import { levelFromStats } from './level';
@@ -48,21 +49,23 @@ export type Achievement = {
   rarity: AchievementRarity;
 };
 
+// Rounds and answers are counted over the category keys, where every round
+// lands exactly once — a mode round is banked a second time under the mode,
+// and these would otherwise pay for it twice.
 function totalGamesPlayed(profile: Profile): number {
-  return Object.values(profile.stats).reduce((sum, s) => sum + s.gamesPlayed, 0);
+  return roundStats(profile.stats).reduce((sum, s) => sum + s.gamesPlayed, 0);
 }
 
 function totalCorrect(profile: Profile): number {
-  return Object.values(profile.stats).reduce((sum, s) => sum + s.totalCorrect, 0);
+  return roundStats(profile.stats).reduce((sum, s) => sum + s.totalCorrect, 0);
 }
 
 function correctIn(profile: Profile, categoryId: CategoryId): number {
-  return TIERS.reduce((sum, t) => sum + getStat(profile, categoryStatsKey(categoryId, t.id)).totalCorrect, 0);
+  return categoryStatsKeys(categoryId).reduce((sum, key) => sum + getStat(profile, key).totalCorrect, 0);
 }
 
 function gamesIn(profile: Profile, categoryId: CategoryId): number {
-  const tiered = TIERS.reduce((sum, t) => sum + getStat(profile, categoryStatsKey(categoryId, t.id)).gamesPlayed, 0);
-  return tiered + getStat(profile, categoryStatsKey(categoryId)).gamesPlayed;
+  return categoryStatsKeys(categoryId).reduce((sum, key) => sum + getStat(profile, key).gamesPlayed, 0);
 }
 
 /** Whether a tier of this category has been cleared — the same share of its

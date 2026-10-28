@@ -14,7 +14,7 @@ import { GAME_MODES, modeTitle } from '../data/modes';
 import { TIERS } from '../data/difficulty';
 import { ACHIEVEMENTS, unlockedCount } from '../data/achievements';
 import { modeStatsKey } from '../quiz/statsKey';
-import { accuracyOf, bestRound, categoryStat, sumStats } from '../quiz/statsSummary';
+import { accuracyOf, bestRound, categoryStat, roundStats, sumStats } from '../quiz/statsSummary';
 import { ModeStat, ZERO_STAT } from '../auth/types';
 import Icon, { IconName } from '../components/Icon';
 import ImageScrim from '../components/ImageScrim';
@@ -68,7 +68,10 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
   const [grouping, setGrouping] = useState<Grouping>('categories');
   const [pickerOpen, setPickerOpen] = useState(false);
   const { scrollProps } = useRememberedScroll(scrollY, onChangeScrollY);
-  const overall = sumStats(Object.values(profile?.stats ?? {}));
+  // Over the rounds themselves, not over every key they are filed under: a
+  // mode round is banked under its category too, and counting both made
+  // every figure up here bigger than the play behind it.
+  const overall = sumStats(roundStats(profile?.stats ?? {}));
   const overallAccuracy = accuracyOf(overall);
   // The three figures at the top land rather than appear. Worked out before
   // the signed-out return below, like every other hook on this screen.

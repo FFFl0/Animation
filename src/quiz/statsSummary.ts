@@ -45,11 +45,8 @@ export function accuracyOf(stat: ModeStat): number {
   return stat.totalQuestions > 0 ? Math.round((stat.totalCorrect / stat.totalQuestions) * 100) : 0;
 }
 
-/**
- * Every key a category's rounds are recorded under. Most categories keep one
- * per difficulty; the hard-only ones and the mixed bag have a single key,
- * because they are never played at a chosen difficulty.
- */
+/** Every key a category's rounds are recorded under, difficulties and
+ * game modes alike. */
 export function categoryStatsKeys(categoryId: CategoryId): string[] {
   return categoryStatSources(categoryId).map((source) => source.key);
 }
@@ -59,11 +56,14 @@ export function categoryStatsKeys(categoryId: CategoryId): string[] {
 const UNTIERED_ROUND = 15;
 
 /**
- * Where a category's rounds are recorded, and how long each of those rounds
- * is — which is what a record kept before the length was stored has to be
- * read against. One tier at a time, because the lengths differ.
+ * The difficulties a category is climbed through, and how long a round is
+ * at each — which is also what a record kept before the length was stored
+ * has to be read against. One tier at a time, because the lengths differ.
+ *
+ * The hard-only categories and the mixed bag have a single source, because
+ * they are never played at a chosen difficulty.
  */
-export function categoryStatSources(categoryId: CategoryId): { key: string; roundLength: number }[] {
+export function categoryLadderSources(categoryId: CategoryId): { key: string; roundLength: number }[] {
   const category = getCategory(categoryId);
   if (category.hardOnly || categoryId === 'mixed') {
     return [{ key: categoryStatsKey(categoryId), roundLength: UNTIERED_ROUND }];
@@ -72,6 +72,22 @@ export function categoryStatSources(categoryId: CategoryId): { key: string; roun
     key: categoryStatsKey(categoryId, tier.id),
     roundLength: tier.questionsPerRound,
   }));
+}
+
+/**
+ * Everywhere this category's rounds are recorded: its ladder, and the key
+ * with no difficulty on it.
+ *
+ * That last one is where a round started from a game mode lands — «Угадай
+ * по силуэту» is a round about characters, played at no difficulty at all.
+ * Those rounds were being written and then read by nobody, so a category
+ * could show no rounds at all while the tiles above counted them.
+ */
+export function categoryStatSources(categoryId: CategoryId): { key: string; roundLength: number }[] {
+  const ladder = categoryLadderSources(categoryId);
+  const untiered = categoryStatsKey(categoryId);
+  if (ladder.some((source) => source.key === untiered)) return ladder;
+  return [...ladder, { key: untiered, roundLength: UNTIERED_ROUND }];
 }
 
 /**
@@ -107,7 +123,7 @@ export function categoryStat(profile: Profile, categoryId: CategoryId): ModeStat
  * the climb, not a part of it that does not exist.
  */
 export function ladderBest(profile: Profile, categoryId: CategoryId): BestRound {
-  return categoryStatSources(categoryId).reduce(
+  return categoryLadderSources(categoryId).reduce(
     (acc, { key, roundLength }) => {
       const record = bestRecord(profile.stats[key] ?? ZERO_STAT, roundLength);
       return { score: acc.score + Math.min(record.score, roundLength), outOf: acc.outOf + roundLength };
@@ -117,15 +133,24 @@ export function ladderBest(profile: Profile, categoryId: CategoryId): BestRound 
 }
 
 /**
- * Rounds played in categories, for working out how much of someone's play a
- * single category accounts for. Mode rounds are deliberately left out: they
- * are the same rounds counted a second time under a different key, so adding
- * them would make every share look smaller than it is.
+ * The stats that stand for rounds played, each round once.
+ *
+ * A round started from a game mode is banked twice: under the category it
+ * was about and again under the mode. Anything that adds up every key
+ * therefore counts those rounds, and every answer in them, twice over. The
+ * category keys are the ones every round has, mode or not, so they are the
+ * set to add up.
  */
-export function categoryGamesPlayed(profile: Profile): number {
-  return Object.entries(profile.stats)
+export function roundStats(stats: Record<string, ModeStat>): ModeStat[] {
+  return Object.entries(stats)
     .filter(([key]) => key.startsWith('cat:'))
-    .reduce((total, [, stat]) => total + stat.gamesPlayed, 0);
+    .map(([, stat]) => stat);
+}
+
+/** Rounds played in categories, for working out how much of someone's play
+ * a single category accounts for. */
+export function categoryGamesPlayed(profile: Profile): number {
+  return roundStats(profile.stats).reduce((total, stat) => total + stat.gamesPlayed, 0);
 }
 
 /** How much of the player's category rounds went into this one, 0..1. */

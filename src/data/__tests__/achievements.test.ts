@@ -32,6 +32,28 @@ describe('achievements', () => {
     expect(isUnlocked(a, p)).toBe(true);
   });
 
+  // A mode round is banked under its category as well, so adding up every
+  // key would pay for it twice and unlock this at fifty real answers.
+  it('does not count a mode round twice towards a hundred answers', () => {
+    const a = findAchievement('hundred-correct');
+    const p = emptyProfile();
+    p.stats[categoryStatsKey('mixed')] = { gamesPlayed: 10, bestScore: 10, bestOutOf: 10, totalCorrect: 60, totalQuestions: 100 };
+    p.stats[modeStatsKey('quick')] = { gamesPlayed: 10, bestScore: 10, bestOutOf: 10, totalCorrect: 60, totalQuestions: 100 };
+    expect(progressOf(a, p)).toBe(60);
+    expect(isUnlocked(a, p)).toBe(false);
+  });
+
+  // The same round, from the other side: it belongs to the category it was
+  // about, difficulty or no difficulty.
+  it('counts a mode round towards its own category', () => {
+    const a = findAchievement('character-expert');
+    const p = emptyProfile();
+    p.stats[categoryStatsKey('characters')] = { gamesPlayed: 4, bestScore: 14, bestOutOf: 15, totalCorrect: 50, totalQuestions: 60 };
+    p.stats[modeStatsKey('silhouette')] = { gamesPlayed: 4, bestScore: 14, bestOutOf: 15, totalCorrect: 50, totalQuestions: 60 };
+    expect(progressOf(a, p)).toBe(50);
+    expect(isUnlocked(a, p)).toBe(true);
+  });
+
   it('character-expert requires 50 total correct answers across character tiers', () => {
     const a = findAchievement('character-expert');
     const p = emptyProfile();

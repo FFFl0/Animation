@@ -2,11 +2,13 @@ import { ModeStat, Profile, ZERO_STAT } from '../../auth/types';
 import {
   accuracyOf,
   bestRound,
+  categoryLadderSources,
   ladderBest,
   categoryGamesPlayed,
   categoryShare,
   categoryStat,
   categoryStatsKeys,
+  roundStats,
   sumStats,
 } from '../statsSummary';
 
@@ -71,11 +73,15 @@ describe('accuracyOf', () => {
 });
 
 describe('categoryStatsKeys', () => {
-  it('gives an ordinary category one key per difficulty', () => {
+  // One per difficulty, plus the key with no difficulty on it: that is
+  // where a round started from a game mode lands, and leaving it out hid
+  // those rounds from the category entirely.
+  it('gives an ordinary category its difficulties and its mode rounds', () => {
     const keys = categoryStatsKeys('anime');
-    expect(keys).toHaveLength(5);
+    expect(keys).toHaveLength(6);
     expect(keys).toContain('cat:anime:novice');
     expect(keys).toContain('cat:anime:legend');
+    expect(keys).toContain('cat:anime');
   });
 
   // These two are never played at a chosen difficulty, so they record under
@@ -83,6 +89,32 @@ describe('categoryStatsKeys', () => {
   it('gives the hard-only and mixed categories a single plain key', () => {
     expect(categoryStatsKeys('hard')).toEqual(['cat:hard']);
     expect(categoryStatsKeys('mixed')).toEqual(['cat:mixed']);
+  });
+
+  it('keeps the ladder itself to the difficulties', () => {
+    expect(categoryLadderSources('anime').map((s) => s.key)).toEqual([
+      'cat:anime:novice',
+      'cat:anime:fan',
+      'cat:anime:otaku',
+      'cat:anime:expert',
+      'cat:anime:legend',
+    ]);
+  });
+});
+
+describe('roundStats', () => {
+  // The same round is banked twice, under its category and under the mode.
+  it('counts a mode round once, under its category', () => {
+    const rounds = roundStats({
+      'cat:mixed': stat({ gamesPlayed: 3, totalCorrect: 20, totalQuestions: 30 }),
+      'mode:quick': stat({ gamesPlayed: 3, totalCorrect: 20, totalQuestions: 30 }),
+    });
+    expect(rounds).toHaveLength(1);
+    expect(sumStats(rounds)).toMatchObject({ gamesPlayed: 3, totalCorrect: 20, totalQuestions: 30 });
+  });
+
+  it('is empty for a profile that has only ever been seeded with modes', () => {
+    expect(roundStats({ 'mode:daily': stat({ gamesPlayed: 1 }) })).toEqual([]);
   });
 });
 
@@ -102,6 +134,21 @@ describe('categoryStat', () => {
       bestOutOf: 8,
       totalCorrect: 29,
       totalQuestions: 33,
+    });
+  });
+
+  // A round of «Угадай по силуэту» is a round about characters, played at
+  // no difficulty — it used to be written and then read by nobody.
+  it('counts the rounds a game mode played in this category', () => {
+    const profile = profileWith({
+      'cat:characters:novice': stat({ gamesPlayed: 1, bestScore: 5, bestOutOf: 6, totalCorrect: 5, totalQuestions: 6 }),
+      'cat:characters': stat({ gamesPlayed: 2, bestScore: 10, bestOutOf: 15, totalCorrect: 18, totalQuestions: 30 }),
+      'mode:silhouette': stat({ gamesPlayed: 2, bestScore: 10, bestOutOf: 15, totalCorrect: 18, totalQuestions: 30 }),
+    });
+    expect(categoryStat(profile, 'characters')).toMatchObject({
+      gamesPlayed: 3,
+      totalCorrect: 23,
+      totalQuestions: 36,
     });
   });
 
@@ -173,6 +220,15 @@ describe('ladderBest', () => {
       'cat:mixed': { gamesPlayed: 2, bestScore: 9, bestOutOf: 15, totalCorrect: 14, totalQuestions: 30 },
     });
     expect(ladderBest(profile, 'mixed')).toEqual({ score: 9, outOf: 15 });
+  });
+
+  // Modes are not a rung on the ladder: they are played at no difficulty,
+  // so they cannot carry the climb forward.
+  it('does not let a mode round stand in for a difficulty', () => {
+    const profile = profileWith({
+      'cat:battles': { gamesPlayed: 4, bestScore: 15, bestOutOf: 15, totalCorrect: 40, totalQuestions: 60 },
+    });
+    expect(ladderBest(profile, 'battles')).toEqual({ score: 0, outOf: LADDER });
   });
 
   it('is nothing out of the whole ladder before anything is played', () => {

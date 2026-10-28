@@ -1,4 +1,5 @@
 import { ModeStat } from '../auth/types';
+import { roundStats } from '../quiz/statsSummary';
 import { TIERS, tierLabel } from './difficulty';
 import { Language } from '../i18n/LanguageContext';
 
@@ -7,8 +8,11 @@ const XP_PER_LEVEL = 200;
 
 export type PlayerLevel = { xp: number; level: number; title: string };
 
+/** Right answers given, counted once each: a round played in a game mode
+ * is banked under its category as well, and adding up every key would pay
+ * twice for it. */
 export function sumTotalCorrect(stats: Record<string, ModeStat>): number {
-  return Object.values(stats).reduce((sum, s) => sum + s.totalCorrect, 0);
+  return roundStats(stats).reduce((sum, s) => sum + s.totalCorrect, 0);
 }
 
 /** Derived, not stored — same total-correct-answers count the app already tracks

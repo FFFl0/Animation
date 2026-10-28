@@ -7,7 +7,8 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { PlayerSummary } from '../friends/friendsApi';
-import { levelFromStats, levelFromTotalCorrect, sumTotalCorrect } from '../data/level';
+import { levelFromStats, levelFromTotalCorrect } from '../data/level';
+import { roundStats, sumStats } from '../quiz/statsSummary';
 import AnimeAvatar from '../components/AnimeAvatar';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
@@ -29,10 +30,12 @@ export default function CompareScreen({ friend, onBack, onChallenge }: Props) {
 
   if (!profile) return null;
 
-  const myGames = Object.values(profile.stats).reduce((sum, s) => sum + s.gamesPlayed, 0);
-  const myQuestions = Object.values(profile.stats).reduce((sum, s) => sum + s.totalQuestions, 0);
-  const myCorrect = sumTotalCorrect(profile.stats);
-  const myAccuracy = myQuestions > 0 ? Math.round((myCorrect / myQuestions) * 100) : 0;
+  // Over the rounds, not over every key they are filed under: a mode round
+  // is banked under its category as well, and counting both would put this
+  // side of the comparison ahead of the other for no reason.
+  const mine = sumStats(roundStats(profile.stats));
+  const myGames = mine.gamesPlayed;
+  const myAccuracy = mine.totalQuestions > 0 ? Math.round((mine.totalCorrect / mine.totalQuestions) * 100) : 0;
   const myXp = levelFromStats(profile.stats).xp;
 
   const theirAccuracy = friend.totalQuestions > 0 ? Math.round((friend.totalCorrect / friend.totalQuestions) * 100) : 0;

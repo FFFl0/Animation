@@ -138,10 +138,14 @@ select
   streak,
   achievements,
   stats,
-  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
-  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
-  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions,
-  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats)), 0) as total_games
+  -- Только ключи 'cat:%'. Раунд, сыгранный в режиме, записывается дважды —
+  -- под своей категорией и под самим режимом, — и сумма по всем ключам
+  -- засчитывала бы его два раза. Под категорией лежит каждый раунд, и
+  -- режимный тоже, так что это полный список и ровно по одному разу.
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_games
 from public.profiles;
 
 grant select on public.leaderboard to authenticated;
@@ -1107,10 +1111,14 @@ select
   achievements,
   stats,
   last_seen_at,
-  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats)), 0) as total_score,
-  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats)), 0) as total_correct,
-  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats)), 0) as total_questions,
-  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats)), 0) as total_games
+  -- Только ключи 'cat:%'. Раунд, сыгранный в режиме, записывается дважды —
+  -- под своей категорией и под самим режимом, — и сумма по всем ключам
+  -- засчитывала бы его два раза. Под категорией лежит каждый раунд, и
+  -- режимный тоже, так что это полный список и ровно по одному разу.
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_games
 from public.profiles;
 
 grant select on public.leaderboard to authenticated;
