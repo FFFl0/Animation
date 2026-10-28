@@ -114,11 +114,22 @@ export function getTier(id: TierId): Tier {
   return TIERS.find((t) => t.id === id)!;
 }
 
-export function isTierUnlocked(id: TierId, bestScoreByTier: Partial<Record<TierId, number>>): boolean {
+/** The share of a tier's questions that counts as having cleared it. */
+export const CLEAR_SHARE = 0.6;
+
+/**
+ * Whether a tier is open, given the best share of its own questions the
+ * player has managed at each tier.
+ *
+ * Shares rather than raw scores: rounds are different lengths now, so nine
+ * right answers means one thing in a round of fifteen and another in a
+ * round of ten — and a record set when every round was eleven would
+ * otherwise unlock everything above it for free.
+ */
+export function isTierUnlocked(id: TierId, bestShareByTier: Partial<Record<TierId, number>>): boolean {
   const tier = getTier(id);
   if (!tier.unlockAfter) return true;
-  const prevBest = bestScoreByTier[tier.unlockAfter] ?? 0;
-  return prevBest >= Math.ceil(getTier(tier.unlockAfter).questionsPerRound * 0.6);
+  return (bestShareByTier[tier.unlockAfter] ?? 0) >= CLEAR_SHARE;
 }
 
 const TIER_EN: Record<TierId, { label: string; description: string }> = {

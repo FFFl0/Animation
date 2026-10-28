@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import { Account, ModeStat, Profile, Streak } from './types';
+import { Account, ModeStat, Profile, Streak, ZERO_STAT, bestOutOf, bestShare } from './types';
 import { makeAvatar } from '../data/avatar';
 import { AuthError } from './authError';
 import { validateCredentials, validateUsername } from './validation';
@@ -189,10 +189,19 @@ export function bumpStreak(streak: Streak, useFreeze = false): { streak: Streak;
 export async function logRoundResult(_userId: string, _score: number, _total: number): Promise<void> {}
 
 export function mergeStat(prev: ModeStat | undefined, score: number, total: number): ModeStat {
-  const base = prev ?? { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
+  const base = prev ?? ZERO_STAT;
+  // Which round was the better one, now that rounds are not all the same
+  // length: the larger share of its own questions, and the higher raw score
+  // when those are equal. The length rides along with the score, so the two
+  // always describe the same round.
+  const previousShare = bestShare(base, total);
+  const thisShare = total > 0 ? score / total : 0;
+  const beatsIt = thisShare > previousShare || (thisShare === previousShare && score > base.bestScore);
+
   return {
     gamesPlayed: base.gamesPlayed + 1,
-    bestScore: Math.max(base.bestScore, score),
+    bestScore: beatsIt ? score : base.bestScore,
+    bestOutOf: beatsIt ? total : bestOutOf(base, total),
     totalCorrect: base.totalCorrect + score,
     totalQuestions: base.totalQuestions + total,
   };

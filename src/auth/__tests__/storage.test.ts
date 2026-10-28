@@ -1,4 +1,5 @@
 import { mergeStat, bumpStreak } from '../storage';
+import { ZERO_STAT, bestOutOf, bestShare } from '../types';
 import { validateCredentials } from '../validation';
 import { AuthError } from '../authError';
 
@@ -7,25 +8,60 @@ describe('mergeStat', () => {
     expect(mergeStat(undefined, 7, 10)).toEqual({
       gamesPlayed: 1,
       bestScore: 7,
+      bestOutOf: 10,
       totalCorrect: 7,
       totalQuestions: 10,
     });
   });
 
-  it('accumulates games played and totals, and keeps the best score', () => {
-    const prev = { gamesPlayed: 2, bestScore: 8, totalCorrect: 15, totalQuestions: 20 };
+  it('accumulates games played and totals, and keeps the best round', () => {
+    const prev = { gamesPlayed: 2, bestScore: 8, bestOutOf: 10, totalCorrect: 15, totalQuestions: 20 };
     expect(mergeStat(prev, 5, 10)).toEqual({
       gamesPlayed: 3,
       bestScore: 8,
+      bestOutOf: 10,
       totalCorrect: 20,
       totalQuestions: 30,
     });
     expect(mergeStat(prev, 9, 10)).toEqual({
       gamesPlayed: 3,
       bestScore: 9,
+      bestOutOf: 10,
       totalCorrect: 24,
       totalQuestions: 30,
     });
+  });
+
+  // Rounds are not all the same length any more, so "best" is the better
+  // round, not the bigger number.
+  it('keeps the round with the larger share, not the higher score', () => {
+    const nineOfFifteen = { gamesPlayed: 1, bestScore: 9, bestOutOf: 15, totalCorrect: 9, totalQuestions: 15 };
+    const after = mergeStat(nineOfFifteen, 6, 6);
+    expect(after.bestScore).toBe(6);
+    expect(after.bestOutOf).toBe(6);
+  });
+
+  it('does not take a worse round even when its score is higher', () => {
+    const sixOfSix = { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6 };
+    const after = mergeStat(sixOfSix, 9, 15);
+    expect(after.bestScore).toBe(6);
+    expect(after.bestOutOf).toBe(6);
+  });
+
+  it('breaks a tie on share by the longer round', () => {
+    const threeOfSix = { gamesPlayed: 1, bestScore: 3, bestOutOf: 6, totalCorrect: 3, totalQuestions: 6 };
+    const after = mergeStat(threeOfSix, 5, 10);
+    expect(after.bestScore).toBe(5);
+    expect(after.bestOutOf).toBe(10);
+  });
+
+  // Records kept before the length was stored: the score itself is the only
+  // honest floor for what it was out of.
+  it('reads a legacy record as being out of at least its own score', () => {
+    const legacy = { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 };
+    const after = mergeStat(legacy, 4, 6);
+    expect(after.bestScore).toBe(11);
+    expect(after.bestOutOf).toBe(11);
   });
 });
 
@@ -90,5 +126,32 @@ describe('validateCredentials', () => {
 
   it('rejects a too-short password', () => {
     expect(() => validateCredentials('hero', 'abc')).toThrow(AuthError);
+  });
+});
+
+describe('reading a record back', () => {
+  it('knows what a stored record was out of', () => {
+    expect(bestOutOf({ gamesPlayed: 1, bestScore: 9, bestOutOf: 15, totalCorrect: 9, totalQuestions: 15 }, 6)).toBe(15);
+  });
+
+  // The fallback: a score of eleven cannot have come from a round of six.
+  it('infers at least the score itself for a record kept without one', () => {
+    const legacy = { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 };
+    expect(bestOutOf(legacy, 6)).toBe(11);
+    expect(bestShare(legacy, 6)).toBe(1);
+  });
+
+  it('uses the round length when the score is below it', () => {
+    const legacy = { gamesPlayed: 1, bestScore: 4, totalCorrect: 4, totalQuestions: 6 };
+    expect(bestOutOf(legacy, 6)).toBe(6);
+    expect(bestShare(legacy, 6)).toBeCloseTo(4 / 6);
+  });
+
+  it('never reports more than a perfect round', () => {
+    expect(bestShare({ gamesPlayed: 1, bestScore: 20, bestOutOf: 10, totalCorrect: 20, totalQuestions: 10 }, 10)).toBe(1);
+  });
+
+  it('is zero for a tier never played', () => {
+    expect(bestShare(ZERO_STAT, 10)).toBe(0);
   });
 });

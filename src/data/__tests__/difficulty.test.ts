@@ -1,4 +1,4 @@
-import { TIERS, isTierUnlocked, getTier } from '../difficulty';
+import { CLEAR_SHARE, TIERS, isTierUnlocked, getTier } from '../difficulty';
 
 describe('difficulty tier unlocking', () => {
   it('novice and fan are always unlocked', () => {
@@ -11,15 +11,22 @@ describe('difficulty tier unlocking', () => {
   });
 
   it('expert requires clearing 60% of otaku', () => {
-    const threshold = Math.ceil(getTier('otaku').questionsPerRound * 0.6);
-    expect(isTierUnlocked('expert', { otaku: threshold - 1 })).toBe(false);
-    expect(isTierUnlocked('expert', { otaku: threshold })).toBe(true);
+    expect(isTierUnlocked('expert', { otaku: CLEAR_SHARE - 0.01 })).toBe(false);
+    expect(isTierUnlocked('expert', { otaku: CLEAR_SHARE })).toBe(true);
   });
 
   it('legend requires clearing 60% of expert', () => {
-    const threshold = Math.ceil(getTier('expert').questionsPerRound * 0.6);
-    expect(isTierUnlocked('legend', { expert: threshold - 1 })).toBe(false);
-    expect(isTierUnlocked('legend', { expert: threshold })).toBe(true);
+    expect(isTierUnlocked('legend', { expert: CLEAR_SHARE - 0.01 })).toBe(false);
+    expect(isTierUnlocked('legend', { expert: CLEAR_SHARE })).toBe(true);
+  });
+
+  // The shares are what makes a short round and a long one comparable.
+  it('judges a short round and a long one by the same bar', () => {
+    const sixOfTen = 6 / 10;
+    const nineOfFifteen = 9 / 15;
+    expect(isTierUnlocked('expert', { otaku: sixOfTen })).toBe(true);
+    expect(isTierUnlocked('legend', { expert: nineOfFifteen })).toBe(true);
+    expect(isTierUnlocked('expert', { otaku: 5 / 10 })).toBe(false);
   });
 
   it('missing prerequisite score defaults to zero (locked)', () => {

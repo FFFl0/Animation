@@ -10,6 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { CategoryId, getCategory, categoryTitle, categoryDescription } from '../data/categories';
 import { TIERS, TierId, isTierUnlocked, tierLabel, tierDescription } from '../data/difficulty';
 import { categoryStatsKey, getStat } from '../quiz/statsKey';
+import { bestOutOf, bestShare } from '../auth/types';
 import { ToriiIcon } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import ProgressBar from '../components/ProgressBar';
@@ -31,10 +32,13 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
   const t = useT();
   const category = getCategory(categoryId);
 
-  const bestScoreByTier: Partial<Record<TierId, number>> = {};
+  const bestShareByTier: Partial<Record<TierId, number>> = {};
   if (profile) {
     for (const tier of TIERS) {
-      bestScoreByTier[tier.id] = getStat(profile, categoryStatsKey(categoryId, tier.id)).bestScore;
+      bestShareByTier[tier.id] = bestShare(
+        getStat(profile, categoryStatsKey(categoryId, tier.id)),
+        tier.questionsPerRound
+      );
     }
   }
 
@@ -57,11 +61,11 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
           <View style={styles.tierList}>
             {TIERS.map((tier) => {
               const stat = profile ? getStat(profile, categoryStatsKey(categoryId, tier.id)) : undefined;
-              const unlocked = isTierUnlocked(tier.id, bestScoreByTier);
-              const total = tier.questionsPerRound;
-              // Capped at the round's length: a record from when every tier
-              // ran eleven questions would otherwise overflow a shorter one.
-              const best = Math.min(stat?.bestScore ?? 0, total);
+              const unlocked = isTierUnlocked(tier.id, bestShareByTier);
+              // Shown against the round that set it, not against today's
+              // length: a record of eleven came from a round of eleven.
+              const total = stat ? bestOutOf(stat, tier.questionsPerRound) : tier.questionsPerRound;
+              const best = stat?.bestScore ?? 0;
 
               return (
                 <SoundTouchable

@@ -6,7 +6,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { ZERO_STAT } from '../auth/types';
+import { ZERO_STAT, bestOutOf, bestShare } from '../auth/types';
 import { CategoryId, categoryDescription, categoryTitle, getCategory } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { TIERS, isTierUnlocked, tierLabel } from '../data/difficulty';
@@ -62,9 +62,12 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
   // difficulties to break down.
   const hasTiers = !category.hardOnly && categoryId !== 'mixed';
 
-  const bestScoreByTier: Partial<Record<string, number>> = {};
+  const bestShareByTier: Partial<Record<string, number>> = {};
   for (const tier of TIERS) {
-    bestScoreByTier[tier.id] = (profile.stats[categoryStatsKey(categoryId, tier.id)] ?? ZERO_STAT).bestScore;
+    bestShareByTier[tier.id] = bestShare(
+      profile.stats[categoryStatsKey(categoryId, tier.id)] ?? ZERO_STAT,
+      tier.questionsPerRound
+    );
   }
 
   return (
@@ -104,7 +107,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
               <View style={styles.tile}>
                 <Icon name="target" size={16} color={category.color} />
                 <Text style={styles.tileValue}>{countedRounds}</Text>
-                <Text style={styles.tileLabel}>{t('categoryStats.rounds')}</Text>
+                <Text style={styles.tileLabel}>{t('categoryStats.rounds', total.gamesPlayed)}</Text>
               </View>
               <View style={styles.tile}>
                 <StatRing percent={accuracy} size={22} color={category.color} trackColor={theme.border} />
@@ -118,6 +121,11 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
               </View>
             </View>
 
+            {/* A remark about rounds, under the rounds — it used to sit in
+                the card about answers, where it read as a third figure
+                about them. */}
+            <Text style={styles.shareLine}>{t('categoryStats.shareLine', share)}</Text>
+
             <View style={styles.card}>
               <View style={styles.cardHead}>
                 <Text style={styles.cardTitle}>{t('categoryStats.answersTitle')}</Text>
@@ -126,7 +134,6 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                 </Text>
               </View>
               <ProgressBar progress={accuracy / 100} color={category.color} height={7} />
-              <Text style={styles.cardNote}>{t('categoryStats.shareLine', share)}</Text>
             </View>
 
             {hasTiers && (
@@ -134,11 +141,11 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                 <Text style={styles.sectionTitle}>{t('categoryStats.byDifficulty')}</Text>
                 {TIERS.map((tier) => {
                   const stat = profile.stats[categoryStatsKey(categoryId, tier.id)] ?? ZERO_STAT;
-                  const unlocked = isTierUnlocked(tier.id, bestScoreByTier);
+                  const unlocked = isTierUnlocked(tier.id, bestShareByTier);
                   const tierAccuracy = accuracyOf(stat);
-                  // A record set when rounds were longer would otherwise read
-                  // as eleven out of six.
-                  const best = Math.min(stat.bestScore, tier.questionsPerRound);
+                  // Against the round that set it: a record of eleven came
+                  // from a round of eleven, whatever this tier runs today.
+                  const bestTotal = bestOutOf(stat, tier.questionsPerRound);
 
                   return (
                     <View key={tier.id} style={[styles.tierCard, !unlocked && styles.tierCardLocked]}>
@@ -161,7 +168,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                         {unlocked && stat.gamesPlayed > 0 && (
                           <View style={styles.tierTrack}>
                             <ProgressBar
-                              progress={best / tier.questionsPerRound}
+                              progress={bestShare(stat, tier.questionsPerRound)}
                               color={tier.color}
                               height={5}
                             />
@@ -171,7 +178,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                       {unlocked && stat.gamesPlayed > 0 && (
                         <View style={styles.tierBest}>
                           <Text style={styles.tierBestValue}>
-                            {best}/{tier.questionsPerRound}
+                            {stat.bestScore}/{bestTotal}
                           </Text>
                           <Text style={styles.tierBestLabel}>{t('categoryStats.best')}</Text>
                         </View>
@@ -253,7 +260,13 @@ function makeStyles(theme: Theme) {
     cardHead: { flexDirection: 'row', alignItems: 'baseline', justifyContent: 'space-between', gap: 12 },
     cardTitle: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     cardValue: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
-    cardNote: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted },
+    shareLine: {
+      fontSize: 12,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      paddingHorizontal: 20,
+      marginTop: 10,
+    },
     sectionTitle: {
       fontSize: 20,
       fontFamily: fontFamily('800'),

@@ -1,6 +1,6 @@
-import { Profile } from '../auth/types';
+import { Profile, bestShare } from '../auth/types';
 import { categoryStatsKey, getStat, modeStatsKey } from '../quiz/statsKey';
-import { TIERS, getTier } from './difficulty';
+import { CLEAR_SHARE, TIERS, TierId, getTier } from './difficulty';
 import { CATEGORIES, CategoryId } from './categories';
 import { levelFromStats } from './level';
 import { IconName } from '../components/Icon';
@@ -65,12 +65,16 @@ function gamesIn(profile: Profile, categoryId: CategoryId): number {
   return tiered + getStat(profile, categoryStatsKey(categoryId)).gamesPlayed;
 }
 
-/** Tiers of one category cleared, at its best — a tier counts at 60% right. */
+/** Whether a tier of this category has been cleared — the same share of its
+ * own questions that opens the tier above it. */
+function tierCleared(profile: Profile, categoryId: CategoryId, tier: TierId): boolean {
+  const stat = getStat(profile, categoryStatsKey(categoryId, tier));
+  return bestShare(stat, getTier(tier).questionsPerRound) >= CLEAR_SHARE;
+}
+
+/** Tiers of one category cleared, at its best. */
 function tiersClearedIn(profile: Profile, categoryId: CategoryId): number {
-  return TIERS.filter((tier) => {
-    const need = Math.ceil(getTier(tier.id).questionsPerRound * 0.6);
-    return getStat(profile, categoryStatsKey(categoryId, tier.id)).bestScore >= need;
-  }).length;
+  return TIERS.filter((tier) => tierCleared(profile, categoryId, tier.id)).length;
 }
 
 export const ACHIEVEMENTS: Achievement[] = [
@@ -100,10 +104,8 @@ export const ACHIEVEMENTS: Achievement[] = [
   { id: 'explorer', title: 'Всё попробовал', description: 'Сыграй хотя бы раз в каждой категории', icon: 'shuffle', group: 'collection', rarity: 'epic', target: CATEGORIES.length, progress: (p) => CATEGORIES.filter((c) => gamesIn(p, c.id) > 0).length },
 
   // ---- special: streaks and the hardest tier
-  { id: 'legend-tier', title: 'Легенда', description: 'Пройди уровень «Легенда» в любой категории', icon: 'crown', group: 'special', rarity: 'epic', target: 1, progress: (p) => {
-    const need = Math.ceil(getTier('legend').questionsPerRound * 0.6);
-    return CATEGORIES.some((c) => getStat(p, categoryStatsKey(c.id, 'legend')).bestScore >= need) ? 1 : 0;
-  } },
+  { id: 'legend-tier', title: 'Легенда', description: 'Пройди уровень «Легенда» в любой категории', icon: 'crown', group: 'special', rarity: 'epic', target: 1, progress: (p) =>
+    CATEGORIES.some((c) => tierCleared(p, c.id, 'legend')) ? 1 : 0 },
   { id: 'week-streak', title: 'Неделя огня', description: 'Играй 7 дней подряд', icon: 'flame', group: 'special', rarity: 'rare', target: 7, progress: (p) => p.streak.count },
   { id: 'month-streak', title: 'Месяц отаку', description: 'Играй 30 дней подряд', icon: 'sakura', group: 'special', rarity: 'legendary', target: 30, progress: (p) => p.streak.count },
 
