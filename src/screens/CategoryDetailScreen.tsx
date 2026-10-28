@@ -58,8 +58,10 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
             {TIERS.map((tier) => {
               const stat = profile ? getStat(profile, categoryStatsKey(categoryId, tier.id)) : undefined;
               const unlocked = isTierUnlocked(tier.id, bestScoreByTier);
-              const best = stat?.bestScore ?? 0;
               const total = tier.questionsPerRound;
+              // Capped at the round's length: a record from when every tier
+              // ran eleven questions would otherwise overflow a shorter one.
+              const best = Math.min(stat?.bestScore ?? 0, total);
 
               return (
                 <SoundTouchable

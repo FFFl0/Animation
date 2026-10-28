@@ -3,7 +3,8 @@ import { CHARACTERS } from '../../data/characters';
 import { ANIME_SERIES } from '../../data/animeSeries';
 import { OPENING_VIDEOS } from '../../data/openingVideos';
 import { ANIME_SERIES as ALL_SERIES } from '../../data/animeSeries';
-import { QUOTE_AUDIO } from '../../data/quoteAudio';
+import { QUOTE_AUDIO, hasQuoteAudio } from '../../data/quoteAudio';
+import { TIERS } from '../../data/difficulty';
 import { RoundConfig } from '../types';
 
 function baseConfig(overrides: Partial<RoundConfig> = {}): RoundConfig {
@@ -146,5 +147,52 @@ describe('generateQuiz', () => {
     const legendCount = CHARACTERS.filter((c) => c.tier === 'legend').length;
     expect(legendCount).toBeGreaterThan(0);
     expect(legendCount).toBeLessThan(25);
+  });
+});
+
+describe('quote questions are voiced', () => {
+  const quoteRound = (overrides: Partial<Parameters<typeof generateQuiz>[0]> = {}) =>
+    generateQuiz({ categoryId: 'quotes', questionCount: 15, seed: 7, ...overrides });
+
+  it('asks only about characters whose line can be played', () => {
+    for (const question of quoteRound()) {
+      expect(question.type).toBe('guessQuote');
+      expect(question.character).toBeDefined();
+      expect(hasQuoteAudio(question.character!.id)).toBe(true);
+    }
+  });
+
+  it('holds at every difficulty, where the voiced handful is smallest', () => {
+    for (const tier of TIERS) {
+      const round = quoteRound({ tier: tier.id, questionCount: tier.questionsPerRound });
+      expect(round.length).toBe(tier.questionsPerRound);
+      for (const question of round) {
+        expect(hasQuoteAudio(question.character!.id)).toBe(true);
+      }
+    }
+  });
+
+  it('does not ask about the same person twice in one round', () => {
+    const ids = quoteRound({ questionCount: 15 }).map((q) => q.character!.id);
+    expect(new Set(ids).size).toBe(ids.length);
+  });
+
+  // A mixed round takes quote questions alongside everything else; those
+  // still have to be answerable by ear.
+  it('holds for the quote questions inside a mixed round', () => {
+    const round = generateQuiz({ categoryId: 'mixed', questionCount: 40, seed: 3 });
+    const quotes = round.filter((q) => q.type === 'guessQuote');
+    expect(quotes.length).toBeGreaterThan(0);
+    for (const question of quotes) {
+      expect(hasQuoteAudio(question.character!.id)).toBe(true);
+    }
+  });
+
+  it('is not a fluke of one seed', () => {
+    for (let seed = 0; seed < 25; seed += 1) {
+      for (const question of quoteRound({ seed })) {
+        expect(hasQuoteAudio(question.character!.id)).toBe(true);
+      }
+    }
   });
 });

@@ -11,6 +11,16 @@ export type Tier = {
   icon: IconName;
   color: string;
   colorBg: string;
+  /**
+   * How long a round at this tier is.
+   *
+   * The ladder grows with the difficulty rather than running eleven
+   * questions at every step: the first tier is short enough to try on a
+   * whim, and the last is long enough to be a test of stamina as well as
+   * knowledge. Everything derived — the score that clears a tier, the
+   * progress bars, the quiz itself — reads this number, so the shape of the
+   * ladder lives here and nowhere else.
+   */
   questionsPerRound: number;
   unlockAfter: TierId | null;
 };
@@ -23,7 +33,7 @@ export const TIERS: Tier[] = [
     icon: 'leaf',
     color: '#22C55E',
     colorBg: '#E8F9EE',
-    questionsPerRound: 11,
+    questionsPerRound: 6,
     unlockAfter: null,
   },
   {
@@ -33,7 +43,7 @@ export const TIERS: Tier[] = [
     icon: 'wave',
     color: '#3B82F6',
     colorBg: '#E7F0FE',
-    questionsPerRound: 11,
+    questionsPerRound: 8,
     unlockAfter: null,
   },
   {
@@ -43,7 +53,7 @@ export const TIERS: Tier[] = [
     icon: 'sakura',
     color: '#F06292',
     colorBg: '#FADDE1',
-    questionsPerRound: 11,
+    questionsPerRound: 10,
     unlockAfter: null,
   },
   {
@@ -53,7 +63,7 @@ export const TIERS: Tier[] = [
     icon: 'flame',
     color: '#EF4444',
     colorBg: '#FDEAEA',
-    questionsPerRound: 11,
+    questionsPerRound: 12,
     unlockAfter: 'otaku',
   },
   {
@@ -63,7 +73,7 @@ export const TIERS: Tier[] = [
     icon: 'crown',
     color: '#D4A017',
     colorBg: '#FBF0C9',
-    questionsPerRound: 10,
+    questionsPerRound: 15,
     unlockAfter: 'expert',
   },
 ];

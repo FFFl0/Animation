@@ -1,3 +1,4 @@
+import { hasQuoteAudio } from '../data/quoteAudio';
 import { CHARACTERS, Character, characterName, localizeCharacter } from '../data/characters';
 import { ANIME_SERIES, AnimeSeries, seriesTitleById } from '../data/animeSeries';
 import { openingVideoFor } from '../data/openingVideos';
@@ -191,27 +192,55 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
         : getCategory(config.categoryId).questionTypes;
 
   const questions: Question[] = [];
-  let cycle = shuffle(pool, rng);
-  let cycleIndex = 0;
+  const nextCharacter = cycleThrough(pool, rng);
+  // Quote questions draw from their own, smaller set: a written quote is
+  // meant to be heard as well, and only some characters have a recording.
+  // See voicedPool for what happens when the tier's own run out.
+  const nextVoiced = cycleThrough(voicedPool(pool, rng), rng);
   // Series get their own cycle: difficulty tiers describe characters, so a
   // tier filter says nothing about which openings to play, and drawing the
   // series from the character just picked would repeat the popular ones.
-  let seriesCycle = shuffle(VIDEO_SERIES, rng);
-  let seriesIndex = 0;
+  const nextSeries = cycleThrough(VIDEO_SERIES, rng);
 
   for (let i = 0; i < config.questionCount; i++) {
-    if (cycleIndex >= cycle.length) {
-      cycle = shuffle(pool, rng);
-      cycleIndex = 0;
-    }
-    if (seriesIndex >= seriesCycle.length) {
-      seriesCycle = shuffle(VIDEO_SERIES, rng);
-      seriesIndex = 0;
-    }
     const type = types[Math.floor(rng() * types.length)];
-    const subject = { character: cycle[cycleIndex++], series: seriesCycle[seriesIndex++] };
-    questions.push(questionFor(type, subject, i, rng, lang));
+    const character = type === 'guessQuote' ? nextVoiced() : nextCharacter();
+    questions.push(questionFor(type, { character, series: nextSeries() }, i, rng, lang));
   }
 
   return questions;
+}
+
+/**
+ * Hands out one item at a time, shuffled, and starts a fresh shuffle once
+ * the list is spent — so a round shows everything available before it shows
+ * anything twice.
+ */
+function cycleThrough<T>(items: T[], rng: Rng): () => T {
+  let order = shuffle(items, rng);
+  let index = 0;
+  return () => {
+    if (index >= order.length) {
+      order = shuffle(items, rng);
+      index = 0;
+    }
+    return order[index++];
+  };
+}
+
+/**
+ * The characters a quote question may be about: those with a recording, the
+ * ones from this round's own pool first.
+ *
+ * The tier's own voiced characters come first so a round keeps the
+ * difficulty it promised; the rest follow for a round longer than that
+ * handful, where the alternative is asking about the same person twice.
+ * If nothing is voiced at all — no audio shipped — the ordinary pool stands,
+ * because a quote question without sound beats no question.
+ */
+function voicedPool(pool: Character[], rng: Rng): Character[] {
+  const fromPool = pool.filter((c) => hasQuoteAudio(c.id));
+  const others = CHARACTERS.filter((c) => hasQuoteAudio(c.id) && !fromPool.includes(c));
+  const voiced = [...shuffle(fromPool, rng), ...shuffle(others, rng)];
+  return voiced.length > 0 ? voiced : pool;
 }

@@ -69,3 +69,15 @@ export const QUOTE_AUDIO: Record<string, AudioSource> = {
 export function quoteAudioFor(characterId: string): AudioSource | undefined {
   return QUOTE_AUDIO[characterId];
 }
+
+/**
+ * Whether this character's line can be heard as well as read.
+ *
+ * The quiz asks a quote question only about somebody this answers yes for,
+ * so the question always comes with its recording. Adding a file to
+ * `assets/quotes` and a line to the table above is all it takes to bring a
+ * character into that set.
+ */
+export function hasQuoteAudio(characterId: string): boolean {
+  return characterId in QUOTE_AUDIO;
+}

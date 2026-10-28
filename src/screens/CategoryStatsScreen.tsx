@@ -136,6 +136,9 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                   const stat = profile.stats[categoryStatsKey(categoryId, tier.id)] ?? ZERO_STAT;
                   const unlocked = isTierUnlocked(tier.id, bestScoreByTier);
                   const tierAccuracy = accuracyOf(stat);
+                  // A record set when rounds were longer would otherwise read
+                  // as eleven out of six.
+                  const best = Math.min(stat.bestScore, tier.questionsPerRound);
 
                   return (
                     <View key={tier.id} style={[styles.tierCard, !unlocked && styles.tierCardLocked]}>
@@ -158,7 +161,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                         {unlocked && stat.gamesPlayed > 0 && (
                           <View style={styles.tierTrack}>
                             <ProgressBar
-                              progress={stat.bestScore / tier.questionsPerRound}
+                              progress={best / tier.questionsPerRound}
                               color={tier.color}
                               height={5}
                             />
@@ -168,7 +171,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                       {unlocked && stat.gamesPlayed > 0 && (
                         <View style={styles.tierBest}>
                           <Text style={styles.tierBestValue}>
-                            {stat.bestScore}/{tier.questionsPerRound}
+                            {best}/{tier.questionsPerRound}
                           </Text>
                           <Text style={styles.tierBestLabel}>{t('categoryStats.best')}</Text>
                         </View>
