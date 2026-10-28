@@ -8,6 +8,8 @@ import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
 import { Friendship, PlayerSummary, friendState, removeFriend, respondToRequest, sendFriendRequest } from '../friends/friendsApi';
 import { levelFromTotalCorrect } from '../data/level';
+import { speedMultiplier } from '../data/rating';
+import RatingCard from '../components/RatingCard';
 import { topCategories } from '../data/favoriteCategories';
 import { getCategory } from '../data/categories';
 import AnimeAvatar from '../components/AnimeAvatar';
@@ -99,6 +101,14 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
             </>
           )}
         </View>
+
+        {/* Their rating, as the ranking has it. Only the number: the
+            workings behind it are their own business, and the breakdown
+            would need stats a friend cannot read. */}
+        <RatingCard
+          compact
+          rating={{ points: player.rating, cleared: 0, outOf: 0, averageMs: null, multiplier: speedMultiplier(null) }}
+        />
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>

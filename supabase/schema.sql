@@ -1340,3 +1340,42 @@ on conflict (id) do update
   set public = excluded.public,
       file_size_limit = excluded.file_size_limit,
       allowed_mime_types = excluded.allowed_mime_types;
+
+-- ============================================================
+-- РЕЙТИНГ ИГРОКА.
+--
+-- Очки = пройдено вопросов × множитель скорости. «Пройдено вопросов» —
+-- это лучший результат на каждой ступени каждой категории, сложенный
+-- вместе: число ограничено сверху, поэтому рейтинг нельзя нагриндить
+-- долгой игрой без новых рекордов. Множитель (от 0.5 до 2.0) зависит от
+-- среднего времени ответа.
+--
+-- Считает приложение и кладёт сюда вместе со статистикой: посчитать это
+-- в представлении нельзя — нужна длина раунда каждой ступени, а она живёт
+-- в коде. Число здесь — копия для ранжирования, правда — в stats.
+-- ============================================================
+
+alter table public.profiles add column if not exists rating integer not null default 0;
+
+drop view if exists public.leaderboard cascade;
+create view public.leaderboard as
+select
+  id,
+  username,
+  avatar,
+  streak,
+  achievements,
+  stats,
+  last_seen_at,
+  rating,
+  -- Только ключи 'cat:%'. Раунд, сыгранный в режиме, записывается дважды —
+  -- под своей категорией и под самим режимом, — и сумма по всем ключам
+  -- засчитывала бы его два раза. Под категорией лежит каждый раунд, и
+  -- режимный тоже, так что это полный список и ровно по одному разу.
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_games
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;

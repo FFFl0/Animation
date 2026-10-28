@@ -41,6 +41,7 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     achievements: [],
     stats: {},
     totalScore: row.score,
+    rating: row.score,
     totalCorrect: row.totalCorrect,
     totalQuestions: row.totalQuestions,
     totalGames: 0,
@@ -174,7 +175,15 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
                   </Text>
                   <Text style={styles.rowSub}>{t('leaderboard.accuracyLine', accuracy)}</Text>
                 </View>
-                <Text style={styles.rowScore}>{row.score}</Text>
+                {/* All-time ranks by rating points; the two periods rank by
+                    the answers given inside them, which is a different
+                    number and has to say so. */}
+                <View style={styles.scoreColumn}>
+                  <Text style={styles.rowScore}>{row.score}</Text>
+                  <Text style={styles.rowScoreLabel}>
+                    {period === 'all' ? t('rating.pointsLabel') : t('rating.answersLabel')}
+                  </Text>
+                </View>
               </SoundTouchable>
             );
           })}
@@ -355,7 +364,9 @@ function makeStyles(theme: Theme) {
     rowText: { flex: 1 },
     rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
+    scoreColumn: { alignItems: 'flex-end' },
     rowScore: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.primary },
+    rowScoreLabel: { fontSize: 10, fontFamily: fontFamily('500'), color: theme.textMuted },
     modalBackdrop: {
       flex: 1,
       backgroundColor: 'rgba(0,0,0,0.4)',

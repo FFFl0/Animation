@@ -15,6 +15,8 @@ import { pickProfilePhoto } from '../avatar/photoPicker';
 import { deleteAvatarPhoto, uploadAvatarPhoto } from '../avatar/avatarStorage';
 import { PresetAvatarId, PRESET_AVATAR_IDS, PRESET_AVATAR_IMAGES } from '../data/presetAvatars';
 import { levelFromStats } from '../data/level';
+import { ratingOf } from '../data/rating';
+import RatingCard from '../components/RatingCard';
 import MedalShelf from '../components/MedalShelf';
 import { totalMedals } from '../tournament/medals';
 import WalletSheet from '../components/WalletSheet';
@@ -242,8 +244,10 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
         {photoError && <Text style={styles.photoError}>{photoError}</Text>}
       </View>
 
-      {/* The first thing on your own profile that is about how you play
-          rather than how it looks. */}
+      {/* Where the profile stops being about how you look and starts being
+          about how you play. */}
+      <RatingCard rating={ratingOf(profile)} />
+
       <Text style={styles.sectionTitle}>{t('profile.rareAchievementsTitle')}</Text>
       <RareAchievements unlocked={unlockedIds(profile)} emptyText={t('profile.rareAchievementsEmpty')} />
 

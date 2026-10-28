@@ -15,6 +15,15 @@ export type ModeStat = {
   bestOutOf?: number;
   totalCorrect: number;
   totalQuestions: number;
+  /**
+   * Thinking time banked here, and how many answers it covers.
+   *
+   * The pair, not the mean: rounds are different lengths, and the player's
+   * average is the total over the count. Absent on anything recorded before
+   * the clock was kept, which simply does not count towards the average.
+   */
+  answeredMs?: number;
+  answeredCount?: number;
 };
 
 export const ZERO_STAT: ModeStat = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
@@ -63,6 +72,13 @@ export type Profile = {
   avatar: Avatar;
   favoriteCharacterId: string | null;
   stats: Record<string, ModeStat>;
+  /**
+   * The rating, derived from the stats by `ratingOf` and written down with
+   * them. Derived figures do not normally belong in a profile, but this one
+   * is what other players are ranked by, and the ranking cannot read anyone
+   * else's stats to work it out. Absent until the first round is banked.
+   */
+  rating?: number;
   streak: Streak;
   achievements: string[];
   /** Achievement id -> the day it was earned, as YYYY-MM-DD. */

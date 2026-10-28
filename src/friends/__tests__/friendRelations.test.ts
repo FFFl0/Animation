@@ -19,6 +19,7 @@ function player(id: string): PlayerSummary {
     achievements: [],
     stats: {},
     totalScore: 0,
+    rating: 0,
     totalCorrect: 0,
     totalQuestions: 0,
     totalGames: 0,

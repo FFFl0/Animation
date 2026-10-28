@@ -13,6 +13,8 @@ export type PlayerSummary = {
   achievements: string[];
   stats: Record<string, ModeStat>;
   totalScore: number;
+  /** Rating points — the figure the global ranking orders by. */
+  rating: number;
   totalCorrect: number;
   totalQuestions: number;
   totalGames: number;
@@ -74,6 +76,7 @@ type LeaderboardRow = {
   achievements: string[] | null;
   stats: Record<string, ModeStat> | null;
   total_score: number;
+  rating: number | null;
   total_correct: number;
   total_questions: number;
   total_games: number;
@@ -96,6 +99,7 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     achievements: row.achievements ?? [],
     stats: row.stats ?? {},
     totalScore: row.total_score,
+    rating: row.rating ?? 0,
     totalCorrect: row.total_correct,
     totalQuestions: row.total_questions,
     totalGames: row.total_games,

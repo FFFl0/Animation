@@ -9,6 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { useT } from '../i18n/strings';
 import Icon from '../components/Icon';
+import { AnswerTiming } from '../quiz/answerTiming';
 import QuizScreen from './QuizScreen';
 import { RoundConfig } from '../quiz/types';
 import {
@@ -49,7 +50,7 @@ import {
 
 type Props = {
   onBack: () => void;
-  onMatchPlayed: (score: number, total: number) => void;
+  onMatchPlayed: (score: number, total: number, timing: AnswerTiming) => void;
 };
 
 type Tab = 'bracket' | 'players' | 'matches' | 'rules';
@@ -152,11 +153,11 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
     setBusy(false);
   };
 
-  const finishGame = async (score: number) => {
+  const finishGame = async (score: number, timing: AnswerTiming) => {
     const match = playing;
     setPlaying(null);
     if (!match) return;
-    onMatchPlayed(score, GAME_QUESTIONS);
+    onMatchPlayed(score, GAME_QUESTIONS, timing);
     setPhase('view');
     setBusy(true);
     try {
@@ -176,7 +177,7 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
           allowItems={false}
           key={quizKey}
           config={WEEKLY_MATCH_CONFIG}
-          onFinish={(score) => finishGame(score)}
+          onFinish={(score, _total, outcome) => finishGame(score, outcome.timing)}
           onClose={() => {
             setPlaying(null);
             setPhase('view');

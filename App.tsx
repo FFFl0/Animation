@@ -460,6 +460,7 @@ function AppShell() {
         activeModeId,
         score,
         total,
+        outcome.timing,
         countOf('streakFreeze') > 0
       );
       if (freezeUsed) spendConsumable('streakFreeze');
@@ -559,7 +560,7 @@ function AppShell() {
           {screen === 'tournament' && (
             <TournamentScreen
               onBack={() => setScreen('home')}
-              onMatchPlayed={async (score, total) => {
+              onMatchPlayed={async (score, total, timing) => {
                 // A tournament game is still seven real questions, so it feeds
                 // stats, XP and achievements like any other round.
                 const { unlocked, freezeUsed } = await recordRoundResult(
@@ -567,6 +568,7 @@ function AppShell() {
                   null,
                   score,
                   total,
+                  timing,
                   countOf('streakFreeze') > 0
                 );
                 if (freezeUsed) spendConsumable('streakFreeze');

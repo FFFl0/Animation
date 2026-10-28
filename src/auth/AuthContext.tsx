@@ -7,6 +7,8 @@ import { RoundConfig } from '../quiz/types';
 import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
 import { ACHIEVEMENTS, Achievement, isUnlocked } from '../data/achievements';
+import { ratingOf } from '../data/rating';
+import { AnswerTiming } from '../quiz/answerTiming';
 import { todayDateStr } from '../quiz/today';
 
 export { AuthError } from './backend';
@@ -29,6 +31,7 @@ type AuthContextValue = {
     modeId: ModeId | null,
     score: number,
     total: number,
+    timing?: AnswerTiming | null,
     useFreeze?: boolean
   ) => Promise<RoundOutcome>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
@@ -48,6 +51,17 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       .then(setProfile)
       .finally(() => setLoading(false));
   }, []);
+
+  // A rating that disagrees with the stats it is derived from is put right:
+  // the stats are the truth, the number beside them is a copy for the
+  // ranking. This catches a profile whose rounds were played before the
+  // rating existed, and one changed on another device.
+  useEffect(() => {
+    if (!profile) return;
+    const points = ratingOf(profile).points;
+    if (profile.rating === points) return;
+    Storage.updateAccount(profile.id, { rating: points }).then(setProfile).catch(() => {});
+  }, [profile]);
 
   // When a Supabase backend is configured, pick up changes made on other
   // devices logged into the same account (no-op for the local-only backend).
@@ -121,6 +135,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     modeId: ModeId | null,
     score: number,
     total: number,
+    timing: AnswerTiming | null = null,
     useFreeze = false
   ): Promise<RoundOutcome> => {
     if (!profile) return { unlocked: [], freezeUsed: false };
@@ -129,7 +144,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
 
     const nextStats = { ...profile.stats };
     for (const key of keys) {
-      nextStats[key] = Storage.mergeStat(nextStats[key], score, total);
+      nextStats[key] = Storage.mergeStat(nextStats[key], score, total, timing);
     }
 
     const { streak: nextStreak, freezeUsed } = Storage.bumpStreak(profile.streak, useFreeze);
@@ -159,6 +174,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       stats: nextStats,
       streak: nextStreak,
       dailyChallenge: nextDailyChallenge,
+      // Written down beside the stats it comes from: it is what the global
+      // ranking orders by, and that ranking cannot read anybody's stats.
+      rating: ratingOf(afterRound).points,
       ...(unlocked.length ? { achievements: nextIds, achievementDates: nextDates } : null),
     });
     setProfile(p);

@@ -9,7 +9,7 @@ import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question } from '../quiz/generateQuiz';
 import { RoundConfig } from '../quiz/types';
-import { answerSample, averageAnswerMs } from '../quiz/answerTiming';
+import { AnswerTiming, answerSample, answerTiming, averageAnswerMs } from '../quiz/answerTiming';
 import AnimeAvatar from '../components/AnimeAvatar';
 import ProgressBar, { ProgressDots } from '../components/ProgressBar';
 import LivesIndicator from '../components/LivesIndicator';
@@ -32,6 +32,8 @@ export type RoundOutcome = {
   /** The round ended early because the player ran out of lives — a loss,
    * however many of the questions reached were right. */
   lost: boolean;
+  /** The same thinking time unaveraged, for the profile's own running mean. */
+  timing: AnswerTiming;
 };
 
 type Props = {
@@ -184,6 +186,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
       onFinish(score, index + 1 - skipped, {
         averageAnswerMs: averageAnswerMs(answerTimes.current),
         lost: outOfLives,
+        timing: answerTiming(answerTimes.current),
       });
       return;
     }
@@ -214,6 +217,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
       onFinish(score, index - skipped, {
         averageAnswerMs: averageAnswerMs(answerTimes.current),
         lost: false,
+        timing: answerTiming(answerTimes.current),
       });
       return;
     }

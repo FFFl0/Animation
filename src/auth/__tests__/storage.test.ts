@@ -11,6 +11,8 @@ describe('mergeStat', () => {
       bestOutOf: 10,
       totalCorrect: 7,
       totalQuestions: 10,
+      answeredMs: 0,
+      answeredCount: 0,
     });
   });
 
@@ -22,6 +24,8 @@ describe('mergeStat', () => {
       bestOutOf: 10,
       totalCorrect: 20,
       totalQuestions: 30,
+      answeredMs: 0,
+      answeredCount: 0,
     });
     expect(mergeStat(prev, 9, 10)).toEqual({
       gamesPlayed: 3,
@@ -29,6 +33,8 @@ describe('mergeStat', () => {
       bestOutOf: 10,
       totalCorrect: 24,
       totalQuestions: 30,
+      answeredMs: 0,
+      answeredCount: 0,
     });
   });
 
@@ -72,6 +78,19 @@ describe('mergeStat', () => {
     const after = mergeStat(legacy, 5, 6);
     expect(after.bestScore).toBe(6);
     expect(after.bestOutOf).toBe(6);
+  });
+  // Thinking time is banked as a total and a count, so a player's average
+  // can be taken over everything they have played.
+  it('adds up the thinking time a round brings', () => {
+    const first = mergeStat(undefined, 5, 6, { answeredMs: 24000, answered: 6 });
+    expect(first).toMatchObject({ answeredMs: 24000, answeredCount: 6 });
+    const second = mergeStat(first, 4, 6, { answeredMs: 12000, answered: 6 });
+    expect(second).toMatchObject({ answeredMs: 36000, answeredCount: 12 });
+  });
+
+  it('leaves the clock alone for a round that brought no timing', () => {
+    const timed = mergeStat(undefined, 5, 6, { answeredMs: 24000, answered: 6 });
+    expect(mergeStat(timed, 6, 6)).toMatchObject({ answeredMs: 24000, answeredCount: 6 });
   });
 });
 

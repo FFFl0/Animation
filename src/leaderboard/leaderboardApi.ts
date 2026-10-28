@@ -17,6 +17,7 @@ type LeaderboardViewRow = {
   username: string;
   avatar: Avatar;
   total_score: number;
+  rating: number | null;
   total_correct: number;
   total_questions: number;
 };
@@ -32,7 +33,7 @@ type PeriodViewRow = {
 export { isSupabaseConfigured };
 
 /** `period` picks which of the three safe views to read from — `leaderboard`
- * (all-time, ranked by summed best scores) or `leaderboard_weekly` /
+ * (all-time, ranked by rating points) or `leaderboard_weekly` /
  * `leaderboard_season` (ranked by correct answers logged via
  * round_results within that window). Same shape either way so the screen
  * doesn't need to know which one it's showing. */
@@ -43,7 +44,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
     const { data, error } = await supabase
       .from('leaderboard')
       .select('*')
-      .order('total_score', { ascending: false })
+      .order('rating', { ascending: false })
       .limit(limit);
 
     if (error || !data) return [];
@@ -51,7 +52,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
       id: row.id,
       username: row.username,
       avatar: row.avatar,
-      score: row.total_score,
+      score: row.rating ?? 0,
       totalCorrect: row.total_correct,
       totalQuestions: row.total_questions,
     }));

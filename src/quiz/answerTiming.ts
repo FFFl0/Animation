@@ -33,6 +33,20 @@ export function averageAnswerMs(samples: number[]): number | null {
 }
 
 /**
+ * What a round banks about its thinking time: the total and how many
+ * answers it covers.
+ *
+ * The pair rather than the mean, because means cannot be added up — a round
+ * of fifteen and a round of six both average something, and the player's
+ * own average is the total over the count, not the average of the averages.
+ */
+export type AnswerTiming = { answeredMs: number; answered: number };
+
+export function answerTiming(samples: number[]): AnswerTiming {
+  return { answeredMs: samples.reduce((sum, ms) => sum + ms, 0), answered: samples.length };
+}
+
+/**
  * Seconds to one decimal, for display: 4200 -> "4.2".
  *
  * Rounded to tenths before formatting rather than left to `toFixed`, which

@@ -22,6 +22,7 @@ type ProfileRow = {
   achievements: string[];
   achievement_dates: Record<string, string>;
   daily_challenge: Profile['dailyChallenge'];
+  rating: number | null;
   created_at: string;
 };
 
@@ -36,6 +37,7 @@ function rowToProfile(row: ProfileRow): Profile {
     achievements: row.achievements ?? [],
     achievementDates: row.achievement_dates ?? {},
     dailyChallenge: row.daily_challenge ?? null,
+    rating: row.rating ?? 0,
     createdAt: row.created_at,
   };
 }
@@ -49,6 +51,7 @@ function patchToRow(patch: Partial<Profile>): Record<string, unknown> {
   if (patch.achievements !== undefined) row.achievements = patch.achievements;
   if (patch.achievementDates !== undefined) row.achievement_dates = patch.achievementDates;
   if (patch.dailyChallenge !== undefined) row.daily_challenge = patch.dailyChallenge;
+  if (patch.rating !== undefined) row.rating = patch.rating;
   return row;
 }
 
@@ -104,6 +107,7 @@ async function resolveOrCreateProfile(client: SupabaseClient, userId: string, em
     achievements: [],
     achievement_dates: {},
     daily_challenge: null,
+    rating: 0,
     created_at: new Date().toISOString(),
   };
   const { data: inserted, error: insertError } = await client.from('profiles').insert(newRow).select().single();
@@ -137,6 +141,7 @@ export async function register(username: string, password: string, recoveryEmail
     achievements: [],
     achievement_dates: {},
     daily_challenge: null,
+    rating: 0,
     created_at: new Date().toISOString(),
   };
 

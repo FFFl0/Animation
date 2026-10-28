@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
 import { Account, ModeStat, Profile, Streak, ZERO_STAT, bestRecord } from './types';
+import { AnswerTiming } from '../quiz/answerTiming';
 import { makeAvatar } from '../data/avatar';
 import { AuthError } from './authError';
 import { validateCredentials, validateUsername } from './validation';
@@ -188,7 +189,12 @@ export function bumpStreak(streak: Streak, useFreeze = false): { streak: Streak;
  * against anyway. */
 export async function logRoundResult(_userId: string, _score: number, _total: number): Promise<void> {}
 
-export function mergeStat(prev: ModeStat | undefined, score: number, total: number): ModeStat {
+export function mergeStat(
+  prev: ModeStat | undefined,
+  score: number,
+  total: number,
+  timing?: AnswerTiming | null
+): ModeStat {
   const base = prev ?? ZERO_STAT;
   // Which round was the better one, now that rounds are not all the same
   // length: the larger share of its own questions, and the higher raw score
@@ -210,5 +216,9 @@ export function mergeStat(prev: ModeStat | undefined, score: number, total: numb
     bestOutOf: beatsIt ? total : previous.outOf,
     totalCorrect: base.totalCorrect + score,
     totalQuestions: base.totalQuestions + total,
+    // Time is banked as a total and a count, so the mean can be taken over
+    // everything played rather than averaged out of other averages.
+    answeredMs: (base.answeredMs ?? 0) + (timing?.answeredMs ?? 0),
+    answeredCount: (base.answeredCount ?? 0) + (timing?.answered ?? 0),
   };
 }
