@@ -401,10 +401,14 @@ function AppShell() {
   }
 
   const startTier = (categoryId: CategoryId, tier: TierId | undefined) => {
+    const rules = tier ? getTier(tier).rules : undefined;
     const config: RoundConfig = {
       categoryId,
       tier,
       questionCount: tier ? getTier(tier).questionsPerRound : 15,
+      // Only the last tier sets one; everywhere else this stays undefined
+      // and the round has no clock.
+      timerSeconds: rules?.timerSeconds,
     };
     setRoundConfig(config);
     setActiveModeId(null);
@@ -702,7 +706,15 @@ function AppShell() {
             />
           )}
           {screen === 'quiz' && roundConfig && (
-            <QuizScreen key={quizKey} config={roundConfig} onFinish={finishQuiz} onClose={() => setScreen('home')} />
+            <QuizScreen
+              key={quizKey}
+              config={roundConfig}
+              // A tier can forbid the bought hints; the last one does, which
+              // is most of what makes it the last one.
+              allowItems={roundConfig.tier ? getTier(roundConfig.tier).rules?.items !== false : true}
+              onFinish={finishQuiz}
+              onClose={() => setScreen('home')}
+            />
           )}
           {screen === 'result' && (
             <ResultScreen

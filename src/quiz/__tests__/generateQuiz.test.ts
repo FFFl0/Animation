@@ -1,10 +1,10 @@
 import { generateQuiz, seededRng, dateSeed } from '../generateQuiz';
-import { CHARACTERS } from '../../data/characters';
+import { CHARACTERS, characterName } from '../../data/characters';
 import { ANIME_SERIES } from '../../data/animeSeries';
 import { OPENING_VIDEOS } from '../../data/openingVideos';
 import { ANIME_SERIES as ALL_SERIES } from '../../data/animeSeries';
 import { QUOTE_AUDIO, hasQuoteAudio } from '../../data/quoteAudio';
-import { TIERS } from '../../data/difficulty';
+import { TIERS, getTier } from '../../data/difficulty';
 import { RoundConfig } from '../types';
 
 function baseConfig(overrides: Partial<RoundConfig> = {}): RoundConfig {
@@ -192,6 +192,68 @@ describe('quote questions are voiced', () => {
     for (let seed = 0; seed < 25; seed += 1) {
       for (const question of quoteRound({ seed })) {
         expect(hasQuoteAudio(question.character!.id)).toBe(true);
+      }
+    }
+  });
+});
+
+describe('the Legend tier plays by its own rules', () => {
+  const seriesOf = (name: string) => CHARACTERS.find((c) => characterName(c, 'ru') === name)?.seriesId;
+  const tierOf = (name: string) => CHARACTERS.find((c) => characterName(c, 'ru') === name)?.tier;
+
+  it('is the only tier that changes anything', () => {
+    for (const tier of TIERS) {
+      if (tier.id === 'legend') expect(tier.rules).toBeDefined();
+      else expect(tier.rules).toBeUndefined();
+    }
+  });
+
+  it('puts a clock on the question and takes the hints away', () => {
+    const rules = getTier('legend').rules!;
+    expect(rules.timerSeconds).toBeGreaterThan(0);
+    expect(rules.items).toBe(false);
+    expect(rules.closeDistractors).toBe(true);
+  });
+
+  // The point of close answers: every name on screen could plausibly be the
+  // one, instead of one obscure character beside three famous ones.
+  it('draws the wrong answers from the same series or the same tier', () => {
+    const round = generateQuiz({ categoryId: 'characters', tier: 'legend', questionCount: 15, seed: 11 });
+    let checked = 0;
+    for (const question of round) {
+      if (!question.character) continue;
+      const right = characterName(question.character, 'ru');
+      for (const option of question.options) {
+        if (option === right) continue;
+        const near = seriesOf(option) === question.character.seriesId || tierOf(option) === question.character.tier;
+        expect(near).toBe(true);
+        checked += 1;
+      }
+    }
+    expect(checked).toBeGreaterThan(20);
+  });
+
+  it('leaves the easier tiers drawing from the whole cast', () => {
+    const round = generateQuiz({ categoryId: 'characters', tier: 'novice', questionCount: 6, seed: 11 });
+    const far = round.some((question) => {
+      if (!question.character) return false;
+      const right = characterName(question.character, 'ru');
+      return question.options.some(
+        (option) =>
+          option !== right &&
+          seriesOf(option) !== question.character!.seriesId &&
+          tierOf(option) !== question.character!.tier
+      );
+    });
+    expect(far).toBe(true);
+  });
+
+  it('still offers four distinct answers, one of them right', () => {
+    for (const seed of [1, 2, 3, 4, 5]) {
+      for (const question of generateQuiz({ categoryId: 'characters', tier: 'legend', questionCount: 15, seed })) {
+        expect(question.options).toHaveLength(4);
+        expect(new Set(question.options).size).toBe(4);
+        expect(question.options[question.correctIndex]).toBe(characterName(question.character!, 'ru'));
       }
     }
   });

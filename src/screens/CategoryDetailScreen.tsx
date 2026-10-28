@@ -76,6 +76,21 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
                   <View style={styles.tierText}>
                     <Text style={styles.tierLabel}>{tierLabel(tier, language)}</Text>
                     <Text style={styles.tierDesc}>{unlocked ? tierDescription(tier, language) : t('categoryDetail.lockedDesc')}</Text>
+                    {/* A tier that changes the rules has to say so before
+                        the round starts, not surprise somebody mid-quiz. */}
+                    {unlocked && tier.rules && (
+                      <View style={styles.ruleRow}>
+                        {tier.rules.timerSeconds !== undefined && (
+                          <Rule label={t('categoryDetail.ruleTimer', tier.rules.timerSeconds)} color={tier.color} styles={styles} />
+                        )}
+                        {tier.rules.items === false && (
+                          <Rule label={t('categoryDetail.ruleNoItems')} color={tier.color} styles={styles} />
+                        )}
+                        {tier.rules.closeDistractors && (
+                          <Rule label={t('categoryDetail.ruleCloseAnswers')} color={tier.color} styles={styles} />
+                        )}
+                      </View>
+                    )}
                     {unlocked && (
                       <View style={styles.tierProgressRow}>
                         <View style={styles.tierProgressBar}>
@@ -97,6 +112,15 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** One of the things this tier does differently, as a small chip. */
+function Rule({ label, color, styles }: { label: string; color: string; styles: ReturnType<typeof makeStyles> }) {
+  return (
+    <View style={[styles.ruleChip, { borderColor: color }]}>
+      <Text style={[styles.ruleText, { color }]}>{label}</Text>
+    </View>
   );
 }
 
@@ -131,6 +155,9 @@ function makeStyles(theme: Theme) {
     tierText: { flex: 1 },
     tierLabel: { fontSize: 15, fontFamily: fontFamily('700'), color: theme.text },
     tierDesc: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1, marginBottom: 6 },
+    ruleRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 5, marginBottom: 7 },
+    ruleChip: { borderWidth: 1.2, borderRadius: radius.pill, paddingHorizontal: 7, paddingVertical: 2 },
+    ruleText: { fontSize: 9, fontFamily: fontFamily('800') },
     tierProgressRow: { flexDirection: 'row', alignItems: 'center', gap: 8 },
     tierProgressBar: { flex: 1 },
     tierScore: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 34, textAlign: 'right' },

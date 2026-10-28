@@ -4,6 +4,7 @@ import { ANIME_SERIES, AnimeSeries, seriesTitleById } from '../data/animeSeries'
 import { openingVideoFor } from '../data/openingVideos';
 import { OPENINGS } from '../data/openings';
 import { QuestionType, getCategory } from '../data/categories';
+import { getTier } from '../data/difficulty';
 import { RoundConfig } from './types';
 import { Language } from '../i18n/LanguageContext';
 import { getT } from '../i18n/strings';
@@ -59,10 +60,71 @@ function sampleDistractors<T>(pool: T[], correct: T, n: number, rng: Rng): T[] {
   return candidates.slice(0, n);
 }
 
+/** Takes the first n that are not the right answer, keeping the order the
+ * pool came in — for a pool that is already sorted by how near each option
+ * is to the answer. */
+function nearestDistractors<T>(pool: T[], correct: T, n: number): T[] {
+  const seen = new Set<T>([correct]);
+  const picked: T[] = [];
+  for (const candidate of pool) {
+    if (seen.has(candidate)) continue;
+    seen.add(candidate);
+    picked.push(candidate);
+    if (picked.length === n) break;
+  }
+  return picked;
+}
+
+function buildCharacterOptions(
+  correct: Character,
+  lang: Language,
+  rng: Rng,
+  close: boolean
+): { options: string[]; correctIndex: number } {
+  const name = characterName(correct, lang);
+  const pool = characterPool(correct, lang, rng, close);
+  const distractors = close
+    ? nearestDistractors(pool, name, 3)
+    : sampleDistractors(pool, name, 3, rng);
+  const options = shuffle([name, ...distractors], rng);
+  return { options, correctIndex: options.indexOf(name) };
+}
+
 function buildOptions(correct: string, pool: string[], rng: Rng): { options: string[]; correctIndex: number } {
   const distractors = sampleDistractors(pool, correct, 3, rng);
   const options = shuffle([correct, ...distractors], rng);
   return { options, correctIndex: options.indexOf(correct) };
+}
+
+/**
+ * The other characters a question may offer as answers, nearest first.
+ *
+ * With `close` off this is everybody, which is what the earlier tiers want:
+ * part of being a beginner round is that two of the four names are from
+ * shows you have heard of. With it on, the wrong answers come from the same
+ * series where the catalogue has enough of them, then from the same
+ * difficulty tier, and only then from the rest — so the four names on screen
+ * are all ones that could plausibly have said it.
+ *
+ * Ordered rather than filtered because most series here have two or three
+ * characters: insisting on same-series answers would leave questions with
+ * nothing to fill them.
+ */
+function characterPool(correct: Character, lang: Language, rng: Rng, close: boolean): string[] {
+  const name = (c: Character) => characterName(c, lang);
+  if (!close) return CHARACTERS.map(name);
+
+  const others = CHARACTERS.filter((c) => c.id !== correct.id);
+  const sameSeries = others.filter((c) => c.seriesId === correct.seriesId);
+  const sameTier = others.filter((c) => c.seriesId !== correct.seriesId && c.tier === correct.tier);
+  const rest = others.filter((c) => c.seriesId !== correct.seriesId && c.tier !== correct.tier);
+
+  return [
+    name(correct),
+    ...shuffle(sameSeries, rng).map(name),
+    ...shuffle(sameTier, rng).map(name),
+    ...shuffle(rest, rng).map(name),
+  ];
 }
 
 /**
@@ -87,7 +149,15 @@ const VIDEO_SERIES = SERIES_WITH_CLIPS.length > 0 ? SERIES_WITH_CLIPS : ANIME_SE
  */
 type Subject = { character: Character; series: AnimeSeries };
 
-function questionFor(type: QuestionType, subject: Subject, idSuffix: number, rng: Rng, lang: Language): Question {
+function questionFor(
+  type: QuestionType,
+  subject: Subject,
+  idSuffix: number,
+  rng: Rng,
+  lang: Language,
+  /** Whether the wrong answers should be drawn from near the right one. */
+  close: boolean
+): Question {
   const { character, series } = subject;
   const id = `${character.id}-${type}-${idSuffix}`;
   const t = getT(lang);
@@ -113,23 +183,19 @@ function questionFor(type: QuestionType, subject: Subject, idSuffix: number, rng
       return { id, type, promptKind: 'avatar', promptText: t('quiz.promptGuessSeries'), character, options, correctIndex };
     }
     case 'guessCharacterFull': {
-      const pool = CHARACTERS.map((c) => characterName(c, lang));
-      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      const { options, correctIndex } = buildCharacterOptions(character, lang, rng, close);
       return { id, type, promptKind: 'avatar', promptText: t('quiz.promptGuessCharacterFull'), character, options, correctIndex };
     }
     case 'guessCharacterSilhouette': {
-      const pool = CHARACTERS.map((c) => characterName(c, lang));
-      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      const { options, correctIndex } = buildCharacterOptions(character, lang, rng, close);
       return { id, type, promptKind: 'silhouette', promptText: t('quiz.promptGuessCharacterSilhouette'), character, options, correctIndex };
     }
     case 'guessCharacterEyes': {
-      const pool = CHARACTERS.map((c) => characterName(c, lang));
-      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      const { options, correctIndex } = buildCharacterOptions(character, lang, rng, close);
       return { id, type, promptKind: 'eyes', promptText: t('quiz.promptGuessCharacterEyes'), character, options, correctIndex };
     }
     case 'guessQuote': {
-      const pool = CHARACTERS.map((c) => characterName(c, lang));
-      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      const { options, correctIndex } = buildCharacterOptions(character, lang, rng, close);
       return {
         id,
         type,
@@ -141,8 +207,7 @@ function questionFor(type: QuestionType, subject: Subject, idSuffix: number, rng
       };
     }
     case 'guessAbility': {
-      const pool = CHARACTERS.map((c) => characterName(c, lang));
-      const { options, correctIndex } = buildOptions(localized.name, pool, rng);
+      const { options, correctIndex } = buildCharacterOptions(character, lang, rng, close);
       return {
         id,
         type,
@@ -191,6 +256,10 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
         ? ['guessSeries', 'guessCharacterFull', 'guessQuote', 'guessAbility', 'guessFaction', 'openingTrivia']
         : getCategory(config.categoryId).questionTypes;
 
+  // The last tier draws its wrong answers from near the right one; every
+  // other round draws them from the whole cast.
+  const closeDistractors = config.tier ? getTier(config.tier).rules?.closeDistractors === true : false;
+
   const questions: Question[] = [];
   const nextCharacter = cycleThrough(pool, rng);
   // Quote questions draw from their own, smaller set: a written quote is
@@ -205,7 +274,7 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
   for (let i = 0; i < config.questionCount; i++) {
     const type = types[Math.floor(rng() * types.length)];
     const character = type === 'guessQuote' ? nextVoiced() : nextCharacter();
-    questions.push(questionFor(type, { character, series: nextSeries() }, i, rng, lang));
+    questions.push(questionFor(type, { character, series: nextSeries() }, i, rng, lang, closeDistractors));
   }
 
   return questions;

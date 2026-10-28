@@ -98,6 +98,9 @@ const ru: StringDict = {
   categoryDetail: {
     back: '‹ Назад',
     startQuiz: 'Начать квиз',
+    ruleTimer: (seconds: number) => `${seconds} с на вопрос`,
+    ruleNoItems: 'Без подсказок',
+    ruleCloseAnswers: 'Похожие ответы',
     lockedDesc: 'Пройди предыдущий уровень',
   },
   categoryStats: {
@@ -798,6 +801,9 @@ const en: StringDict = {
   categoryDetail: {
     back: '‹ Back',
     startQuiz: 'Start Quiz',
+    ruleTimer: (seconds: number) => `${seconds}s per question`,
+    ruleNoItems: 'No hints',
+    ruleCloseAnswers: 'Close answers',
     lockedDesc: 'Complete the previous level first',
   },
   categoryStats: {

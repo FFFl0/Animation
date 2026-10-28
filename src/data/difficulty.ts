@@ -4,6 +4,29 @@ import { pick } from './localize';
 
 export type TierId = 'novice' | 'fan' | 'otaku' | 'expert' | 'legend';
 
+/**
+ * What a tier does differently, beyond asking about harder characters.
+ *
+ * Only the last one has any, which is the point: the ladder is a ladder of
+ * length and obscurity until Legend, where it also changes the rules. Kept
+ * as data on the tier rather than as conditionals spread over the quiz, so
+ * what makes Legend hard can be read in one place — and shown to the player
+ * before they start.
+ */
+export type TierRules = {
+  /** Seconds a question is allowed. Absent means no clock. */
+  timerSeconds?: number;
+  /** Whether bought hints and skips are offered. Absent means they are. */
+  items?: boolean;
+  /**
+   * Draw the wrong answers from as near the right one as the catalogue
+   * allows — the same series first, then the same tier — instead of from
+   * everybody. Three obscure names beside an obvious one is a question you
+   * can answer without knowing anything.
+   */
+  closeDistractors?: boolean;
+};
+
 export type Tier = {
   id: TierId;
   label: string;
@@ -23,6 +46,8 @@ export type Tier = {
    */
   questionsPerRound: number;
   unlockAfter: TierId | null;
+  /** Present only where the tier plays by different rules. */
+  rules?: TierRules;
 };
 
 export const TIERS: Tier[] = [
@@ -75,6 +100,13 @@ export const TIERS: Tier[] = [
     colorBg: '#FBF0C9',
     questionsPerRound: 15,
     unlockAfter: 'expert',
+    // Fifteen questions, twenty seconds each, nothing to buy your way out
+    // with, and four names that all belong in the answer.
+    rules: {
+      timerSeconds: 20,
+      items: false,
+      closeDistractors: true,
+    },
   },
 ];
 
