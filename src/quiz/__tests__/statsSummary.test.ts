@@ -1,6 +1,7 @@
 import { ModeStat, Profile, ZERO_STAT } from '../../auth/types';
 import {
   accuracyOf,
+  bestRound,
   categoryGamesPlayed,
   categoryShare,
   categoryStat,
@@ -26,8 +27,30 @@ describe('sumStats', () => {
   });
 
   // Two rounds of 9 is not a best of 18.
-  it('takes the best score rather than adding the best scores', () => {
-    expect(sumStats([stat({ bestScore: 9 }), stat({ bestScore: 7 })]).bestScore).toBe(9);
+  it('takes the best round rather than adding the best scores', () => {
+    const rolled = sumStats([
+      stat({ gamesPlayed: 1, bestScore: 9, bestOutOf: 10 }),
+      stat({ gamesPlayed: 1, bestScore: 7, bestOutOf: 10 }),
+    ]);
+    expect(rolled.bestScore).toBe(9);
+    expect(rolled.bestOutOf).toBe(10);
+  });
+
+  // Rounds are different lengths per tier, so the bigger number is not
+  // automatically the better round.
+  it('prefers the larger share over the larger score', () => {
+    const rolled = sumStats([
+      stat({ gamesPlayed: 1, bestScore: 9, bestOutOf: 15 }),
+      stat({ gamesPlayed: 1, bestScore: 6, bestOutOf: 6 }),
+    ]);
+    expect(rolled.bestScore).toBe(6);
+    expect(rolled.bestOutOf).toBe(6);
+  });
+
+  it('ignores a tier that was never played', () => {
+    const rolled = sumStats([stat({ gamesPlayed: 0 }), stat({ gamesPlayed: 2, bestScore: 4, bestOutOf: 8 })]);
+    expect(rolled.bestScore).toBe(4);
+    expect(rolled.bestOutOf).toBe(8);
   });
 
   it('is all zeroes for nothing at all', () => {
@@ -72,6 +95,9 @@ describe('categoryStat', () => {
     expect(categoryStat(profile, 'anime')).toEqual({
       gamesPlayed: 3,
       bestScore: 11,
+      // Kept without a length, so read against its own score: a round of
+      // eleven, not the eight that tier runs today.
+      bestOutOf: 11,
       totalCorrect: 29,
       totalQuestions: 33,
     });
@@ -79,6 +105,27 @@ describe('categoryStat', () => {
 
   it('is empty for a category that has never been played', () => {
     expect(categoryStat(profileWith({}), 'world')).toEqual(ZERO_STAT);
+  });
+
+  // Each tier's record is read against that tier before they are rolled
+  // together; afterwards there is no single length left to read it against.
+  it('reads a legacy record against its own tier, not the longest one', () => {
+    const profile = profileWith({
+      'cat:battles:novice': { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 },
+    });
+    const rolled = categoryStat(profile, 'battles');
+    expect(rolled.bestScore).toBe(11);
+    expect(rolled.bestOutOf).toBe(11);
+  });
+
+  it('keeps a short perfect round over a long middling one', () => {
+    const profile = profileWith({
+      'cat:anime:novice': { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6 },
+      'cat:anime:legend': { gamesPlayed: 1, bestScore: 9, bestOutOf: 15, totalCorrect: 9, totalQuestions: 15 },
+    });
+    const rolled = categoryStat(profile, 'anime');
+    expect(rolled.bestScore).toBe(6);
+    expect(rolled.bestOutOf).toBe(6);
   });
 });
 
@@ -105,5 +152,21 @@ describe('categoryShare', () => {
 
   it('is zero rather than NaN before anything is played', () => {
     expect(categoryShare(profileWith({}), 'anime')).toBe(0);
+  });
+});
+
+describe('bestRound', () => {
+  it('reads a record back against its own questions', () => {
+    expect(bestRound(stat({ gamesPlayed: 2, bestScore: 9, bestOutOf: 15 }), 15)).toEqual({ score: 9, outOf: 15 });
+  });
+
+  // Nothing played is a dash on the screen, not a zero out of zero.
+  it('is null when nothing has been played', () => {
+    expect(bestRound(stat({ gamesPlayed: 0 }), 10)).toBeNull();
+  });
+
+  it('falls back for a record stored without its length', () => {
+    expect(bestRound(stat({ gamesPlayed: 1, bestScore: 11 }), 6)).toEqual({ score: 11, outOf: 11 });
+    expect(bestRound(stat({ gamesPlayed: 1, bestScore: 4 }), 10)).toEqual({ score: 4, outOf: 10 });
   });
 });

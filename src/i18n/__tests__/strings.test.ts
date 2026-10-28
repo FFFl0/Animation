@@ -61,3 +61,21 @@ describe('the category stats page', () => {
     expect(en('categoryStats.shareLine', 69)).toContain('69%');
   });
 });
+
+describe('the stats list', () => {
+  it('agrees the round count with its number', () => {
+    expect(ru('stats.gamesAccuracy', 1, 80)).toContain('1 раунд ·');
+    expect(ru('stats.gamesAccuracy', 3, 80)).toContain('3 раунда ·');
+    expect(ru('stats.gamesAccuracy', 11, 80)).toContain('11 раундов ·');
+    expect(en('stats.gamesAccuracy', 1, 80)).toContain('1 round ·');
+    expect(en('stats.gamesAccuracy', 2, 80)).toContain('2 rounds ·');
+  });
+
+  it('agrees the rounds tile label too', () => {
+    expect(ru('categoryStats.rounds', 1)).toBe('Раунд');
+    expect(ru('categoryStats.rounds', 2)).toBe('Раунда');
+    expect(ru('categoryStats.rounds', 7)).toBe('Раундов');
+    expect(en('categoryStats.rounds', 1)).toBe('Round');
+    expect(en('categoryStats.rounds', 7)).toBe('Rounds');
+  });
+});

@@ -11,9 +11,10 @@ import { CATEGORIES, CategoryId, categoryTitle } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { STATS_HEADER, STATS_QUOTE } from '../data/statsImages';
 import { GAME_MODES, modeTitle } from '../data/modes';
+import { TIERS } from '../data/difficulty';
 import { ACHIEVEMENTS, unlockedCount } from '../data/achievements';
 import { modeStatsKey } from '../quiz/statsKey';
-import { accuracyOf, categoryStat, sumStats } from '../quiz/statsSummary';
+import { accuracyOf, bestRound, categoryStat, sumStats } from '../quiz/statsSummary';
 import { ModeStat, ZERO_STAT } from '../auth/types';
 import Icon, { IconName } from '../components/Icon';
 import ImageScrim from '../components/ImageScrim';
@@ -24,6 +25,10 @@ import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { useRememberedScroll } from '../components/useRememberedScroll';
+
+/** The longest round any tier runs — what a category's rolled-up record
+ * falls back to when it was stored without its own length. */
+const LONGEST_TIER = Math.max(...TIERS.map((tier) => tier.questionsPerRound));
 
 /** How many flames the streak row draws before it just shows the number. */
 const STREAK_PIPS = 5;
@@ -39,6 +44,9 @@ type Row = {
   colorBg: string;
   art?: CategoryId;
   stat: ModeStat;
+  /** The longest round this row could hold, for reading back a record kept
+   * before its length was stored. */
+  longestRound: number;
 };
 
 type Props = {
@@ -78,6 +86,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
     colorBg: cat.colorBg,
     art: cat.id,
     stat: categoryStat(profile, cat.id),
+    longestRound: LONGEST_TIER,
   }));
 
   const modeRows: Row[] = GAME_MODES.map((mode) => ({
@@ -87,10 +96,10 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
     color: theme.primary,
     colorBg: theme.primaryLight,
     stat: profile.stats[modeStatsKey(mode.id)] ?? ZERO_STAT,
+    longestRound: mode.config.questionCount,
   }));
 
   const rows = grouping === 'categories' ? categoryRows : modeRows;
-  const best = Math.max(1, ...rows.map((r) => r.stat.bestScore));
 
   // The tab bar below pays the bottom inset, so this screen must not:
   // claiming it twice leaves a dead band above the bar that crops the content.
@@ -183,7 +192,6 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
           <FadeIn key={`${grouping}-${row.key}`} delay={i * 45}>
             <StatRow
               row={row}
-              best={best}
               styles={styles}
               theme={theme}
               t={t}
@@ -226,20 +234,23 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
 
 function StatRow({
   row,
-  best,
   styles,
   theme,
   t,
   onPress,
 }: {
   row: Row;
-  best: number;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
   onPress?: () => void;
 }) {
   const accuracy = accuracyOf(row.stat);
+  // The best round as a share of its own questions: tiers and modes run
+  // different lengths, so bare scores put a short perfect round below a long
+  // mediocre one.
+  const record = bestRound(row.stat, row.longestRound);
+  const share = record ? record.score / record.outOf : 0;
   const Container: typeof SoundTouchable | typeof View = onPress ? SoundTouchable : View;
 
   return (
@@ -270,11 +281,11 @@ function StatRow({
         <Text style={styles.rowTitle} numberOfLines={1}>{row.title}</Text>
         <Text style={styles.rowSub}>{t('stats.gamesAccuracy', row.stat.gamesPlayed, accuracy)}</Text>
         <View style={styles.rowTrack}>
-          <View style={[styles.rowFill, { width: `${Math.round((row.stat.bestScore / best) * 100)}%`, backgroundColor: row.color }]} />
+          <View style={[styles.rowFill, { width: `${Math.round(share * 100)}%`, backgroundColor: row.color }]} />
         </View>
       </View>
 
-      <Text style={styles.rowBest}>{row.stat.bestScore}</Text>
+      <Text style={styles.rowBest}>{record ? `${record.score}/${record.outOf}` : '—'}</Text>
       {onPress && <Icon name="chevronRight" size={15} color={theme.textMuted} />}
     </Container>
   );
