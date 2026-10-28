@@ -2,6 +2,7 @@ import { ModeStat, Profile, ZERO_STAT } from '../../auth/types';
 import {
   accuracyOf,
   bestRound,
+  ladderBest,
   categoryGamesPlayed,
   categoryShare,
   categoryStat,
@@ -127,6 +128,55 @@ describe('categoryStat', () => {
     const rolled = categoryStat(profile, 'anime');
     expect(rolled.bestScore).toBe(6);
     expect(rolled.bestOutOf).toBe(6);
+  });
+});
+
+describe('ladderBest', () => {
+  // 6 + 8 + 10 + 12 + 15: the whole ladder, locked difficulties included.
+  const LADDER = 51;
+
+  it('adds every difficulty record up over the whole ladder', () => {
+    const profile = profileWith({
+      'cat:battles:novice': { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6 },
+      'cat:battles:otaku': { gamesPlayed: 3, bestScore: 7, bestOutOf: 10, totalCorrect: 20, totalQuestions: 30 },
+    });
+    expect(ladderBest(profile, 'battles')).toEqual({ score: 13, outOf: LADDER });
+  });
+
+  // The figure the running totals cannot give: ten rounds of Novice is
+  // still six of the six questions that tier asks.
+  it('does not grow with the number of rounds played', () => {
+    const profile = profileWith({
+      'cat:battles:novice': { gamesPlayed: 10, bestScore: 6, bestOutOf: 6, totalCorrect: 48, totalQuestions: 60 },
+    });
+    expect(ladderBest(profile, 'battles')).toEqual({ score: 6, outOf: LADDER });
+  });
+
+  it('counts a record kept without a length against its own tier', () => {
+    const profile = profileWith({
+      'cat:battles:novice': { gamesPlayed: 1, bestScore: 10, totalCorrect: 10, totalQuestions: 11 },
+    });
+    expect(ladderBest(profile, 'battles')).toEqual({ score: 6, outOf: LADDER });
+  });
+
+  // A record set in a longer round than the tier runs today still cannot
+  // put more answers into it than it holds.
+  it('never counts a tier for more than its round', () => {
+    const profile = profileWith({
+      'cat:battles:novice': { gamesPlayed: 1, bestScore: 11, bestOutOf: 11, totalCorrect: 11, totalQuestions: 11 },
+    });
+    expect(ladderBest(profile, 'battles')).toEqual({ score: 6, outOf: LADDER });
+  });
+
+  it('measures a category with no difficulties against its one round', () => {
+    const profile = profileWith({
+      'cat:mixed': { gamesPlayed: 2, bestScore: 9, bestOutOf: 15, totalCorrect: 14, totalQuestions: 30 },
+    });
+    expect(ladderBest(profile, 'mixed')).toEqual({ score: 9, outOf: 15 });
+  });
+
+  it('is nothing out of the whole ladder before anything is played', () => {
+    expect(ladderBest(profileWith({}), 'battles')).toEqual({ score: 0, outOf: LADDER });
   });
 });
 

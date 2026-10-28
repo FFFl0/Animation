@@ -93,6 +93,30 @@ export function categoryStat(profile: Profile, categoryId: CategoryId): ModeStat
 }
 
 /**
+ * How much of a category has actually been answered: every difficulty's
+ * record added up, out of every question the ladder holds.
+ *
+ * Not the same thing as the running totals above, which count every answer
+ * ever given and grow without end — six right answers in ten rounds of
+ * Novice is still six of the six that tier asks. This is the one figure
+ * that says how far through a category someone is, so it is bounded by the
+ * ladder: 6 + 8 + 10 + 12 + 15 where the category has difficulties, and one
+ * round where it has none.
+ *
+ * Difficulties still locked count towards the total. They are the rest of
+ * the climb, not a part of it that does not exist.
+ */
+export function ladderBest(profile: Profile, categoryId: CategoryId): BestRound {
+  return categoryStatSources(categoryId).reduce(
+    (acc, { key, roundLength }) => {
+      const record = bestRecord(profile.stats[key] ?? ZERO_STAT, roundLength);
+      return { score: acc.score + Math.min(record.score, roundLength), outOf: acc.outOf + roundLength };
+    },
+    { score: 0, outOf: 0 }
+  );
+}
+
+/**
  * Rounds played in categories, for working out how much of someone's play a
  * single category accounts for. Mode rounds are deliberately left out: they
  * are the same rounds counted a second time under a different key, so adding

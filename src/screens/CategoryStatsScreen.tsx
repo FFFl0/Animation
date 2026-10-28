@@ -11,7 +11,7 @@ import { CategoryId, categoryDescription, categoryTitle, getCategory } from '../
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { TIERS, isTierUnlocked, tierLabel } from '../data/difficulty';
 import { categoryStatsKey } from '../quiz/statsKey';
-import { accuracyOf, categoryShare, categoryStat } from '../quiz/statsSummary';
+import { accuracyOf, categoryShare, categoryStat, ladderBest } from '../quiz/statsSummary';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
 import ImageScrim from '../components/ImageScrim';
@@ -49,10 +49,14 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
   const category = getCategory(categoryId);
   const total = profile ? categoryStat(profile, categoryId) : ZERO_STAT;
   const accuracy = accuracyOf(total);
+  // How far through the category's own questions this is, as against the
+  // running totals in the tiles above, which count every answer ever given.
+  const ladder = profile ? ladderBest(profile, categoryId) : { score: 0, outOf: 0 };
   // Hooks before the signed-out return below, so they run on every render.
   const countedRounds = useCountUp(total.gamesPlayed);
   const countedAccuracy = useCountUp(accuracy);
   const countedCorrect = useCountUp(total.totalCorrect);
+  const countedLadder = useCountUp(ladder.score);
 
   if (!profile) return null;
 
@@ -130,10 +134,14 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
               <View style={styles.cardHead}>
                 <Text style={styles.cardTitle}>{t('categoryStats.answersTitle')}</Text>
                 <Text style={styles.cardValue}>
-                  {t('categoryStats.answersOf', total.totalCorrect, total.totalQuestions)}
+                  {t('categoryStats.answersOf', countedLadder, ladder.outOf)}
                 </Text>
               </View>
-              <ProgressBar progress={accuracy / 100} color={category.color} height={7} />
+              <ProgressBar
+                progress={ladder.outOf > 0 ? ladder.score / ladder.outOf : 0}
+                color={category.color}
+                height={7}
+              />
             </View>
 
             {hasTiers && (
