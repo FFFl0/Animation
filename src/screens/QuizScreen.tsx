@@ -46,6 +46,16 @@ type Props = {
 
 const useNative = Platform.OS !== 'web';
 
+/**
+ * How long the right answer stays up after the clock runs out, before the
+ * round carries on by itself.
+ *
+ * Long enough to read which one it was, short enough that a quiz against
+ * the clock does not stop to wait for somebody who has already stopped
+ * answering.
+ */
+const TIMEOUT_REVEAL_MS = 1500;
+
 export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowItems = true }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -71,6 +81,8 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
    * a re-render per tick is exactly what a quiz does not need. */
   const askedAt = useRef(Date.now());
   const answerTimes = useRef<number[]>([]);
+  /** Set while a timed-out question is showing its answer before moving on. */
+  const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
   const question = questions[index];
   const isLast = index === questions.length - 1;
@@ -84,6 +96,11 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     timeoutRef.current = null;
   };
 
+  const cancelAdvance = () => {
+    if (advanceRef.current) clearTimeout(advanceRef.current);
+    advanceRef.current = null;
+  };
+
   /** Records how long the question on screen took. Called once per question,
    * by whichever came first: the answer or the clock. */
   const recordAnswerTime = () => {
@@ -93,6 +110,9 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   useEffect(() => {
     askedAt.current = Date.now();
   }, [index]);
+
+  // Leaving mid-question must not drag the round on behind a closed screen.
+  useEffect(() => cancelAdvance, []);
 
   useEffect(() => {
     if (!hasTimer) return;
@@ -128,6 +148,12 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     playWrong();
     if (hasLives) setLives((l) => Math.max(0, l - 1));
     onAnswer?.(false, index + 1, score);
+    // Nobody chose to stop here, so nothing waits for a tap: show which one
+    // was right, then carry on. Through the ref rather than the closure, so
+    // the life just lost is counted — a timeout that takes the last one has
+    // to end the round, not move to the next question.
+    cancelAdvance();
+    advanceRef.current = setTimeout(() => advanceNow.current(), TIMEOUT_REVEAL_MS);
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [timeLeft]);
 
@@ -151,6 +177,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   };
 
   const handleNext = () => {
+    cancelAdvance();
     const outOfLives = hasLives && lives <= 0;
     if (isLast || outOfLives) {
       onFinish(score, index + 1 - skipped, {
@@ -163,6 +190,11 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     setSelected(null);
     setHidden([]);
   };
+
+  /** Kept pointing at this render's handleNext, so a move scheduled a second
+   * and a half ago still acts on the state as it is when it fires. */
+  const advanceNow = useRef(handleNext);
+  advanceNow.current = handleNext;
 
   const useHint = () => {
     if (selected !== null || hidden.length || !spendConsumable('hint5050')) return;
@@ -325,6 +357,10 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
             // Keyed on the question so it fades in again each round rather
             // than only the first time it is mounted.
             <FadeIn key={questionKey} duration={220}>
+              {/* The button stays: the round moves on by itself in a moment,
+                  and somebody who has already read the answer should not
+                  have to wait for it. */}
+              {selected === -1 && <Text style={styles.timeUp}>{t('quiz.timeUp')}</Text>}
               <SoundTouchable style={styles.nextButton} onPress={handleNext} activeOpacity={0.85} accessibilityRole="button">
                 <Text style={styles.nextButtonText}>
                   {isLast || (hasLives && lives <= 0) ? t('quiz.results') : t('quiz.next')}
@@ -368,6 +404,13 @@ function makeStyles(theme: Theme) {
       lineHeight: 24,
       marginBottom: 22,
       minHeight: 48,
+    },
+    timeUp: {
+      fontSize: 13,
+      fontFamily: fontFamily('700'),
+      color: theme.danger,
+      textAlign: 'center',
+      marginBottom: 8,
     },
     options: { gap: 12 },
     optionHidden: { opacity: 0.3 },
