@@ -1,6 +1,6 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import * as Crypto from 'expo-crypto';
-import { Account, ModeStat, Profile, Streak, ZERO_STAT, bestOutOf, bestShare } from './types';
+import { Account, ModeStat, Profile, Streak, ZERO_STAT, bestRecord } from './types';
 import { makeAvatar } from '../data/avatar';
 import { AuthError } from './authError';
 import { validateCredentials, validateUsername } from './validation';
@@ -194,14 +194,20 @@ export function mergeStat(prev: ModeStat | undefined, score: number, total: numb
   // length: the larger share of its own questions, and the higher raw score
   // when those are equal. The length rides along with the score, so the two
   // always describe the same round.
-  const previousShare = bestShare(base, total);
+  //
+  // The old record is read against this round first, which is what finally
+  // settles a record kept before lengths were stored: once it has been
+  // compared against a real round it is written back with that round's
+  // length and stops being a legacy row.
+  const previous = bestRecord(base, total);
+  const previousShare = previous.outOf > 0 ? previous.score / previous.outOf : 0;
   const thisShare = total > 0 ? score / total : 0;
-  const beatsIt = thisShare > previousShare || (thisShare === previousShare && score > base.bestScore);
+  const beatsIt = thisShare > previousShare || (thisShare === previousShare && score > previous.score);
 
   return {
     gamesPlayed: base.gamesPlayed + 1,
-    bestScore: beatsIt ? score : base.bestScore,
-    bestOutOf: beatsIt ? total : bestOutOf(base, total),
+    bestScore: beatsIt ? score : previous.score,
+    bestOutOf: beatsIt ? total : previous.outOf,
     totalCorrect: base.totalCorrect + score,
     totalQuestions: base.totalQuestions + total,
   };

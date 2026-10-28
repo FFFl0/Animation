@@ -10,7 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { CategoryId, getCategory, categoryTitle, categoryDescription } from '../data/categories';
 import { TIERS, TierId, isTierUnlocked, tierLabel, tierDescription } from '../data/difficulty';
 import { categoryStatsKey, getStat } from '../quiz/statsKey';
-import { bestOutOf, bestShare } from '../auth/types';
+import { bestRecord, bestShare } from '../auth/types';
 import { ToriiIcon } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import ProgressBar from '../components/ProgressBar';
@@ -62,10 +62,12 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
             {TIERS.map((tier) => {
               const stat = profile ? getStat(profile, categoryStatsKey(categoryId, tier.id)) : undefined;
               const unlocked = isTierUnlocked(tier.id, bestShareByTier);
-              // Shown against the round that set it, not against today's
-              // length: a record of eleven came from a round of eleven.
-              const total = stat ? bestOutOf(stat, tier.questionsPerRound) : tier.questionsPerRound;
-              const best = stat?.bestScore ?? 0;
+              // Shown against this tier's own round. A record kept before
+              // lengths were stored carries none, and the round on the card
+              // below it is the one it would be set in now.
+              const record = stat ? bestRecord(stat, tier.questionsPerRound) : null;
+              const total = record?.outOf ?? tier.questionsPerRound;
+              const best = record?.score ?? 0;
 
               return (
                 <SoundTouchable

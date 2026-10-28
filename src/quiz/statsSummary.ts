@@ -1,4 +1,4 @@
-import { ModeStat, Profile, ZERO_STAT, bestOutOf } from '../auth/types';
+import { BestRound, ModeStat, Profile, ZERO_STAT, bestRecord } from '../auth/types';
 import { CategoryId, getCategory } from '../data/categories';
 import { TIERS } from '../data/difficulty';
 import { categoryStatsKey } from './statsKey';
@@ -31,13 +31,13 @@ export function sumStats(stats: ModeStat[]): ModeStat {
  * The best round this stat holds, as a score out of its own questions, or
  * null when nothing has been played — a dash says that, and "0/0" does not.
  *
- * Takes the round length to fall back on for records kept before the length
+ * Takes the round length to read against for records kept before the length
  * was stored; a stat rolled up from several tiers has no single length, so
  * those pass the longest one they could have come from.
  */
-export function bestRound(stat: ModeStat, fallbackLength: number): { score: number; outOf: number } | null {
+export function bestRound(stat: ModeStat, fallbackLength: number): BestRound | null {
   if (stat.gamesPlayed === 0) return null;
-  return { score: stat.bestScore, outOf: bestOutOf(stat, fallbackLength) };
+  return bestRecord(stat, fallbackLength);
 }
 
 /** Percentage of answers that were right, rounded; 0 before anything is played. */
@@ -79,14 +79,15 @@ export function categoryStatSources(categoryId: CategoryId): { key: string; roun
  *
  * Each tier's record is read against that tier's own length before the
  * tiers are rolled together: once they are one stat there is no single
- * length left to fall back on, and a legacy eleven would be read against
- * the longest tier instead of the round it actually came from.
+ * length left to read against, and a record kept without one would be held
+ * up against the longest tier rather than the one it sits under.
  */
 export function categoryStat(profile: Profile, categoryId: CategoryId): ModeStat {
   return sumStats(
     categoryStatSources(categoryId).map(({ key, roundLength }) => {
       const stat = profile.stats[key] ?? ZERO_STAT;
-      return { ...stat, bestOutOf: bestOutOf(stat, roundLength) };
+      const record = bestRecord(stat, roundLength);
+      return { ...stat, bestScore: record.score, bestOutOf: record.outOf };
     })
   );
 }

@@ -94,10 +94,11 @@ describe('categoryStat', () => {
     });
     expect(categoryStat(profile, 'anime')).toEqual({
       gamesPlayed: 3,
-      bestScore: 11,
-      // Kept without a length, so read against its own score: a round of
-      // eleven, not the eight that tier runs today.
-      bestOutOf: 11,
+      // Both records were kept without a length, so each is read against
+      // its own tier's round — nine at Novice is six out of six, eleven at
+      // Fan is eight out of eight — and the longer perfect round wins.
+      bestScore: 8,
+      bestOutOf: 8,
       totalCorrect: 29,
       totalQuestions: 33,
     });
@@ -114,8 +115,8 @@ describe('categoryStat', () => {
       'cat:battles:novice': { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 },
     });
     const rolled = categoryStat(profile, 'battles');
-    expect(rolled.bestScore).toBe(11);
-    expect(rolled.bestOutOf).toBe(11);
+    expect(rolled.bestScore).toBe(6);
+    expect(rolled.bestOutOf).toBe(6);
   });
 
   it('keeps a short perfect round over a long middling one', () => {
@@ -165,8 +166,8 @@ describe('bestRound', () => {
     expect(bestRound(stat({ gamesPlayed: 0 }), 10)).toBeNull();
   });
 
-  it('falls back for a record stored without its length', () => {
-    expect(bestRound(stat({ gamesPlayed: 1, bestScore: 11 }), 6)).toEqual({ score: 11, outOf: 11 });
+  it('reads a record stored without its length against the round given', () => {
+    expect(bestRound(stat({ gamesPlayed: 1, bestScore: 11 }), 6)).toEqual({ score: 6, outOf: 6 });
     expect(bestRound(stat({ gamesPlayed: 1, bestScore: 4 }), 10)).toEqual({ score: 4, outOf: 10 });
   });
 });

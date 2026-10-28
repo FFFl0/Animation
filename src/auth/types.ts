@@ -9,7 +9,8 @@ export type ModeStat = {
    * A record is only meaningful against the round that set it: tiers have
    * not always been the same length, and nine out of fifteen is a better
    * round than six out of six is a longer one. Absent on anything recorded
-   * before this was kept — see bestShare, which infers what it can.
+   * before this was kept — see bestRecord, which reads those against the
+   * round they would be played in today.
    */
   bestOutOf?: number;
   totalCorrect: number;
@@ -18,23 +19,30 @@ export type ModeStat = {
 
 export const ZERO_STAT: ModeStat = { gamesPlayed: 0, bestScore: 0, totalCorrect: 0, totalQuestions: 0 };
 
+/** A record as it is shown: a score out of the questions it was over. */
+export type BestRound = { score: number; outOf: number };
+
 /**
- * What the best score was out of, falling back for records kept before the
- * length was stored.
+ * The best round a stat holds, read against the round it would be played in
+ * today.
  *
- * The fallback is the longer of the score itself and the round's length
- * today: a score of eleven cannot have come from a round of six, so eleven
- * is the only honest denominator for it, while a score of four at a
- * six-question tier is four out of six.
+ * A record stored with its own length keeps it — that is the round it
+ * really came from. One kept before the length was stored has nothing to
+ * keep, and the only round left to show it against is the one on offer now:
+ * a ladder of six, eight, ten, twelve and fifteen cannot put "10 / 10"
+ * beside a Novice round of six questions. The score comes down with the
+ * denominator, so a perfect old round still reads as perfect and no record
+ * ever claims more answers than its round has questions.
  */
-export function bestOutOf(stat: ModeStat, roundLength: number): number {
-  return stat.bestOutOf ?? Math.max(stat.bestScore, roundLength);
+export function bestRecord(stat: ModeStat, roundLength: number): BestRound {
+  const outOf = stat.bestOutOf ?? roundLength;
+  return { score: Math.min(stat.bestScore, outOf), outOf };
 }
 
 /** The best round as a share of its own questions, 0..1. */
 export function bestShare(stat: ModeStat, roundLength: number): number {
-  const total = bestOutOf(stat, roundLength);
-  return total > 0 ? Math.min(1, stat.bestScore / total) : 0;
+  const { score, outOf } = bestRecord(stat, roundLength);
+  return outOf > 0 ? Math.min(1, score / outOf) : 0;
 }
 
 export type Streak = {

@@ -6,7 +6,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { ZERO_STAT, bestOutOf, bestShare } from '../auth/types';
+import { ZERO_STAT, bestRecord, bestShare } from '../auth/types';
 import { CategoryId, categoryDescription, categoryTitle, getCategory } from '../data/categories';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
 import { TIERS, isTierUnlocked, tierLabel } from '../data/difficulty';
@@ -143,9 +143,10 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                   const stat = profile.stats[categoryStatsKey(categoryId, tier.id)] ?? ZERO_STAT;
                   const unlocked = isTierUnlocked(tier.id, bestShareByTier);
                   const tierAccuracy = accuracyOf(stat);
-                  // Against the round that set it: a record of eleven came
-                  // from a round of eleven, whatever this tier runs today.
-                  const bestTotal = bestOutOf(stat, tier.questionsPerRound);
+                  // Against this tier's own round: a record kept before
+                  // lengths were stored has no round of its own to be shown
+                  // against, and this is the one it would be set in now.
+                  const record = bestRecord(stat, tier.questionsPerRound);
 
                   return (
                     <View key={tier.id} style={[styles.tierCard, !unlocked && styles.tierCardLocked]}>
@@ -178,7 +179,7 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                       {unlocked && stat.gamesPlayed > 0 && (
                         <View style={styles.tierBest}>
                           <Text style={styles.tierBestValue}>
-                            {stat.bestScore}/{bestTotal}
+                            {record.score}/{record.outOf}
                           </Text>
                           <Text style={styles.tierBestLabel}>{t('categoryStats.best')}</Text>
                         </View>

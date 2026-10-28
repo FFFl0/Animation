@@ -1,5 +1,5 @@
 import { mergeStat, bumpStreak } from '../storage';
-import { ZERO_STAT, bestOutOf, bestShare } from '../types';
+import { ZERO_STAT, bestRecord, bestShare } from '../types';
 import { validateCredentials } from '../validation';
 import { AuthError } from '../authError';
 
@@ -55,13 +55,23 @@ describe('mergeStat', () => {
     expect(after.bestOutOf).toBe(10);
   });
 
-  // Records kept before the length was stored: the score itself is the only
-  // honest floor for what it was out of.
-  it('reads a legacy record as being out of at least its own score', () => {
+  // Records kept before the length was stored: read against the round being
+  // played, which is also what finally gives them a length to keep.
+  it('settles a record kept without a length against the round played', () => {
     const legacy = { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 };
     const after = mergeStat(legacy, 4, 6);
-    expect(after.bestScore).toBe(11);
-    expect(after.bestOutOf).toBe(11);
+    expect(after.bestScore).toBe(6);
+    expect(after.bestOutOf).toBe(6);
+  });
+
+  // The old record survives on its merits, not on its bare number: a
+  // legacy eight read against a round of six is a round of six, and a real
+  // five out of six does not beat it.
+  it('does not let a settled legacy record be beaten by a worse round', () => {
+    const legacy = { gamesPlayed: 1, bestScore: 8, totalCorrect: 8, totalQuestions: 11 };
+    const after = mergeStat(legacy, 5, 6);
+    expect(after.bestScore).toBe(6);
+    expect(after.bestOutOf).toBe(6);
   });
 });
 
@@ -130,25 +140,30 @@ describe('validateCredentials', () => {
 });
 
 describe('reading a record back', () => {
-  it('knows what a stored record was out of', () => {
-    expect(bestOutOf({ gamesPlayed: 1, bestScore: 9, bestOutOf: 15, totalCorrect: 9, totalQuestions: 15 }, 6)).toBe(15);
+  it('keeps the round a stored record really came from', () => {
+    const stored = { gamesPlayed: 1, bestScore: 9, bestOutOf: 15, totalCorrect: 9, totalQuestions: 15 };
+    expect(bestRecord(stored, 6)).toEqual({ score: 9, outOf: 15 });
   });
 
-  // The fallback: a score of eleven cannot have come from a round of six.
-  it('infers at least the score itself for a record kept without one', () => {
-    const legacy = { gamesPlayed: 1, bestScore: 11, totalCorrect: 11, totalQuestions: 11 };
-    expect(bestOutOf(legacy, 6)).toBe(11);
+  // The whole point of the change: a record kept before lengths were stored
+  // is shown against the round it would be set in today, never against a
+  // number of questions the tier no longer asks.
+  it('reads a record kept without a length against today round', () => {
+    const legacy = { gamesPlayed: 1, bestScore: 10, totalCorrect: 10, totalQuestions: 11 };
+    expect(bestRecord(legacy, 6)).toEqual({ score: 6, outOf: 6 });
     expect(bestShare(legacy, 6)).toBe(1);
   });
 
-  it('uses the round length when the score is below it', () => {
+  it('leaves a legacy score that fits the round alone', () => {
     const legacy = { gamesPlayed: 1, bestScore: 4, totalCorrect: 4, totalQuestions: 6 };
-    expect(bestOutOf(legacy, 6)).toBe(6);
+    expect(bestRecord(legacy, 6)).toEqual({ score: 4, outOf: 6 });
     expect(bestShare(legacy, 6)).toBeCloseTo(4 / 6);
   });
 
   it('never reports more than a perfect round', () => {
-    expect(bestShare({ gamesPlayed: 1, bestScore: 20, bestOutOf: 10, totalCorrect: 20, totalQuestions: 10 }, 10)).toBe(1);
+    const impossible = { gamesPlayed: 1, bestScore: 20, bestOutOf: 10, totalCorrect: 20, totalQuestions: 10 };
+    expect(bestRecord(impossible, 10)).toEqual({ score: 10, outOf: 10 });
+    expect(bestShare(impossible, 10)).toBe(1);
   });
 
   it('is zero for a tier never played', () => {
