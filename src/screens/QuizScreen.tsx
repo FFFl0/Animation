@@ -18,6 +18,7 @@ import FadeIn from '../components/FadeIn';
 import AnswerOption from '../quiz/AnswerOption';
 import VideoPrompt from '../quiz/VideoPrompt';
 import QuoteAudio from '../quiz/QuoteAudio';
+import AbilityPrompt from '../quiz/AbilityPrompt';
 import QuizTimer from '../quiz/QuizTimer';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
@@ -302,7 +303,16 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
               </View>
             )}
 
-            {question.promptKind !== 'text' && question.promptKind !== 'video' && question.character && (
+            {question.promptKind === 'ability' && question.ability && (
+              <View style={styles.avatarWrap}>
+                <AbilityPrompt ability={question.ability} questionKey={questionKey} />
+              </View>
+            )}
+
+            {question.promptKind !== 'text' &&
+              question.promptKind !== 'video' &&
+              question.promptKind !== 'ability' &&
+              question.character && (
               <View style={styles.avatarWrap}>
                 <AnimeAvatar
                   avatar={question.character.avatar}

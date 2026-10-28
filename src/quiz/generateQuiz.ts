@@ -9,7 +9,7 @@ import { RoundConfig } from './types';
 import { Language } from '../i18n/LanguageContext';
 import { getT } from '../i18n/strings';
 
-export type PromptKind = 'avatar' | 'silhouette' | 'eyes' | 'text' | 'video';
+export type PromptKind = 'avatar' | 'silhouette' | 'eyes' | 'text' | 'video' | 'ability';
 
 export type Question = {
   id: string;
@@ -17,6 +17,8 @@ export type Question = {
   promptKind: PromptKind;
   promptText: string;
   character?: Character;
+  /** The technique a 'ability' prompt draws its card from. */
+  ability?: string;
   /** Set on question types that ask about a series rather than a character —
    * the theme clip to play comes from here. */
   seriesId?: string;
@@ -211,8 +213,12 @@ function questionFor(
       return {
         id,
         type,
-        promptKind: 'text',
+        // Its own kind, not plain text: the card is drawn from the ability
+        // and must not be the character's portrait, which would be the
+        // answer.
+        promptKind: 'ability',
         promptText: t('quiz.promptGuessAbility', localized.ability),
+        ability: localized.ability,
         character,
         options,
         correctIndex,
