@@ -35,7 +35,6 @@ type Props = {
   onOpenPrivacy: () => void;
   onOpenShop: () => void;
   onOpenTournament: () => void;
-  onOpenBattle: () => void;
 };
 
 export default function ProfileScreen({
@@ -43,7 +42,6 @@ export default function ProfileScreen({
   onOpenPrivacy,
   onOpenShop,
   onOpenTournament,
-  onOpenBattle,
 }: Props) {
   const { profile, logout, deleteAccount, updateAvatar, rename } = useAuth();
   const { theme, mode, setMode } = useTheme();
@@ -258,7 +256,6 @@ export default function ProfileScreen({
         rating={ratingOf(profile)}
         victories={profile.victories}
         onOpenTournament={onOpenTournament}
-        onOpenBattle={onOpenBattle}
       />
 
       <Text style={styles.sectionTitle}>{t('profile.rareAchievementsTitle')}</Text>

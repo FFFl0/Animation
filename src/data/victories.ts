@@ -2,7 +2,12 @@ import { medalForPlace } from '../tournament/medals';
 
 /**
  * What a player has won against other people, as opposed to what they have
- * answered: weekly tournaments and fan battles.
+ * answered: the weekly tournament.
+ *
+ * Only the tournament. A fan battle is played against whoever you like as
+ * often as you like, so it cannot be worth rating points without handing
+ * the ranking to whoever has the most patient friend; the tournament is run
+ * once a week by the server, and there is nothing there to grind.
  *
  * Kept on the profile rather than on the device, because the rating is read
  * from the profile by a ranking that cannot see anybody's phone — the medal
@@ -18,25 +23,12 @@ export type Victories = {
   /** The last tournament banked. A finished bracket is re-read every few
    * seconds, and without this it would be paid for on every read. */
   lastRunId?: string;
-  /** Fan battles won. */
-  battles: number;
 };
 
-export const EMPTY_VICTORIES: Victories = { runs: 0, gold: 0, silver: 0, bronze: 0, battles: 0 };
+export const EMPTY_VICTORIES: Victories = { runs: 0, gold: 0, silver: 0, bronze: 0 };
 
 /** What finishing a tournament is worth, by where it finished. */
 export const TOURNAMENT_POINTS = { gold: 30, silver: 20, bronze: 12, played: 5 };
-
-/** What winning a fan battle is worth, and the most they can ever add up to. */
-export const BATTLE_POINTS = 3;
-
-/**
- * A fan battle is played against whoever you like, as often as you like, so
- * without a ceiling the rating would go to whoever had the most patient
- * friend. The tournament has no ceiling because the server only runs one a
- * week: there is nothing to grind.
- */
-export const BATTLE_CAP = 60;
 
 export function tournamentPoints(victories: Victories): number {
   const { runs, gold, silver, bronze } = victories;
@@ -49,12 +41,8 @@ export function tournamentPoints(victories: Victories): number {
   );
 }
 
-export function battlePoints(victories: Victories): number {
-  return Math.min(BATTLE_CAP, victories.battles * BATTLE_POINTS);
-}
-
 export function victoryPoints(victories: Victories): number {
-  return tournamentPoints(victories) + battlePoints(victories);
+  return tournamentPoints(victories);
 }
 
 /** Folds a finished tournament in, ignoring one already banked. */
@@ -69,8 +57,4 @@ export function applyTournamentRun(victories: Victories, place: number, runId: s
     silver: victories.silver + (medal === 'silver' ? 1 : 0),
     bronze: victories.bronze + (medal === 'bronze' ? 1 : 0),
   };
-}
-
-export function applyBattleWin(victories: Victories): Victories {
-  return { ...victories, battles: victories.battles + 1 };
 }

@@ -1,14 +1,4 @@
-import {
-  BATTLE_CAP,
-  BATTLE_POINTS,
-  EMPTY_VICTORIES,
-  TOURNAMENT_POINTS,
-  applyBattleWin,
-  applyTournamentRun,
-  battlePoints,
-  tournamentPoints,
-  victoryPoints,
-} from '../victories';
+import { EMPTY_VICTORIES, TOURNAMENT_POINTS, applyTournamentRun, tournamentPoints, victoryPoints } from '../victories';
 
 describe('tournamentPoints', () => {
   it('pays the podium by its place', () => {
@@ -29,22 +19,13 @@ describe('tournamentPoints', () => {
   });
 });
 
-describe('battlePoints', () => {
-  it('pays each win', () => {
-    expect(battlePoints({ ...EMPTY_VICTORIES, battles: 4 })).toBe(4 * BATTLE_POINTS);
-  });
-
-  // A battle is played against whoever you like as often as you like, so
-  // this is the one half of the rating that has to stop somewhere.
-  it('stops at the ceiling however many are won', () => {
-    expect(battlePoints({ ...EMPTY_VICTORIES, battles: 1000 })).toBe(BATTLE_CAP);
-  });
-
-  // The tournament runs once a week, so it is bounded by the calendar and
-  // needs no ceiling of its own.
-  it('does not cap the tournament along with it', () => {
-    const many = { ...EMPTY_VICTORIES, runs: 40, gold: 40, battles: 1000 };
-    expect(victoryPoints(many)).toBe(40 * TOURNAMENT_POINTS.gold + BATTLE_CAP);
+describe('victoryPoints', () => {
+  // The tournament is the only thing here: a fan battle is played against
+  // whoever you like as often as you like, and cannot be worth points.
+  it('is the tournaments and nothing else', () => {
+    const record = { ...EMPTY_VICTORIES, runs: 40, gold: 40 };
+    expect(victoryPoints(record)).toBe(tournamentPoints(record));
+    expect(victoryPoints(record)).toBe(40 * TOURNAMENT_POINTS.gold);
   });
 });
 
@@ -68,13 +49,3 @@ describe('applyTournamentRun', () => {
   });
 });
 
-describe('applyBattleWin', () => {
-  it('counts the win', () => {
-    expect(applyBattleWin(applyBattleWin(EMPTY_VICTORIES)).battles).toBe(2);
-  });
-
-  it('leaves the tournament record alone', () => {
-    const won = applyTournamentRun(EMPTY_VICTORIES, 1, 'week-1');
-    expect(applyBattleWin(won)).toMatchObject({ gold: 1, lastRunId: 'week-1', battles: 1 });
-  });
-});

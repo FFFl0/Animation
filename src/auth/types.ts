@@ -73,8 +73,8 @@ export type Profile = {
   avatar: Avatar;
   favoriteCharacterId: string | null;
   stats: Record<string, ModeStat>;
-  /** Tournaments finished and fan battles won — the half of the rating
-   * that is not about answering questions alone. */
+  /** Tournaments finished — the half of the rating that is not about
+   * answering questions alone. */
   victories?: Victories;
   /**
    * The rating, derived from the stats by `ratingOf` and written down with

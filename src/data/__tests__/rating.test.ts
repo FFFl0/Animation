@@ -98,18 +98,18 @@ describe('ratingOf', () => {
     expect(ratingOf(again).points).toBe(ratingOf(once).points);
   });
 
-  // Tournaments and battles are played at no difficulty, so they climb no
-  // ladder — they are added on top rather than multiplied in, or a player
-  // who only ever played those would be multiplying nothing.
-  it('adds what was won against other players', () => {
-    const victories: Victories = { ...EMPTY_VICTORIES, runs: 1, gold: 1, battles: 2 };
+  // A tournament match is played at no difficulty, so it climbs no ladder —
+  // it is added on top rather than multiplied in, or a player who only ever
+  // played tournaments would be multiplying nothing.
+  it('adds what was won in the tournament', () => {
+    const victories: Victories = { ...EMPTY_VICTORIES, runs: 1, gold: 1 };
     const stats = {
       'cat:anime:novice': { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6, answeredMs: 48000, answeredCount: 6 },
     };
     const without = ratingOf(profileWith(stats));
     const with_ = ratingOf(profileWith(stats, victories));
     expect(without.fromVictories).toBe(0);
-    expect(with_.fromVictories).toBe(TOURNAMENT_POINTS.gold + 6);
+    expect(with_.fromVictories).toBe(TOURNAMENT_POINTS.gold);
     expect(with_.points).toBe(without.points + with_.fromVictories);
   });
 

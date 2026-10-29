@@ -109,14 +109,13 @@ const ru: StringDict = {
     average: (seconds: string) => `среднее ${seconds} с`,
     noAverage: 'время ещё не измерено',
     multiplier: (value: string) => `×${value}`,
-    hint: 'Очки = пройдено вопросов × скорость (от 0.5 до 2.0) + победы',
+    hint: 'Очки = пройдено вопросов × скорость (от 0.5 до 2.0) + турниры',
     pointsLabel: 'очки',
     answersLabel: 'ответы',
-    victories: (points: number, tournaments: number, battles: number) =>
-      `Победы +${points} · ${tournaments} ${plural(tournaments, 'турнир', 'турнира', 'турниров')}, ${battles} ${plural(battles, 'битва', 'битвы', 'битв')}`,
-    victoriesNone: 'Победы в турнирах и битвах тоже дают очки',
+    victories: (points: number, tournaments: number) =>
+      `Турниры +${points} · сыграно ${tournaments}`,
+    victoriesNone: 'Турниры тоже дают очки',
     playTournament: 'Турнир',
-    playBattle: 'Битва фанатов',
     leaderboardPoints: (points: number) => `${points} ${plural(points, 'очко', 'очка', 'очков')}`,
   },
   categoryStats: {
@@ -830,14 +829,12 @@ const en: StringDict = {
     average: (seconds: string) => `${seconds}s on average`,
     noAverage: 'not timed yet',
     multiplier: (value: string) => `×${value}`,
-    hint: 'Points = questions cleared × speed (0.5 to 2.0) + victories',
+    hint: 'Points = questions cleared × speed (0.5 to 2.0) + tournaments',
     pointsLabel: 'pts',
     answersLabel: 'answers',
-    victories: (points: number, tournaments: number, battles: number) =>
-      `Victories +${points} · ${tournaments} ${tournaments === 1 ? 'tournament' : 'tournaments'}, ${battles} ${battles === 1 ? 'battle' : 'battles'}`,
-    victoriesNone: 'Tournament and battle wins earn points too',
+    victories: (points: number, tournaments: number) => `Tournaments +${points} · ${tournaments} played`,
+    victoriesNone: 'Tournaments earn points too',
     playTournament: 'Tournament',
-    playBattle: 'Fan battle',
     leaderboardPoints: (points: number) => `${points} ${points === 1 ? 'point' : 'points'}`,
   },
   categoryStats: {

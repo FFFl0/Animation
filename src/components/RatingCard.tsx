@@ -10,7 +10,6 @@ import { formatSeconds } from '../quiz/answerTiming';
 import { useT } from '../i18n/strings';
 import Icon from './Icon';
 import PillButton from './PillButton';
-import ProgressBar from './ProgressBar';
 import { useCountUp } from './useCountUp';
 
 type Props = {
@@ -19,10 +18,9 @@ type Props = {
   compact?: boolean;
   /** What the victories were, for the line that explains them. */
   victories?: Victories;
-  /** Where the other half of the points is earned. Both are left out on
-   * another player's card, where there is nothing for the reader to play. */
+  /** Where the other half of the points is earned. Left out on another
+   * player's card, where there is nothing for the reader to play. */
   onOpenTournament?: () => void;
-  onOpenBattle?: () => void;
 };
 
 /**
@@ -38,7 +36,6 @@ export default function RatingCard({
   compact = false,
   victories = EMPTY_VICTORIES,
   onOpenTournament,
-  onOpenBattle,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -57,11 +54,6 @@ export default function RatingCard({
 
       {!compact && (
         <>
-          <ProgressBar
-            progress={rating.outOf > 0 ? rating.cleared / rating.outOf : 0}
-            color={theme.primary}
-            height={7}
-          />
           <View style={styles.legend}>
             <Text style={styles.legendText}>{t('rating.cleared', rating.cleared, rating.outOf)}</Text>
             <Text style={styles.legendText}>
@@ -72,40 +64,29 @@ export default function RatingCard({
               <Text style={styles.multiplier}>{t('rating.multiplier', rating.multiplier.toFixed(1))}</Text>
             </Text>
           </View>
-          {/* The other half of the points, and the two places it comes
-              from. Shown even at nothing, because a player who has never
-              played either has no other way of finding out they count. */}
+          {/* The other half of the points. Shown even at nothing, because a
+              player who has never been in a tournament has no other way of
+              finding out that it counts. */}
           <View style={styles.victoryRow}>
-            <Icon name="swords" size={14} color={theme.primary} />
+            <Icon name="trophy" size={14} color={theme.primary} />
             <Text style={styles.victoryText}>
-              {victories.runs + victories.battles === 0
+              {victories.runs === 0
                 ? t('rating.victoriesNone')
-                : t('rating.victories', rating.fromVictories, victories.runs, victories.battles)}
+                : t('rating.victories', rating.fromVictories, victories.runs)}
             </Text>
           </View>
 
           <Text style={styles.hint}>{t('rating.hint')}</Text>
 
-          {(onOpenTournament || onOpenBattle) && (
+          {onOpenTournament && (
             <View style={styles.actions}>
-              {onOpenTournament && (
-                <PillButton
-                  title={t('rating.playTournament')}
-                  variant="ink"
-                  fullWidth={false}
-                  style={styles.action}
-                  onPress={onOpenTournament}
-                />
-              )}
-              {onOpenBattle && (
-                <PillButton
-                  title={t('rating.playBattle')}
-                  variant="outline"
-                  fullWidth={false}
-                  style={styles.action}
-                  onPress={onOpenBattle}
-                />
-              )}
+              <PillButton
+                title={t('rating.playTournament')}
+                variant="ink"
+                fullWidth={false}
+                style={styles.action}
+                onPress={onOpenTournament}
+              />
             </View>
           )}
         </>

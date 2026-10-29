@@ -43,7 +43,7 @@ type Phase = 'menu' | 'joinInput' | 'connecting' | 'waiting' | 'countdown' | 'pl
 const BATTLE_QUESTION_COUNT = 10;
 
 export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode }: Props) {
-  const { profile, recordBattleWin } = useAuth();
+  const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
@@ -200,27 +200,11 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
     Share.share({ message: t('battle.shareMessage', roomCode, inviteUrl) }).catch(() => {});
   };
 
-  /** The battle whose win has been banked, so a re-render of the result —
-   * or the opponent's score arriving a second time — does not pay twice. */
-  const bankedWin = useRef<string | null>(null);
-
   const handleFinish = (score: number, total: number) => {
     setLocalResult({ score, total });
     roomRef.current?.broadcastFinish({ userId: me.userId, score, total });
     setPhase('result');
   };
-
-  // A won battle counts towards the rating, the same as a tournament does.
-  // Only a win: losing to a friend is not something to bank, and a draw is
-  // nobody's victory.
-  useEffect(() => {
-    if (phase !== 'result' || !localResult || !opponentFinish) return;
-    if (localResult.score <= opponentFinish.score) return;
-    if (bankedWin.current === roomCode) return;
-    bankedWin.current = roomCode;
-    recordBattleWin();
-    // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [phase, localResult, opponentFinish, roomCode]);
 
   useEffect(() => {
     if (autoJoinRoomCode && profile) connect(autoJoinRoomCode, false);
