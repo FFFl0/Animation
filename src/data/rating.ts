@@ -1,12 +1,13 @@
 import { ModeStat, Profile } from '../auth/types';
 import { ladderBest, roundStats } from '../quiz/statsSummary';
 import { CATEGORIES } from './categories';
+import { EMPTY_VICTORIES, victoryPoints } from './victories';
 
 /**
  * The rating: how much of the game you have beaten, worth more when you
- * answer quickly.
+ * answer quickly, plus what you have won against other people.
  *
- *   очки = пройдено вопросов × множитель скорости
+ *   очки = пройдено вопросов × множитель скорости + победы
  *
  * "Пройдено вопросов" is the bounded figure the category pages show — the
  * best result on each difficulty, added up — not every answer ever given.
@@ -16,6 +17,12 @@ import { CATEGORIES } from './categories';
  *
  * The multiplier is the other half of it, and the reason the same climb is
  * worth more to a faster player.
+ *
+ * Victories are added rather than multiplied in, so that beating people
+ * counts on its own: a tournament run and a fan battle are played at no
+ * difficulty, so they climb no ladder, and a player who only ever played
+ * those would otherwise be multiplying nothing. See victories.ts for what
+ * each one is worth and why only one of the two has a ceiling.
  */
 
 /** Average answer times the multiplier is pinned to. */
@@ -71,6 +78,8 @@ export type Rating = {
   outOf: number;
   averageMs: number | null;
   multiplier: number;
+  /** Of those points, the ones that came from beating other players. */
+  fromVictories: number;
 };
 
 /** Every question the game holds, across every category's ladder. */
@@ -82,5 +91,13 @@ export function ratingOf(profile: Profile): Rating {
   const cleared = CATEGORIES.reduce((sum, category) => sum + ladderBest(profile, category.id).score, 0);
   const averageMs = averageThinkingMs(profile.stats);
   const multiplier = speedMultiplier(averageMs);
-  return { points: Math.round(cleared * multiplier), cleared, outOf: ratingCeiling(), averageMs, multiplier };
+  const fromVictories = victoryPoints(profile.victories ?? EMPTY_VICTORIES);
+  return {
+    points: Math.round(cleared * multiplier) + fromVictories,
+    cleared,
+    outOf: ratingCeiling(),
+    averageMs,
+    multiplier,
+    fromVictories,
+  };
 }

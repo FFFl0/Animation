@@ -1,4 +1,5 @@
 import { Profile } from '../../auth/types';
+import { EMPTY_VICTORIES, TOURNAMENT_POINTS, Victories } from '../victories';
 import {
   FAST_MS,
   PAR_MS,
@@ -9,8 +10,8 @@ import {
   speedMultiplier,
 } from '../rating';
 
-function profileWith(stats: Profile['stats']): Profile {
-  return { stats } as Profile;
+function profileWith(stats: Profile['stats'], victories?: Victories): Profile {
+  return { stats, victories } as Profile;
 }
 
 describe('speedMultiplier', () => {
@@ -95,6 +96,27 @@ describe('ratingOf', () => {
       'cat:anime:novice': { gamesPlayed: 40, bestScore: 4, bestOutOf: 6, totalCorrect: 160, totalQuestions: 240, answeredMs: 1920000, answeredCount: 240 },
     });
     expect(ratingOf(again).points).toBe(ratingOf(once).points);
+  });
+
+  // Tournaments and battles are played at no difficulty, so they climb no
+  // ladder — they are added on top rather than multiplied in, or a player
+  // who only ever played those would be multiplying nothing.
+  it('adds what was won against other players', () => {
+    const victories: Victories = { ...EMPTY_VICTORIES, runs: 1, gold: 1, battles: 2 };
+    const stats = {
+      'cat:anime:novice': { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6, answeredMs: 48000, answeredCount: 6 },
+    };
+    const without = ratingOf(profileWith(stats));
+    const with_ = ratingOf(profileWith(stats, victories));
+    expect(without.fromVictories).toBe(0);
+    expect(with_.fromVictories).toBe(TOURNAMENT_POINTS.gold + 6);
+    expect(with_.points).toBe(without.points + with_.fromVictories);
+  });
+
+  it('counts a tournament for a player who has answered nothing', () => {
+    const rating = ratingOf(profileWith({}, { ...EMPTY_VICTORIES, runs: 1, gold: 1 }));
+    expect(rating.cleared).toBe(0);
+    expect(rating.points).toBe(TOURNAMENT_POINTS.gold);
   });
 
   it('is worth more to the faster of two players who cleared the same', () => {

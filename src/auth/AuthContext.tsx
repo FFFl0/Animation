@@ -8,6 +8,7 @@ import { categoryStatsKey, modeStatsKey } from '../quiz/statsKey';
 import { ModeId } from '../data/modes';
 import { ACHIEVEMENTS, Achievement, isUnlocked } from '../data/achievements';
 import { ratingOf } from '../data/rating';
+import { EMPTY_VICTORIES, applyBattleWin, applyTournamentRun } from '../data/victories';
 import { AnswerTiming } from '../quiz/answerTiming';
 import { todayDateStr } from '../quiz/today';
 
@@ -34,6 +35,11 @@ type AuthContextValue = {
     timing?: AnswerTiming | null,
     useFreeze?: boolean
   ) => Promise<RoundOutcome>;
+  /** A tournament that has finished, by the place it finished in. Safe to
+   * call on every read of a finished bracket: the run is banked once. */
+  recordTournamentPlace: (place: number, runId: string) => Promise<void>;
+  /** A fan battle won. */
+  recordBattleWin: () => Promise<void>;
   resetPassword: (username: string) => Promise<{ ok: boolean; reason?: string }>;
   completePasswordReset: (accessToken: string, refreshToken: string, newPassword: string) => Promise<void>;
   loginWithGoogle: () => Promise<void>;
@@ -185,6 +191,28 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     return { unlocked, freezeUsed };
   };
 
+  // Won against other people rather than answered alone, and the other half
+  // of the rating. Banked with the rating they change, so the number other
+  // players are ranked by never lags a round behind.
+  const bankVictories = async (next: ReturnType<typeof applyBattleWin>) => {
+    if (!profile) return;
+    const after: Profile = { ...profile, victories: next };
+    setProfile(await Storage.updateAccount(profile.id, { victories: next, rating: ratingOf(after).points }));
+  };
+
+  const recordTournamentPlace = async (place: number, runId: string) => {
+    if (!profile) return;
+    const current = profile.victories ?? EMPTY_VICTORIES;
+    const next = applyTournamentRun(current, place, runId);
+    if (next === current) return;
+    await bankVictories(next);
+  };
+
+  const recordBattleWin = async () => {
+    if (!profile) return;
+    await bankVictories(applyBattleWin(profile.victories ?? EMPTY_VICTORIES));
+  };
+
   const value = useMemo(
     () => ({
       profile,
@@ -196,6 +224,8 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       updateAvatar,
       rename,
       recordRoundResult,
+      recordTournamentPlace,
+      recordBattleWin,
       resetPassword,
       completePasswordReset,
       loginWithGoogle,

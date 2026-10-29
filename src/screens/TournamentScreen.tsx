@@ -77,7 +77,7 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { buzz } = useSound();
   const t = useT();
-  const { profile } = useAuth();
+  const { profile, recordTournamentPlace } = useAuth();
 
   const [state, setState] = useState<WeeklyState | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
@@ -119,6 +119,10 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   // counting the same medal twice.
   useEffect(() => {
     if (!walletReady || !profile || myPlace === null || !state) return;
+    // The rating keeps its own count of finished runs — it is read off the
+    // profile by a ranking that cannot see this device's shelf — and banks
+    // the run once by the same tournament id.
+    recordTournamentPlace(myPlace, state.tournament.id);
     if (record.lastRunId === state.tournament.id) return;
     recordTournamentRun(myPlace, state.tournament.id);
     buzz(myPlace === 1 ? 'success' : 'tap');

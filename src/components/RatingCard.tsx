@@ -5,9 +5,11 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { Rating } from '../data/rating';
+import { EMPTY_VICTORIES, Victories } from '../data/victories';
 import { formatSeconds } from '../quiz/answerTiming';
 import { useT } from '../i18n/strings';
 import Icon from './Icon';
+import PillButton from './PillButton';
 import ProgressBar from './ProgressBar';
 import { useCountUp } from './useCountUp';
 
@@ -15,6 +17,12 @@ type Props = {
   rating: Rating;
   /** Another player's card: the points alone, without the workings. */
   compact?: boolean;
+  /** What the victories were, for the line that explains them. */
+  victories?: Victories;
+  /** Where the other half of the points is earned. Both are left out on
+   * another player's card, where there is nothing for the reader to play. */
+  onOpenTournament?: () => void;
+  onOpenBattle?: () => void;
 };
 
 /**
@@ -25,7 +33,13 @@ type Props = {
  * A player who wants more points can read off which of the two to go and
  * work on.
  */
-export default function RatingCard({ rating, compact = false }: Props) {
+export default function RatingCard({
+  rating,
+  compact = false,
+  victories = EMPTY_VICTORIES,
+  onOpenTournament,
+  onOpenBattle,
+}: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
@@ -58,7 +72,42 @@ export default function RatingCard({ rating, compact = false }: Props) {
               <Text style={styles.multiplier}>{t('rating.multiplier', rating.multiplier.toFixed(1))}</Text>
             </Text>
           </View>
+          {/* The other half of the points, and the two places it comes
+              from. Shown even at nothing, because a player who has never
+              played either has no other way of finding out they count. */}
+          <View style={styles.victoryRow}>
+            <Icon name="swords" size={14} color={theme.primary} />
+            <Text style={styles.victoryText}>
+              {victories.runs + victories.battles === 0
+                ? t('rating.victoriesNone')
+                : t('rating.victories', rating.fromVictories, victories.runs, victories.battles)}
+            </Text>
+          </View>
+
           <Text style={styles.hint}>{t('rating.hint')}</Text>
+
+          {(onOpenTournament || onOpenBattle) && (
+            <View style={styles.actions}>
+              {onOpenTournament && (
+                <PillButton
+                  title={t('rating.playTournament')}
+                  variant="ink"
+                  fullWidth={false}
+                  style={styles.action}
+                  onPress={onOpenTournament}
+                />
+              )}
+              {onOpenBattle && (
+                <PillButton
+                  title={t('rating.playBattle')}
+                  variant="outline"
+                  fullWidth={false}
+                  style={styles.action}
+                  onPress={onOpenBattle}
+                />
+              )}
+            </View>
+          )}
         </>
       )}
     </View>
@@ -84,6 +133,10 @@ function makeStyles(theme: Theme) {
     legend: { flexDirection: 'row', alignItems: 'center', justifyContent: 'space-between', gap: 10 },
     legendText: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted },
     multiplier: { fontFamily: fontFamily('800'), color: theme.primary },
+    victoryRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
+    victoryText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text },
     hint: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
+    actions: { flexDirection: 'row', gap: 10, marginTop: 2 },
+    action: { flex: 1 },
   });
 }

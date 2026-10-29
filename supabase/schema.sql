@@ -1379,3 +1379,44 @@ select
 from public.profiles;
 
 grant select on public.leaderboard to authenticated;
+
+-- ============================================================
+-- ПОБЕДЫ НАД ЖИВЫМИ ИГРОКАМИ: турниры и битвы фанатов.
+--
+-- Вторая половина рейтинга. Пройденные вопросы говорят, сколько игрок
+-- взял у самой игры; это — сколько он взял у других людей.
+--
+--   турнир: золото 30, серебро 20, бронза 12, просто доигранный 5
+--   битва фанатов: 3 за победу, но не больше 60 очков всего
+--
+-- Потолок стоит только на битвах, потому что их можно играть с кем угодно
+-- и сколько угодно; турнир сервер проводит раз в неделю, гриндить нечего.
+--
+-- Медали в магазине — тот же турнир с другой стороны, и остаются на
+-- устройстве: здесь лежит только то, что нужно рейтингу.
+-- ============================================================
+
+alter table public.profiles add column if not exists victories jsonb;
+
+drop view if exists public.leaderboard cascade;
+create view public.leaderboard as
+select
+  id,
+  username,
+  avatar,
+  streak,
+  achievements,
+  stats,
+  last_seen_at,
+  rating,
+  -- Только ключи 'cat:%'. Раунд, сыгранный в режиме, записывается дважды —
+  -- под своей категорией и под самим режимом, — и сумма по всем ключам
+  -- засчитывала бы его два раза. Под категорией лежит каждый раунд, и
+  -- режимный тоже, так что это полный список и ровно по одному разу.
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_games
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;

@@ -773,6 +773,13 @@ function AppShell() {
                 setPrivacyFrom('profile');
                 setScreen('privacy');
               }}
+              onOpenTournament={() => setScreen('tournament')}
+              onOpenBattle={() => {
+                // Back from the battle returns here, not to the home screen
+                // it usually comes from.
+                setBattleFrom('profile');
+                setScreen('battle');
+              }}
             />
           )}
         </ScreenTransition>

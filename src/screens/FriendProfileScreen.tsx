@@ -107,7 +107,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
             would need stats a friend cannot read. */}
         <RatingCard
           compact
-          rating={{ points: player.rating, cleared: 0, outOf: 0, averageMs: null, multiplier: speedMultiplier(null) }}
+          rating={{ points: player.rating, cleared: 0, outOf: 0, averageMs: null, multiplier: speedMultiplier(null), fromVictories: 0 }}
         />
 
         <View style={styles.statsRow}>

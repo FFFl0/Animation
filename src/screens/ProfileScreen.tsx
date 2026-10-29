@@ -34,9 +34,17 @@ type Props = {
   onOpenAbout: () => void;
   onOpenPrivacy: () => void;
   onOpenShop: () => void;
+  onOpenTournament: () => void;
+  onOpenBattle: () => void;
 };
 
-export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }: Props) {
+export default function ProfileScreen({
+  onOpenAbout,
+  onOpenPrivacy,
+  onOpenShop,
+  onOpenTournament,
+  onOpenBattle,
+}: Props) {
   const { profile, logout, deleteAccount, updateAvatar, rename } = useAuth();
   const { theme, mode, setMode } = useTheme();
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
@@ -246,7 +254,12 @@ export default function ProfileScreen({ onOpenAbout, onOpenPrivacy, onOpenShop }
 
       {/* Where the profile stops being about how you look and starts being
           about how you play. */}
-      <RatingCard rating={ratingOf(profile)} />
+      <RatingCard
+        rating={ratingOf(profile)}
+        victories={profile.victories}
+        onOpenTournament={onOpenTournament}
+        onOpenBattle={onOpenBattle}
+      />
 
       <Text style={styles.sectionTitle}>{t('profile.rareAchievementsTitle')}</Text>
       <RareAchievements unlocked={unlockedIds(profile)} emptyText={t('profile.rareAchievementsEmpty')} />
