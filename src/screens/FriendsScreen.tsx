@@ -89,9 +89,11 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
 
   if (!profile) return null;
 
+  // Ranked by rating, which is what the row now shows and what the three
+  // medals at the top of the list are claiming to be about.
   const friends = (friendships ?? [])
     .filter((f) => f.status === 'accepted')
-    .sort((a, b) => levelFromTotalCorrect(b.player.totalCorrect).xp - levelFromTotalCorrect(a.player.totalCorrect).xp);
+    .sort((a, b) => b.player.rating - a.player.rating);
   const incoming = (friendships ?? []).filter((f) => f.status === 'pending' && !f.isOutgoing);
   const outgoing = (friendships ?? []).filter((f) => f.status === 'pending' && f.isOutgoing);
   const friendshipByPlayerId = new Map((friendships ?? []).map((f) => [f.player.id, f]));
@@ -242,7 +244,15 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
                       rank={i < 3 ? i : undefined}
                       hasUnread={unreadByFriend.has(f.player.id)}
                       onPress={() => onOpenFriend(f.player, f)}
-                      right={<Text style={styles.xpText}>{levelFromTotalCorrect(f.player.totalCorrect).xp} {t('friends.xp')}</Text>}
+                      // Their rating rather than their experience: the
+                      // level and title that experience buys are already in
+                      // the line underneath.
+                      right={
+                        <View style={styles.ratingColumn}>
+                          <Text style={styles.ratingValue}>{f.player.rating}</Text>
+                          <Text style={styles.ratingLabel}>{t('rating.pointsLabel')}</Text>
+                        </View>
+                      }
                     />
                   ))
                 ))}
@@ -523,7 +533,9 @@ function makeStyles(theme: Theme) {
     rowText: { flex: 1 },
     rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 1 },
-    xpText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.primary },
+    ratingColumn: { alignItems: 'flex-end' },
+    ratingValue: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.primary },
+    ratingLabel: { fontSize: 10, fontFamily: fontFamily('500'), color: theme.textMuted },
     addButton: {
       width: 30,
       height: 30,
