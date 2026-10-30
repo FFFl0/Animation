@@ -213,6 +213,9 @@ function AppShell() {
   // profile (and a group from the list and from the groups screen), so Back
   // has to return to wherever it was actually opened from.
   const [chatFrom, setChatFrom] = useState<Screen>('chats');
+  // A friend's profile is reachable from the friends list and from the chat
+  // with them, and Back has to return to whichever it was.
+  const [profileFrom, setProfileFrom] = useState<Screen>('friends');
   const [groupChatFrom, setGroupChatFrom] = useState<Screen>('chats');
   const lastBackPressRef = useRef(0);
 
@@ -302,7 +305,7 @@ function AppShell() {
           setScreen(shopItemId ? 'shopItem' : 'shop');
           return true;
         case 'friendProfile':
-          setScreen('friends');
+          setScreen(profileFrom);
           return true;
         case 'chat':
           setScreen(chatFrom);
@@ -363,7 +366,7 @@ function AppShell() {
 
     const subscription = BackHandler.addEventListener('hardwareBackPress', onBackPress);
     return () => subscription.remove();
-  }, [profile, preAuthScreen, screen, battleFrom, categoryFrom, chatFrom, groupChatFrom, t]);
+  }, [profile, preAuthScreen, screen, battleFrom, categoryFrom, chatFrom, groupChatFrom, profileFrom, t]);
 
   if (loading) {
     return (
@@ -615,6 +618,7 @@ function AppShell() {
               onOpenFriend={(player, friendship) => {
                 setSelectedFriend(player);
                 setSelectedFriendship(friendship);
+                setProfileFrom('friends');
                 setScreen('friendProfile');
               }}
               onAcceptBattleInvite={(roomCode) => {
@@ -663,7 +667,7 @@ function AppShell() {
             <FriendProfileScreen
               player={selectedFriend}
               friendship={selectedFriendship}
-              onBack={() => setScreen('friends')}
+              onBack={() => setScreen(profileFrom)}
               onCompare={() => setScreen('compare')}
               onOpenChat={() => {
                 setChatFrom('friendProfile');
@@ -677,7 +681,14 @@ function AppShell() {
             />
           )}
           {screen === 'chat' && selectedFriend && (
-            <ChatScreen friend={selectedFriend} onBack={() => setScreen(chatFrom)} />
+            <ChatScreen
+              friend={selectedFriend}
+              onBack={() => setScreen(chatFrom)}
+              onOpenProfile={() => {
+                setProfileFrom('chat');
+                setScreen('friendProfile');
+              }}
+            />
           )}
           {screen === 'compare' && selectedFriend && (
             <CompareScreen

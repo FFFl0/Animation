@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
@@ -6,7 +6,16 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useAuth } from '../auth/AuthContext';
-import { Friendship, PlayerSummary, friendState, removeFriend, respondToRequest, sendFriendRequest } from '../friends/friendsApi';
+import {
+  Friendship,
+  PlayerSummary,
+  friendState,
+  getFriendships,
+  relationsByPlayer,
+  removeFriend,
+  respondToRequest,
+  sendFriendRequest,
+} from '../friends/friendsApi';
 import { levelFromTotalCorrect } from '../data/level';
 import { speedMultiplier } from '../data/rating';
 import RatingCard from '../components/RatingCard';
@@ -39,6 +48,27 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
   const [status, setStatus] = useState(friendState(friendship));
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState(friendship?.friendshipId ?? null);
+
+  // Opened from a chat, this screen is handed the person but not what they
+  // are to us — the chat list knows one and not the other. Offering to
+  // befriend somebody who is already a friend is worse than a short wait,
+  // so it is looked up.
+  useEffect(() => {
+    if (friendship || !profile) return;
+    let cancelled = false;
+    getFriendships(profile.id)
+      .then((all) => {
+        if (cancelled) return;
+        const relation = relationsByPlayer(all).get(player.id);
+        if (!relation) return;
+        setStatus(relation.state);
+        setId(relation.friendshipId);
+      })
+      .catch(() => {});
+    return () => {
+      cancelled = true;
+    };
+  }, [friendship, profile?.id, player.id]);
 
   if (!profile) return null;
 

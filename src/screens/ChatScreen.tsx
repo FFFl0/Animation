@@ -27,15 +27,18 @@ import { useReactions } from '../chat/useReactions';
 import { useTyping, usePeerPresence } from '../chat/presence';
 import { formatLastSeen } from '../chat/messageGroups';
 import AnimeAvatar from '../components/AnimeAvatar';
+import SoundTouchable from '../sound/SoundTouchable';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 
 type Props = {
   friend: PlayerSummary;
   onBack: () => void;
+  /** Tapping the name at the top opens who you are talking to. */
+  onOpenProfile: () => void;
 };
 
-export default function ChatScreen({ friend, onBack }: Props) {
+export default function ChatScreen({ friend, onBack, onOpenProfile }: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -133,10 +136,15 @@ export default function ChatScreen({ friend, onBack }: Props) {
       mediaScope={mediaScope}
       subtitle={subtitle}
       header={
-        <View style={styles.headerRow}>
+        <SoundTouchable
+          style={styles.headerRow}
+          onPress={onOpenProfile}
+          activeOpacity={0.7}
+          accessibilityRole="button"
+        >
           <AnimeAvatar avatar={friend.avatar} size={36} name={friend.username} />
           <Text style={styles.headerName} numberOfLines={1}>{friend.username}</Text>
-        </View>
+        </SoundTouchable>
       }
       messages={messages}
       meId={meId}
