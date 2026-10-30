@@ -41,7 +41,7 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     achievements: [],
     stats: {},
     totalScore: row.score,
-    rating: row.score,
+    rating: row.rating,
     totalCorrect: row.totalCorrect,
     totalQuestions: row.totalQuestions,
     totalGames: 0,
@@ -212,6 +212,15 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
                   <Text style={styles.modalRelation}>{t('friends.alreadyFriends')}</Text>
                 )}
 
+                {/* Their rating, as the ranking has it — the one figure a
+                    player is measured by, and the one worth seeing before
+                    challenging them. */}
+                <View style={styles.modalRating}>
+                  <Icon name="trophy" size={15} color={theme.primary} />
+                  <Text style={styles.modalRatingLabel}>{t('rating.title')}</Text>
+                  <Text style={styles.modalRatingValue}>{selectedRow.rating}</Text>
+                </View>
+
                 <PillButton
                   title={t('friendProfile.write')}
                   variant="outline"
@@ -364,6 +373,9 @@ function makeStyles(theme: Theme) {
     rowText: { flex: 1 },
     rowName: { fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     rowSub: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
+    modalRating: { flexDirection: 'row', alignItems: 'center', gap: 7, marginTop: 14 },
+    modalRatingLabel: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted },
+    modalRatingValue: { fontSize: 18, fontFamily: fontFamily('800'), color: theme.primary },
     scoreColumn: { alignItems: 'flex-end' },
     rowScore: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.primary },
     rowScoreLabel: { fontSize: 10, fontFamily: fontFamily('500'), color: theme.textMuted },

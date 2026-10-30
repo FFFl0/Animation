@@ -7,7 +7,11 @@ export type LeaderboardRow = {
   id: string;
   username: string;
   avatar: Avatar;
+  /** What this tab ranks by: rating points all-time, answers in a period. */
   score: number;
+  /** The player's rating, whichever tab this row came from — it is what
+   * their profile shows, and a period score is not it. */
+  rating: number;
   totalCorrect: number;
   totalQuestions: number;
 };
@@ -28,6 +32,7 @@ type PeriodViewRow = {
   avatar: Avatar;
   period_score: number;
   period_questions: number;
+  rating: number | null;
 };
 
 export { isSupabaseConfigured };
@@ -53,6 +58,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
       username: row.username,
       avatar: row.avatar,
       score: row.rating ?? 0,
+      rating: row.rating ?? 0,
       totalCorrect: row.total_correct,
       totalQuestions: row.total_questions,
     }));
@@ -73,6 +79,7 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
       username: row.username,
       avatar: row.avatar,
       score: row.period_score,
+      rating: row.rating ?? 0,
       totalCorrect: row.period_score,
       totalQuestions: row.period_questions,
     }));

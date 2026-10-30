@@ -1420,3 +1420,41 @@ select
 from public.profiles;
 
 grant select on public.leaderboard to authenticated;
+
+-- ============================================================
+-- РЕЙТИНГ В НЕДЕЛЬНОЙ И СЕЗОННОЙ ТАБЛИЦАХ.
+--
+-- Эти две ранжируются по ответам внутри периода, но профиль игрока,
+-- открытый из любой таблицы, показывает его рейтинг — а это другое
+-- число. Поэтому оно едет вместе со строкой.
+-- ============================================================
+
+drop view if exists public.leaderboard_weekly cascade;
+create view public.leaderboard_weekly as
+select
+  p.id,
+  p.username,
+  p.avatar,
+  p.rating,
+  coalesce(sum(r.score) filter (where r.created_at >= date_trunc('week', now())), 0) as period_score,
+  coalesce(sum(r.total) filter (where r.created_at >= date_trunc('week', now())), 0) as period_questions
+from public.profiles p
+left join public.round_results r on r.user_id = p.id
+group by p.id, p.username, p.avatar, p.rating;
+
+grant select on public.leaderboard_weekly to authenticated;
+
+drop view if exists public.leaderboard_season cascade;
+create view public.leaderboard_season as
+select
+  p.id,
+  p.username,
+  p.avatar,
+  p.rating,
+  coalesce(sum(r.score) filter (where r.created_at >= date_trunc('month', now())), 0) as period_score,
+  coalesce(sum(r.total) filter (where r.created_at >= date_trunc('month', now())), 0) as period_questions
+from public.profiles p
+left join public.round_results r on r.user_id = p.id
+group by p.id, p.username, p.avatar, p.rating;
+
+grant select on public.leaderboard_season to authenticated;

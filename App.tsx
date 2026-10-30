@@ -773,7 +773,6 @@ function AppShell() {
                 setPrivacyFrom('profile');
                 setScreen('privacy');
               }}
-              onOpenTournament={() => setScreen('tournament')}
             />
           )}
         </ScreenTransition>

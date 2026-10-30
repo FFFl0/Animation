@@ -9,7 +9,6 @@ import { EMPTY_VICTORIES, Victories } from '../data/victories';
 import { formatSeconds } from '../quiz/answerTiming';
 import { useT } from '../i18n/strings';
 import Icon from './Icon';
-import PillButton from './PillButton';
 import { useCountUp } from './useCountUp';
 
 type Props = {
@@ -18,9 +17,6 @@ type Props = {
   compact?: boolean;
   /** What the victories were, for the line that explains them. */
   victories?: Victories;
-  /** Where the other half of the points is earned. Left out on another
-   * player's card, where there is nothing for the reader to play. */
-  onOpenTournament?: () => void;
 };
 
 /**
@@ -35,7 +31,6 @@ export default function RatingCard({
   rating,
   compact = false,
   victories = EMPTY_VICTORIES,
-  onOpenTournament,
 }: Props) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -78,17 +73,6 @@ export default function RatingCard({
 
           <Text style={styles.hint}>{t('rating.hint')}</Text>
 
-          {onOpenTournament && (
-            <View style={styles.actions}>
-              <PillButton
-                title={t('rating.playTournament')}
-                variant="ink"
-                fullWidth={false}
-                style={styles.action}
-                onPress={onOpenTournament}
-              />
-            </View>
-          )}
         </>
       )}
     </View>
@@ -117,7 +101,5 @@ function makeStyles(theme: Theme) {
     victoryRow: { flexDirection: 'row', alignItems: 'center', gap: 7 },
     victoryText: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.text },
     hint: { fontSize: 11, fontFamily: fontFamily('500'), color: theme.textMuted },
-    actions: { flexDirection: 'row', gap: 10, marginTop: 2 },
-    action: { flex: 1 },
   });
 }

@@ -115,7 +115,6 @@ const ru: StringDict = {
     victories: (points: number, tournaments: number) =>
       `Турниры +${points} · сыграно ${tournaments}`,
     victoriesNone: 'Турниры тоже дают очки',
-    playTournament: 'Турнир',
     leaderboardPoints: (points: number) => `${points} ${plural(points, 'очко', 'очка', 'очков')}`,
   },
   categoryStats: {
@@ -834,7 +833,6 @@ const en: StringDict = {
     answersLabel: 'answers',
     victories: (points: number, tournaments: number) => `Tournaments +${points} · ${tournaments} played`,
     victoriesNone: 'Tournaments earn points too',
-    playTournament: 'Tournament',
     leaderboardPoints: (points: number) => `${points} ${points === 1 ? 'point' : 'points'}`,
   },
   categoryStats: {
