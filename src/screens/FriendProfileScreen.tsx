@@ -48,6 +48,11 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
   const [status, setStatus] = useState(friendState(friendship));
   const [busy, setBusy] = useState(false);
   const [id, setId] = useState(friendship?.friendshipId ?? null);
+  // Whether the relationship is known yet. Handed one, it is known from the
+  // first frame; handed none, nothing is offered until the lookup answers —
+  // flashing "add friend" at somebody who is already a friend reads as a
+  // bug even though it corrects itself a moment later.
+  const [known, setKnown] = useState(friendship !== null);
 
   // Opened from a chat, this screen is handed the person but not what they
   // are to us — the chat list knows one and not the other. Offering to
@@ -60,11 +65,16 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
       .then((all) => {
         if (cancelled) return;
         const relation = relationsByPlayer(all).get(player.id);
-        if (!relation) return;
-        setStatus(relation.state);
-        setId(relation.friendshipId);
+        if (relation) {
+          setStatus(relation.state);
+          setId(relation.friendshipId);
+        }
+        setKnown(true);
       })
-      .catch(() => {});
+      // Nothing came back, so nothing is known — but the screen cannot sit
+      // empty for ever either, and offering to add them is the one thing
+      // that is safe to get wrong twice.
+      .catch(() => !cancelled && setKnown(true));
     return () => {
       cancelled = true;
     };
@@ -114,17 +124,17 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         </View>
 
         <View style={styles.actionsRow}>
-          {status === 'accepted' && (
+          {known && status === 'accepted' && (
             <>
               <PillButton title={t('friendProfile.write')} variant="outline" onPress={onOpenChat} fullWidth={false} style={styles.actionButton} />
               <PillButton title={t('friendProfile.compare')} variant="outline" onPress={onCompare} fullWidth={false} style={styles.actionButton} />
             </>
           )}
-          {status === 'none' && (
+          {known && status === 'none' && (
             <PillButton title={t('friendProfile.addFriend')} variant="ink" icon="＋" onPress={handleAdd} disabled={busy} />
           )}
-          {status === 'pending-out' && <PillButton title={t('friendProfile.requestSentButton')} variant="outline" disabled onPress={() => {}} />}
-          {status === 'pending-in' && (
+          {known && status === 'pending-out' && <PillButton title={t('friendProfile.requestSentButton')} variant="outline" disabled onPress={() => {}} />}
+          {known && status === 'pending-in' && (
             <>
               <PillButton title={t('friendProfile.accept')} variant="ink" onPress={handleAccept} disabled={busy} fullWidth={false} style={styles.actionButton} />
               <PillButton title={t('friendProfile.decline')} variant="outline" onPress={handleRemove} disabled={busy} fullWidth={false} style={styles.actionButton} />
@@ -135,10 +145,12 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
         {/* Their rating, as the ranking has it. Only the number: the
             workings behind it are their own business, and the breakdown
             would need stats a friend cannot read. */}
-        <RatingCard
-          compact
-          rating={{ points: player.rating, cleared: 0, outOf: 0, averageMs: null, multiplier: speedMultiplier(null), fromVictories: 0 }}
-        />
+        <View style={styles.ratingWrap}>
+          <RatingCard
+            compact
+            rating={{ points: player.rating, cleared: 0, outOf: 0, averageMs: null, multiplier: speedMultiplier(null), fromVictories: 0 }}
+          />
+        </View>
 
         <View style={styles.statsRow}>
           <View style={styles.statCard}>
@@ -200,6 +212,7 @@ function makeStyles(theme: Theme) {
     levelLine: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
     actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
     actionButton: { flex: 1 },
+    ratingWrap: { marginBottom: 12 },
     statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
     statCard: {
       flex: 1,

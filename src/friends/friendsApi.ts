@@ -1,4 +1,6 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
+import { ratingOf } from '../data/rating';
+import { Victories } from '../data/victories';
 import { Avatar } from '../data/avatar';
 import { ModeStat } from '../auth/types';
 import { sendPush } from '../notifications/pushTokens';
@@ -13,7 +15,7 @@ export type PlayerSummary = {
   achievements: string[];
   stats: Record<string, ModeStat>;
   totalScore: number;
-  /** Rating points — the figure the global ranking orders by. */
+  /** Rating points, worked out from the stats this row carries. */
   rating: number;
   totalCorrect: number;
   totalQuestions: number;
@@ -76,7 +78,7 @@ type LeaderboardRow = {
   achievements: string[] | null;
   stats: Record<string, ModeStat> | null;
   total_score: number;
-  rating: number | null;
+  victories: Victories | null;
   total_correct: number;
   total_questions: number;
   total_games: number;
@@ -99,7 +101,10 @@ function toPlayerSummary(row: LeaderboardRow): PlayerSummary {
     achievements: row.achievements ?? [],
     stats: row.stats ?? {},
     totalScore: row.total_score,
-    rating: row.rating ?? 0,
+    // Worked out here rather than read from the profile's stored copy: the
+    // copy is written by that player's own app, so it can be missing or a
+    // round behind, while their stats are right there in the row.
+    rating: ratingOf({ stats: row.stats ?? {}, victories: row.victories ?? undefined }).points,
     totalCorrect: row.total_correct,
     totalQuestions: row.total_questions,
     totalGames: row.total_games,

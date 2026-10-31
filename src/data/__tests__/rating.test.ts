@@ -119,6 +119,17 @@ describe('ratingOf', () => {
     expect(rating.points).toBe(TOURNAMENT_POINTS.gold);
   });
 
+  // Somebody else's rating is worked out from the row the ranking returns,
+  // which carries their stats and nothing that makes it a profile.
+  it('reads a bare row, with or without victories on it', () => {
+    const stats = {
+      'cat:anime:novice': { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6, answeredMs: 48000, answeredCount: 6 },
+    };
+    expect(ratingOf({ stats }).points).toBe(6);
+    expect(ratingOf({ stats, victories: undefined }).points).toBe(6);
+    expect(ratingOf({ stats, victories: { ...EMPTY_VICTORIES, runs: 1, gold: 1 } }).points).toBe(6 + TOURNAMENT_POINTS.gold);
+  });
+
   it('is worth more to the faster of two players who cleared the same', () => {
     const cleared = { gamesPlayed: 1, bestScore: 6, bestOutOf: 6, totalCorrect: 6, totalQuestions: 6 };
     const quick = ratingOf(profileWith({ 'cat:anime:novice': { ...cleared, answeredMs: 12000, answeredCount: 6 } }));

@@ -87,7 +87,14 @@ export function ratingCeiling(): number {
   return CATEGORIES.reduce((sum, category) => sum + ladderBest({ stats: {} } as Profile, category.id).outOf, 0);
 }
 
-export function ratingOf(profile: Profile): Rating {
+/**
+ * Takes the stats and the victories rather than a whole profile, because
+ * the rating of somebody else is worked out from the row the ranking
+ * returns, not from a profile the app cannot read. Deriving it beats
+ * reading the stored number: that one is a copy for ordering, and a copy
+ * can be missing or a round out of date.
+ */
+export function ratingOf(profile: Pick<Profile, 'stats' | 'victories'>): Rating {
   const cleared = CATEGORIES.reduce((sum, category) => sum + ladderBest(profile, category.id).score, 0);
   const averageMs = averageThinkingMs(profile.stats);
   const multiplier = speedMultiplier(averageMs);

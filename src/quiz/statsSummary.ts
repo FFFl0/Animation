@@ -122,7 +122,7 @@ export function categoryStat(profile: Profile, categoryId: CategoryId): ModeStat
  * Difficulties still locked count towards the total. They are the rest of
  * the climb, not a part of it that does not exist.
  */
-export function ladderBest(profile: Profile, categoryId: CategoryId): BestRound {
+export function ladderBest(profile: Pick<Profile, 'stats'>, categoryId: CategoryId): BestRound {
   return categoryLadderSources(categoryId).reduce(
     (acc, { key, roundLength }) => {
       const record = bestRecord(profile.stats[key] ?? ZERO_STAT, roundLength);

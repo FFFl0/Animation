@@ -1458,3 +1458,81 @@ left join public.round_results r on r.user_id = p.id
 group by p.id, p.username, p.avatar, p.rating;
 
 grant select on public.leaderboard_season to authenticated;
+
+-- ============================================================
+-- РЕЙТИНГ СЧИТАЕТСЯ ИЗ СТАТИСТИКИ, А НЕ БЕРЁТСЯ ИЗ КОЛОНКИ.
+--
+-- В profiles.rating лежит копия — по ней сервер сортирует таблицу, больше
+-- она ни для чего. Пишет её приложение самого игрока, поэтому она бывает
+-- пустой (профиль не открывали с тех пор, как рейтинг появился) или на
+-- раунд устаревшей. Статистика такой не бывает, так что число, которое
+-- видят другие, выводится из неё — для этого представления и отдают stats
+-- и victories.
+--
+-- Недельная и сезонная таблицы ранжируются ответами за период, но профиль,
+-- открытый из любой из них, показывает рейтинг — значит, и им нужны те же
+-- два поля.
+-- ============================================================
+
+drop view if exists public.leaderboard cascade;
+create view public.leaderboard as
+select
+  id,
+  username,
+  avatar,
+  streak,
+  achievements,
+  stats,
+  victories,
+  last_seen_at,
+  rating,
+  -- Только ключи 'cat:%'. Раунд, сыгранный в режиме, записывается дважды —
+  -- под своей категорией и под самим режимом, — и сумма по всем ключам
+  -- засчитывала бы его два раза.
+  coalesce((select sum((value->>'bestScore')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_score,
+  coalesce((select sum((value->>'totalCorrect')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_correct,
+  coalesce((select sum((value->>'totalQuestions')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_questions,
+  coalesce((select sum((value->>'gamesPlayed')::int) from jsonb_each(stats) where key like 'cat:%'), 0) as total_games
+from public.profiles;
+
+grant select on public.leaderboard to authenticated;
+
+drop view if exists public.leaderboard_weekly cascade;
+create view public.leaderboard_weekly as
+select
+  p.id,
+  p.username,
+  p.avatar,
+  p.stats,
+  p.victories,
+  coalesce((
+    select sum(r.score) from public.round_results r
+    where r.user_id = p.id and r.created_at >= date_trunc('week', now())
+  ), 0) as period_score,
+  coalesce((
+    select sum(r.total) from public.round_results r
+    where r.user_id = p.id and r.created_at >= date_trunc('week', now())
+  ), 0) as period_questions
+from public.profiles p;
+
+grant select on public.leaderboard_weekly to authenticated;
+
+drop view if exists public.leaderboard_season cascade;
+create view public.leaderboard_season as
+select
+  p.id,
+  p.username,
+  p.avatar,
+  p.stats,
+  p.victories,
+  coalesce((
+    select sum(r.score) from public.round_results r
+    where r.user_id = p.id and r.created_at >= date_trunc('month', now())
+  ), 0) as period_score,
+  coalesce((
+    select sum(r.total) from public.round_results r
+    where r.user_id = p.id and r.created_at >= date_trunc('month', now())
+  ), 0) as period_questions
+from public.profiles p;
+
+grant select on public.leaderboard_season to authenticated;
