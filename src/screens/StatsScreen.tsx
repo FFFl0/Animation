@@ -288,7 +288,14 @@ function StatRow({
         </View>
       </View>
 
-      <Text style={styles.rowBest}>{record ? `${record.score}/${record.outOf}` : '—'}</Text>
+      {/* The best round as a percentage of its own questions. Six out of
+          six and fifteen out of fifteen are the same round at different
+          lengths, and only the share says so. Captioned, because the line
+          above it is a percentage too and a different one. */}
+      <View style={styles.rowBestColumn}>
+        <Text style={styles.rowBest}>{record ? `${Math.round(share * 100)}%` : '—'}</Text>
+        {record && <Text style={styles.rowBestLabel}>{t('stats.best')}</Text>}
+      </View>
       {onPress && <Icon name="chevronRight" size={15} color={theme.textMuted} />}
     </Container>
   );
@@ -421,6 +428,15 @@ function makeStyles(theme: Theme) {
       overflow: 'hidden',
     },
     rowFill: { height: '100%', borderRadius: 3 },
+    rowBestColumn: { alignItems: 'flex-end' },
+    rowBestLabel: {
+      fontSize: 10,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      textShadowColor: theme.card,
+      textShadowOffset: { width: 0, height: 0 },
+      textShadowRadius: 6,
+    },
     rowBest: {
       fontSize: 19,
       fontFamily: fontFamily('800'),

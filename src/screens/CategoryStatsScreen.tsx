@@ -186,8 +186,13 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                       </View>
                       {unlocked && stat.gamesPlayed > 0 && (
                         <View style={styles.tierBest}>
+                          {/* As a share, the same way the statistics list
+                              shows it: these rounds are six, eight, ten,
+                              twelve and fifteen questions long, and the
+                              bare scores cannot be compared down the
+                              column. */}
                           <Text style={styles.tierBestValue}>
-                            {record.score}/{record.outOf}
+                            {Math.round((record.score / record.outOf) * 100)}%
                           </Text>
                           <Text style={styles.tierBestLabel}>{t('categoryStats.best')}</Text>
                         </View>

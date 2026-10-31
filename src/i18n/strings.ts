@@ -204,6 +204,7 @@ const ru: StringDict = {
     byMode: 'По режимам',
     gamesAccuracy: (games: number, acc: number) =>
       `${games} ${plural(games, 'раунд', 'раунда', 'раундов')} · точность ${acc}%`,
+    best: 'рекорд',
     heroNote: 'Маленькие шаги к большой победе',
     quote: '«Каждый ответ приближает тебя к ещё большему знанию»',
     grouping: { categories: 'Все режимы', modes: 'По режимам' },
@@ -920,6 +921,7 @@ const en: StringDict = {
     byMode: 'By Mode',
     gamesAccuracy: (games: number, acc: number) =>
       `${games} ${games === 1 ? 'round' : 'rounds'} · ${acc}% accuracy`,
+    best: 'best',
     heroNote: 'Small steps towards a big win',
     quote: '"Every answer takes you a little closer to knowing it all"',
     grouping: { categories: 'All modes', modes: 'By mode' },
