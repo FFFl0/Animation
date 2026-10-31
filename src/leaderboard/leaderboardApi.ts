@@ -75,15 +75,18 @@ export async function fetchLeaderboard(period: LeaderboardPeriod = 'all', limit 
 
     if (error || !data) return [];
     return (data as LeaderboardViewRow[])
-      .map((row) => ({
-        id: row.id,
-        username: row.username,
-        avatar: row.avatar,
-        score: ratingOfRow(row),
-        rating: ratingOfRow(row),
-        totalCorrect: row.total_correct,
-        totalQuestions: row.total_questions,
-      }))
+      .map((row) => {
+        const rating = ratingOfRow(row);
+        return {
+          id: row.id,
+          username: row.username,
+          avatar: row.avatar,
+          score: rating,
+          rating,
+          totalCorrect: row.total_correct,
+          totalQuestions: row.total_questions,
+        };
+      })
       .sort((a, b) => b.rating - a.rating);
   }
 
