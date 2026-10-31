@@ -175,14 +175,13 @@ export default function LeaderboardScreen({ onBack, onOpenChat, onChallenge }: P
                   </Text>
                   <Text style={styles.rowSub}>{t('leaderboard.accuracyLine', accuracy)}</Text>
                 </View>
-                {/* All-time ranks by rating points; the two periods rank by
-                    the answers given inside them, which is a different
-                    number and has to say so. */}
+                {/* Only the all-time column is captioned: it is rating
+                    points, which is not a figure anybody can guess from
+                    the number alone. The periods count answers, and the
+                    tab above already says which period. */}
                 <View style={styles.scoreColumn}>
                   <Text style={styles.rowScore}>{row.score}</Text>
-                  <Text style={styles.rowScoreLabel}>
-                    {period === 'all' ? t('rating.pointsLabel') : t('rating.answersLabel')}
-                  </Text>
+                  {period === 'all' && <Text style={styles.rowScoreLabel}>{t('rating.pointsLabel')}</Text>}
                 </View>
               </SoundTouchable>
             );

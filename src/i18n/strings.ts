@@ -111,7 +111,6 @@ const ru: StringDict = {
     multiplier: (value: string) => `×${value}`,
     hint: 'Очки = пройдено вопросов × скорость (от 0.5 до 2.0) + турниры',
     pointsLabel: 'очки',
-    answersLabel: 'ответы',
     victories: (points: number, tournaments: number) =>
       `Турниры +${points} · сыграно ${tournaments}`,
     victoriesNone: 'Турниры тоже дают очки',
@@ -830,7 +829,6 @@ const en: StringDict = {
     multiplier: (value: string) => `×${value}`,
     hint: 'Points = questions cleared × speed (0.5 to 2.0) + tournaments',
     pointsLabel: 'pts',
-    answersLabel: 'answers',
     victories: (points: number, tournaments: number) => `Tournaments +${points} · ${tournaments} played`,
     victoriesNone: 'Tournaments earn points too',
     leaderboardPoints: (points: number) => `${points} ${points === 1 ? 'point' : 'points'}`,
