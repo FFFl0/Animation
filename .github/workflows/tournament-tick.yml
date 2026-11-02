@@ -1,0 +1,53 @@
+# Turns the tournament week over on time.
+#
+# The tournament function opens a week and closes its bracket the moment
+# somebody asks it for the state — which, without this, is whenever the
+# first player next opens the screen. The two notices it sends ("sign-ups
+# are open", "the tournament has started") are about moments in time, so
+# they are worth being punctual about.
+#
+# Needs two repository secrets. Without them the job skips, and the lazy
+# path still works:
+#   SUPABASE_FUNCTIONS_URL  https://<project>.supabase.co/functions/v1
+#   SUPABASE_ANON_KEY       the project's anon key, which gets past the
+#                           platform's own token check
+#   TOURNAMENT_TICK_SECRET  the same value as the function's secret, set
+#                           with `supabase secrets set TOURNAMENT_TICK_SECRET=...`
+name: Tournament tick
+
+on:
+  schedule:
+    # Every quarter of an hour. GitHub treats this as a hint rather than a
+    # promise, which is accurate enough for a weekly event.
+    - cron: '*/15 * * * *'
+  workflow_dispatch:
+
+jobs:
+  tick:
+    runs-on: ubuntu-latest
+    steps:
+      - name: Poke the tournament function
+        env:
+          FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
+          TICK_SECRET: ${{ secrets.TOURNAMENT_TICK_SECRET }}
+        run: |
+          if [ -z "$FUNCTIONS_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$TICK_SECRET" ]; then
+            echo "Secrets are not set — nothing to call, the function turns the week lazily instead."
+            exit 0
+          fi
+          code=$(curl -sS -o response.json -w '%{http_code}' \
+            -X POST "$FUNCTIONS_URL/tournament" \
+            -H "Authorization: Bearer $ANON_KEY" \
+            -H "apikey: $ANON_KEY" \
+            -H "x-tournament-tick: $TICK_SECRET" \
+            -H 'Content-Type: application/json' \
+            -d '{"action":"tick"}')
+          cat response.json
+          echo
+          # A secret that no longer matches, or a function that is not
+          # deployed, should fail loudly rather than quietly never firing.
+          if [ "$code" != "200" ]; then
+            echo "tournament tick failed with HTTP $code"
+            exit 1
+          fi

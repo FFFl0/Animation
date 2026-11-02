@@ -17,7 +17,7 @@ import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
-  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
+  'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type, x-tournament-tick',
 };
 
 const SIZE = 16;
@@ -260,30 +260,52 @@ type TournamentRow = {
   champion_user_id: string | null;
 };
 
-/** The tournament for this week, opening registration for it if it is new. */
-async function ensureWeek(admin: SupabaseClient): Promise<TournamentRow> {
+/**
+ * The two moments in a tournament's week worth waking somebody's phone for.
+ *
+ * Both are sent from here because this is where the week turns: the row for
+ * a new week is inserted in one place and the bracket is closed in another,
+ * and each of those is already guarded against happening twice. Announcing
+ * them anywhere else would mean working out, after the fact, whether the
+ * announcement had already gone.
+ */
+const SIGNUPS_OPEN: PushCopy = {
+  ru: { title: 'Открылась запись на турнир', body: 'Новый недельный турнир — занимайте место в сетке' },
+  en: { title: 'Tournament sign-ups are open', body: 'A new weekly tournament — take your seat in the bracket' },
+};
+
+const TOURNAMENT_STARTED: PushCopy = {
+  ru: { title: 'Турнир начался', body: 'Сетка собрана — ваш первый матч уже ждёт' },
+  en: { title: 'The tournament has started', body: 'The bracket is set — your first match is waiting' },
+};
+
+/** The tournament for this week, opening registration for it if it is new.
+ * `opened` is true only for the caller that inserted the row, which is the
+ * one that gets to announce it. */
+async function ensureWeek(admin: SupabaseClient): Promise<{ tournament: TournamentRow; opened: boolean }> {
   const week = weekStart(new Date());
   const { data: existing } = await admin
     .from('weekly_tournaments')
     .select('*')
     .eq('week_start', week)
     .maybeSingle();
-  if (existing) return existing as TournamentRow;
+  if (existing) return { tournament: existing as TournamentRow, opened: false };
 
   const { data: created } = await admin
     .from('weekly_tournaments')
     .insert({ week_start: week, starts_at: startsAt(week) })
     .select('*')
     .maybeSingle();
-  if (created) return created as TournamentRow;
+  if (created) return { tournament: created as TournamentRow, opened: true };
 
-  // Somebody else opened it in between, which is fine.
+  // Somebody else opened it in between, which is fine — and it is their
+  // call that announces it, not this one.
   const { data: raced } = await admin
     .from('weekly_tournaments')
     .select('*')
     .eq('week_start', week)
     .single();
-  return raced as TournamentRow;
+  return { tournament: raced as TournamentRow, opened: false };
 }
 
 type Entrant = { seed: number; user_id: string | null; name: string; rating: number };
@@ -350,6 +372,14 @@ async function seedBracket(admin: SupabaseClient, tournament: TournamentRow): Pr
       { onConflict: 'tournament_id,seed', ignoreDuplicates: true }
     );
   await admin.from('weekly_tournaments').update({ status: 'running' }).eq('id', tournament.id);
+
+  // Only the people in it, and only the people: a bot has no phone, and
+  // somebody who registered after the sixteen seats were taken has no
+  // tournament to be told about.
+  const playing = entrants.map((e) => e.user_id).filter((id): id is string => !!id);
+  if (playing.length > 0) {
+    await pushToTokens(admin, await tokensFor(admin, playing), TOURNAMENT_STARTED, { kind: 'tournamentStarted' });
+  }
 }
 
 /** Picks a bracket back up if seeding was claimed but never finished. */
@@ -571,11 +601,6 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
 
-  // The caller is whoever the bearer token says, never whoever the body says.
-  const { data: userData } = await asCaller.auth.getUser();
-  const user = userData?.user;
-  if (!user) return json({ error: 'not signed in' }, 401);
-
   let payload: { action?: string; matchId?: string; score?: number };
   try {
     payload = await req.json();
@@ -583,12 +608,50 @@ Deno.serve(async (req) => {
     return json({ error: 'invalid request body' }, 400);
   }
 
-  let tournament = await ensureWeek(admin);
+  /**
+   * Opens the week and closes the bracket when their time has come. Both
+   * send a notification on the way through, so whoever calls this decides
+   * when the two notices go out.
+   */
+  const turnTheWeek = async (): Promise<TournamentRow> => {
+    const { tournament: current, opened } = await ensureWeek(admin);
+    if (opened) {
+      // Everybody, not only last week's entrants: the point of this one is
+      // to reach the people who are not in it yet.
+      await pushToTokens(admin, await tokensFor(admin), SIGNUPS_OPEN, { kind: 'tournamentSignups' });
+    }
+    if (current.status === 'registration' && Date.parse(current.starts_at) <= Date.now()) {
+      await seedBracket(admin, current);
+    }
+    await recoverSeeding(admin, current.id);
+    return current;
+  };
 
-  if (tournament.status === 'registration' && Date.parse(tournament.starts_at) <= Date.now()) {
-    await seedBracket(admin, tournament);
+  /**
+   * A poke from a scheduler rather than a player, carrying a shared secret
+   * instead of a session.
+   *
+   * Without it the week turns when somebody next opens the tournament
+   * screen, and the two notices go out then — hours or days after the
+   * moment they are about. With it they go out on time. The secret is set
+   * with `supabase secrets set TOURNAMENT_TICK_SECRET=...`; where it is
+   * unset there is nothing to call, and the lazy path still works.
+   */
+  if (payload.action === 'tick') {
+    const expected = Deno.env.get('TOURNAMENT_TICK_SECRET');
+    const given = req.headers.get('x-tournament-tick');
+    if (!expected || given !== expected) return json({ error: 'not allowed' }, 403);
+    const current = await turnTheWeek();
+    const { data: after } = await admin.from('weekly_tournaments').select('status').eq('id', current.id).single();
+    return json({ ok: true, status: (after as { status: string } | null)?.status ?? current.status });
   }
-  await recoverSeeding(admin, tournament.id);
+
+  // The caller is whoever the bearer token says, never whoever the body says.
+  const { data: userData } = await asCaller.auth.getUser();
+  const user = userData?.user;
+  if (!user) return json({ error: 'not signed in' }, 401);
+
+  let tournament = await turnTheWeek();
 
   const { data: refreshed } = await admin.from('weekly_tournaments').select('*').eq('id', tournament.id).single();
   tournament = refreshed as TournamentRow;

@@ -13,17 +13,16 @@
 // automatically by the Edge Function runtime — no manual config needed.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { PushCopy, pushToTokens, tokensFor } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
   'Access-Control-Allow-Headers': 'authorization, x-client-info, apikey, content-type',
 };
 
-const EXPO_PUSH_URL = 'https://exp.host/--/api/v2/push/send';
-
 type Kind = 'friendRequest' | 'battleInvite';
 
-const TEXT: Record<Kind, Record<string, { title: string; body: string }>> = {
+const TEXT: Record<Kind, PushCopy> = {
   friendRequest: {
     ru: { title: 'Новая заявка в друзья', body: 'Кто-то хочет добавить вас в друзья' },
     en: { title: 'New friend request', body: 'Somebody wants to add you as a friend' },
@@ -92,36 +91,6 @@ Deno.serve(async (req) => {
 
   if (!count) return json({ error: 'no such invitation' }, 403);
 
-  const { data: tokens } = await admin
-    .from('push_tokens')
-    .select('token, language')
-    .eq('user_id', toUserId);
-
-  if (!tokens || tokens.length === 0) return json({ ok: true, delivered: 0 });
-
-  const messages = tokens.map((row: { token: string; language: string }) => {
-    const text = TEXT[kind][row.language] ?? TEXT[kind].ru;
-    return { to: row.token, sound: 'default', title: text.title, body: text.body, data: { kind } };
-  });
-
-  const response = await fetch(EXPO_PUSH_URL, {
-    method: 'POST',
-    headers: { 'Content-Type': 'application/json', Accept: 'application/json' },
-    body: JSON.stringify(messages),
-  });
-
-  if (!response.ok) return json({ error: 'push service rejected the request' }, 502);
-
-  // Expo reports a dead token per-message rather than failing the request, so
-  // the ones it refuses are cleared out here instead of being retried forever.
-  const result = await response.json().catch(() => null);
-  const tickets: { status?: string; details?: { error?: string } }[] = result?.data ?? [];
-  const dead = tickets
-    .map((ticket, i) => (ticket.details?.error === 'DeviceNotRegistered' ? messages[i].to : null))
-    .filter((t): t is string => !!t);
-  if (dead.length > 0) {
-    await admin.from('push_tokens').delete().eq('user_id', toUserId).in('token', dead);
-  }
-
-  return json({ ok: true, delivered: messages.length - dead.length });
+  const delivered = await pushToTokens(admin, await tokensFor(admin, [toUserId]), TEXT[kind], { kind });
+  return json({ ok: true, delivered });
 });
