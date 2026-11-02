@@ -32,13 +32,23 @@ type Props = {
   onOpenFriend: (player: PlayerSummary, friendship: Friendship | null) => void;
   onAcceptBattleInvite: (roomCode: string) => void;
   onOpenGroups: () => void;
+  /** Which tab to open on. A notification about a request is about the
+   * requests tab, and landing on the friends list instead leaves the
+   * player to go looking for what they were just told about. */
+  initialTab?: Tab;
 };
 
-type Tab = 'friends' | 'requests' | 'recommendations';
+export type Tab = 'friends' | 'requests' | 'recommendations';
 
 const MEDAL_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
 
-export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvite, onOpenGroups }: Props) {
+export default function FriendsScreen({
+  onBack,
+  onOpenFriend,
+  onAcceptBattleInvite,
+  onOpenGroups,
+  initialTab = 'friends',
+}: Props) {
   const { profile } = useAuth();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -46,7 +56,7 @@ export default function FriendsScreen({ onBack, onOpenFriend, onAcceptBattleInvi
   const t = useT();
   const { battleInvites, refresh: refreshNotifications, respondToInvite } = useNotifications();
 
-  const [tab, setTab] = useState<Tab>('friends');
+  const [tab, setTab] = useState<Tab>(initialTab);
   const [friendships, setFriendships] = useState<Friendship[] | null>(null);
   const [recommendations, setRecommendations] = useState<PlayerSummary[] | null>(null);
   const [query, setQuery] = useState('');

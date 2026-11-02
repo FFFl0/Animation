@@ -67,6 +67,7 @@ export async function setReminderEnabled(enabled: boolean, lang: Language = 'ru'
     content: {
       title: text.title,
       body: text.body,
+      data: { kind: 'streak' },
     },
     trigger: {
       type: Notifications.SchedulableTriggerInputTypes.DAILY,

@@ -58,11 +58,15 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
     const t = getT(language);
     const unsubFriend = subscribeIncomingFriendRequests(meId, () => {
       getIncomingFriendRequests(meId).then(setIncomingRequests);
-      presentLocalNotification(t('notifications.friendRequestTitle'), t('notifications.friendRequestBody'));
+      presentLocalNotification(t('notifications.friendRequestTitle'), t('notifications.friendRequestBody'), {
+        kind: 'friendRequest',
+      });
     });
     const unsubBattle = subscribeBattleInvites(meId, () => {
       getPendingBattleInvites(meId).then(setBattleInvites);
-      presentLocalNotification(t('notifications.battleInviteTitle'), t('notifications.battleInviteBody'));
+      presentLocalNotification(t('notifications.battleInviteTitle'), t('notifications.battleInviteBody'), {
+        kind: 'battleInvite',
+      });
     });
     return () => {
       unsubFriend();

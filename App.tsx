@@ -35,6 +35,8 @@ import CategoryStatsScreen from './src/screens/CategoryStatsScreen';
 import ResetPasswordScreen from './src/screens/ResetPasswordScreen';
 import BattleScreen from './src/screens/BattleScreen';
 import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
+import { NotificationTarget } from './src/notifications/notificationRoute';
+import { useNotificationTaps } from './src/notifications/useNotificationTaps';
 import TournamentScreen, { WEEKLY_MATCH_CONFIG } from './src/screens/TournamentScreen';
 import ShopScreen from './src/screens/ShopScreen';
 import { ShopTab } from './src/shop/catalogue';
@@ -42,7 +44,7 @@ import ShopItemScreen from './src/screens/ShopItemScreen';
 import CartScreen from './src/screens/CartScreen';
 import OrdersScreen from './src/screens/OrdersScreen';
 import { ShopProvider, useShop } from './src/shop/ShopContext';
-import FriendsScreen from './src/screens/FriendsScreen';
+import FriendsScreen, { Tab as FriendsTab } from './src/screens/FriendsScreen';
 import FriendProfileScreen from './src/screens/FriendProfileScreen';
 import CompareScreen from './src/screens/CompareScreen';
 import ChatScreen from './src/screens/ChatScreen';
@@ -204,6 +206,12 @@ function AppShell() {
   // profile behind it to go back to.
   const [battleFrom, setBattleFrom] = useState<Screen>('home');
   const [invitedRoomCode, setInvitedRoomCode] = useState<string | null>(null);
+  // The screen a tapped notification asked for, held until there is somebody
+  // signed in to show it to.
+  const [tappedNotification, setTappedNotification] = useState<NotificationTarget | null>(null);
+  // Which tab the friends screen opens on, so a tap on a request notice
+  // lands on the requests rather than on the list of people already added.
+  const [friendsTab, setFriendsTab] = useState<FriendsTab>('friends');
   // Bumped every time an invite link is opened, so the battle screen is
   // rebuilt even when the link points at the room it is already set to.
   const [battleMountKey, setBattleMountKey] = useState(0);
@@ -233,6 +241,10 @@ function AppShell() {
   // is held here and spent once the sign-in is done.
   useBattleInviteLink(setInvitedRoomCode);
 
+  // Same story as the invite link: a notification can be what opens the app,
+  // and that can happen while the sign-in screen is still up.
+  useNotificationTaps(setTappedNotification);
+
   useEffect(() => {
     setScreen('home');
     setPreAuthScreen('welcome');
@@ -250,6 +262,25 @@ function AppShell() {
     setBattleMountKey((n) => n + 1);
     setScreen('battle');
   }, [invitedRoomCode, profile]);
+
+  // The opening tab is a one-shot. Leaving the screen puts it back, or a
+  // notification tapped once would send every later visit to the requests.
+  useEffect(() => {
+    if (screen !== 'friends') setFriendsTab('friends');
+  }, [screen]);
+
+  // Likewise after the reset: a tap that opened the app lands where it was
+  // aimed, and a tap while the app was running goes straight there.
+  useEffect(() => {
+    if (!tappedNotification || !profile) return;
+    setTappedNotification(null);
+    if (tappedNotification === 'friends') {
+      setFriendsTab('requests');
+      setScreen('friends');
+      return;
+    }
+    setScreen(tappedNotification === 'tournament' ? 'tournament' : 'home');
+  }, [tappedNotification, profile]);
 
   // Only the opaque account id, never the username — the policy says reports
   // carry nothing personal, and this is where that has to hold.
@@ -614,6 +645,8 @@ function AppShell() {
 
           {screen === 'friends' && (
             <FriendsScreen
+              key={friendsTab}
+              initialTab={friendsTab}
               onBack={() => setScreen('chats')}
               onOpenFriend={(player, friendship) => {
                 setSelectedFriend(player);
