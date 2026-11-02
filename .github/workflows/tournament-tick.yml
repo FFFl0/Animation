@@ -6,13 +6,16 @@
 # are open", "the tournament has started") are about moments in time, so
 # they are worth being punctual about.
 #
-# Needs two repository secrets. Without them the job skips, and the lazy
-# path still works:
-#   SUPABASE_FUNCTIONS_URL  https://<project>.supabase.co/functions/v1
+# Needs three repository secrets, two of which the deploy workflow already
+# uses. Without them the job skips and the lazy path still works:
+#   SUPABASE_PROJECT_REF    the project ref — the function's address is
+#                           built from it
 #   SUPABASE_ANON_KEY       the project's anon key, which gets past the
-#                           platform's own token check
-#   TOURNAMENT_TICK_SECRET  the same value as the function's secret, set
-#                           with `supabase secrets set TOURNAMENT_TICK_SECRET=...`
+#                           platform's own token check. It ships inside the
+#                           app anyway, so it is public by design.
+#   TOURNAMENT_TICK_SECRET  any long random string, the same one the
+#                           project holds as a function secret — the deploy
+#                           workflow writes it there from this same secret.
 name: Tournament tick
 
 on:
@@ -28,16 +31,20 @@ jobs:
     steps:
       - name: Poke the tournament function
         env:
-          FUNCTIONS_URL: ${{ secrets.SUPABASE_FUNCTIONS_URL }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
           ANON_KEY: ${{ secrets.SUPABASE_ANON_KEY }}
           TICK_SECRET: ${{ secrets.TOURNAMENT_TICK_SECRET }}
         run: |
-          if [ -z "$FUNCTIONS_URL" ] || [ -z "$ANON_KEY" ] || [ -z "$TICK_SECRET" ]; then
-            echo "Secrets are not set — nothing to call, the function turns the week lazily instead."
+          missing=""
+          [ -z "$PROJECT_REF" ] && missing="$missing SUPABASE_PROJECT_REF"
+          [ -z "$ANON_KEY" ] && missing="$missing SUPABASE_ANON_KEY"
+          [ -z "$TICK_SECRET" ] && missing="$missing TOURNAMENT_TICK_SECRET"
+          if [ -n "$missing" ]; then
+            echo "Not set:$missing — nothing to call, the function turns the week lazily instead."
             exit 0
           fi
           code=$(curl -sS -o response.json -w '%{http_code}' \
-            -X POST "$FUNCTIONS_URL/tournament" \
+            -X POST "https://$PROJECT_REF.supabase.co/functions/v1/tournament" \
             -H "Authorization: Bearer $ANON_KEY" \
             -H "apikey: $ANON_KEY" \
             -H "x-tournament-tick: $TICK_SECRET" \
