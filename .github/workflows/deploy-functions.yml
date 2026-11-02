@@ -1,0 +1,76 @@
+# Deploys Edge Functions to the Supabase project.
+#
+# The functions live in supabase/functions and are not part of the app
+# build: a new one, or a change to an existing one, reaches the project
+# only when it is deployed. This runs that from CI, so the access token
+# lives in the repository's secrets and nowhere else.
+#
+# Needs two repository secrets (Settings → Secrets and variables → Actions):
+#   SUPABASE_ACCESS_TOKEN   a personal access token from
+#                           https://supabase.com/dashboard/account/tokens
+#   SUPABASE_PROJECT_REF    the project ref, the subdomain of its URL
+#
+# Optional, and worth having if the tournament notices should arrive on
+# time rather than when somebody next opens the screen:
+#   TOURNAMENT_TICK_SECRET  set here too, and the same value is written to
+#                           the project's function secrets below, so the
+#                           scheduled poke and the function agree.
+name: Deploy functions
+
+on:
+  workflow_dispatch:
+    inputs:
+      functions:
+        description: 'Which functions to deploy, space separated'
+        required: true
+        default: 'tournament send-push'
+        type: string
+
+jobs:
+  deploy:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: supabase/setup-cli@v1
+        with:
+          version: latest
+
+      - name: Deploy
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          FUNCTIONS: ${{ inputs.functions }}
+        run: |
+          if [ -z "$SUPABASE_ACCESS_TOKEN" ] || [ -z "$PROJECT_REF" ]; then
+            echo "SUPABASE_ACCESS_TOKEN and SUPABASE_PROJECT_REF have to be set as repository secrets."
+            exit 1
+          fi
+          for fn in $FUNCTIONS; do
+            if [ ! -d "supabase/functions/$fn" ]; then
+              echo "There is no supabase/functions/$fn in this repository."
+              exit 1
+            fi
+            # The payment webhook is called by YooKassa, which has no
+            # Supabase session to present; every other function checks the
+            # caller itself and keeps the platform's token check on.
+            if [ "$fn" = "yookassa-webhook" ]; then
+              npx --yes supabase@latest functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api --no-verify-jwt
+            else
+              npx --yes supabase@latest functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api
+            fi
+          done
+
+      # Checked inside the step rather than in `if`, where the secrets
+      # context is not available.
+      - name: Keep the tournament tick secret in step with this repository
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          TICK_SECRET: ${{ secrets.TOURNAMENT_TICK_SECRET }}
+        run: |
+          if [ -z "$TICK_SECRET" ]; then
+            echo "No TOURNAMENT_TICK_SECRET in this repository — leaving the project's own secrets alone."
+            exit 0
+          fi
+          npx --yes supabase@latest secrets set "TOURNAMENT_TICK_SECRET=$TICK_SECRET" --project-ref "$PROJECT_REF"

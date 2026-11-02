@@ -39,6 +39,13 @@
    supabase functions deploy tournament
    ```
 
+   Либо кнопкой, без локального CLI: Actions → **Deploy functions** → Run
+   workflow, в поле вписаны `tournament send-push`. Нужны два секрета
+   репозитория — `SUPABASE_ACCESS_TOKEN` (личный токен со страницы
+   [account/tokens](https://supabase.com/dashboard/account/tokens)) и
+   `SUPABASE_PROJECT_REF` (поддомен адреса проекта). Токен живёт только в
+   секретах GitHub.
+
 | Функция | Зачем |
 | --- | --- |
 | `auth-helper` | вход по имени пользователя, не раскрывая клиенту почту аккаунта |
