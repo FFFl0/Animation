@@ -51,13 +51,15 @@ jobs:
               echo "There is no supabase/functions/$fn in this repository."
               exit 1
             fi
+            # --yes because a runner has no terminal to confirm at, and the
+            # CLI will not touch a hosted project without being told so.
             # The payment webhook is called by YooKassa, which has no
             # Supabase session to present; every other function checks the
             # caller itself and keeps the platform's token check on.
             if [ "$fn" = "yookassa-webhook" ]; then
-              npx --yes supabase@latest functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api --no-verify-jwt
+              supabase functions deploy "$fn" --remote="$PROJECT_REF" --use-api --no-verify-jwt --yes
             else
-              npx --yes supabase@latest functions deploy "$fn" --project-ref "$PROJECT_REF" --use-api
+              supabase functions deploy "$fn" --remote="$PROJECT_REF" --use-api --yes
             fi
           done
 
@@ -73,4 +75,4 @@ jobs:
             echo "No TOURNAMENT_TICK_SECRET in this repository — leaving the project's own secrets alone."
             exit 0
           fi
-          npx --yes supabase@latest secrets set "TOURNAMENT_TICK_SECRET=$TICK_SECRET" --project-ref "$PROJECT_REF"
+          supabase secrets set "TOURNAMENT_TICK_SECRET=$TICK_SECRET" --remote="$PROJECT_REF" --yes
