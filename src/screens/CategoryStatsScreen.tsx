@@ -52,11 +52,12 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
   // How far through the category's own questions this is, as against the
   // running totals in the tiles above, which count every answer ever given.
   const ladder = profile ? ladderBest(profile, categoryId) : { score: 0, outOf: 0 };
+  const cleared = ladder.outOf > 0 ? Math.round((ladder.score / ladder.outOf) * 100) : 0;
   // Hooks before the signed-out return below, so they run on every render.
   const countedRounds = useCountUp(total.gamesPlayed);
-  const countedAccuracy = useCountUp(accuracy);
+  const countedCleared = useCountUp(cleared);
   const countedCorrect = useCountUp(total.totalCorrect);
-  const countedLadder = useCountUp(ladder.score);
+  const countedAccuracy = useCountUp(total.totalCorrect);
 
   if (!profile) return null;
 
@@ -113,10 +114,14 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                 <Text style={styles.tileValue}>{countedRounds}</Text>
                 <Text style={styles.tileLabel}>{t('categoryStats.rounds', total.gamesPlayed)}</Text>
               </View>
+              {/* How much of the category has been beaten, not how many of
+                  the answers given were right: one perfect round at the
+                  first difficulty is a hundred percent of nothing much,
+                  and this tile is the one people read as the score. */}
               <View style={styles.tile}>
-                <StatRing percent={accuracy} size={22} color={category.color} trackColor={theme.border} />
-                <Text style={styles.tileValue}>{countedAccuracy}%</Text>
-                <Text style={styles.tileLabel}>{t('categoryStats.accuracy')}</Text>
+                <StatRing percent={cleared} size={22} color={category.color} trackColor={theme.border} />
+                <Text style={styles.tileValue}>{countedCleared}%</Text>
+                <Text style={styles.tileLabel}>{t('categoryStats.cleared')}</Text>
               </View>
               <View style={styles.tile}>
                 <Icon name="check" size={16} color={category.color} />
@@ -130,18 +135,16 @@ export default function CategoryStatsScreen({ categoryId, onBack, onPlay }: Prop
                 about them. */}
             <Text style={styles.shareLine}>{t('categoryStats.shareLine', share)}</Text>
 
+            {/* Accuracy, where it can be read for what it is: so many of
+                the answers given, not so much of the category. */}
             <View style={styles.card}>
               <View style={styles.cardHead}>
                 <Text style={styles.cardTitle}>{t('categoryStats.answersTitle')}</Text>
                 <Text style={styles.cardValue}>
-                  {t('categoryStats.answersOf', countedLadder, ladder.outOf)}
+                  {t('categoryStats.answersOf', countedAccuracy, total.totalQuestions)}
                 </Text>
               </View>
-              <ProgressBar
-                progress={ladder.outOf > 0 ? ladder.score / ladder.outOf : 0}
-                color={category.color}
-                height={7}
-              />
+              <ProgressBar progress={accuracy / 100} color={category.color} height={7} />
             </View>
 
             {hasTiers && (

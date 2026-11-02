@@ -14,7 +14,7 @@ import { GAME_MODES, modeTitle } from '../data/modes';
 import { TIERS } from '../data/difficulty';
 import { ACHIEVEMENTS, unlockedCount } from '../data/achievements';
 import { modeStatsKey } from '../quiz/statsKey';
-import { accuracyOf, bestRound, categoryStat, roundStats, sumStats } from '../quiz/statsSummary';
+import { accuracyOf, bestRound, categoryStat, ladderBest, roundStats, sumStats } from '../quiz/statsSummary';
 import { ModeStat, ZERO_STAT } from '../auth/types';
 import Icon, { IconName } from '../components/Icon';
 import ImageScrim from '../components/ImageScrim';
@@ -47,6 +47,13 @@ type Row = {
   /** The longest round this row could hold, for reading back a record kept
    * before its length was stored. */
   longestRound: number;
+  /**
+   * How much of this row's own questions have been beaten, where there is
+   * such a thing: a category is a ladder with an end, and that is what its
+   * figure should say. A mode is not — it can be replayed for ever — so a
+   * mode row has none of this and shows its best round instead.
+   */
+  progress?: { score: number; outOf: number };
 };
 
 type Props = {
@@ -90,6 +97,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
     art: cat.id,
     stat: categoryStat(profile, cat.id),
     longestRound: LONGEST_TIER,
+    progress: ladderBest(profile, cat.id),
   }));
 
   const modeRows: Row[] = GAME_MODES.map((mode) => ({
@@ -249,11 +257,22 @@ function StatRow({
   onPress?: () => void;
 }) {
   const accuracy = accuracyOf(row.stat);
-  // The best round as a share of its own questions: tiers and modes run
-  // different lengths, so bare scores put a short perfect round below a long
+  // What the big figure on the right means. For a category it is how far
+  // through it the player is — a perfect round at the first difficulty is
+  // a hundred percent of very little, and that is what this used to say.
+  // A mode has no end to work towards, so there it stays the best round,
+  // as a share of its own questions: tiers and modes run different
+  // lengths, and bare scores put a short perfect round below a long
   // mediocre one.
   const record = bestRound(row.stat, row.longestRound);
-  const share = record ? record.score / record.outOf : 0;
+  const played = row.stat.gamesPlayed > 0;
+  const share = row.progress
+    ? row.progress.outOf > 0
+      ? row.progress.score / row.progress.outOf
+      : 0
+    : record
+      ? record.score / record.outOf
+      : 0;
   const Container: typeof SoundTouchable | typeof View = onPress ? SoundTouchable : View;
 
   return (
@@ -288,13 +307,14 @@ function StatRow({
         </View>
       </View>
 
-      {/* The best round as a percentage of its own questions. Six out of
-          six and fifteen out of fifteen are the same round at different
-          lengths, and only the share says so. Captioned, because the line
-          above it is a percentage too and a different one. */}
+      {/* Captioned, because the line above it is a percentage too and a
+          different one — that one is the accuracy of everything ever
+          answered here. */}
       <View style={styles.rowBestColumn}>
-        <Text style={styles.rowBest}>{record ? `${Math.round(share * 100)}%` : '—'}</Text>
-        {record && <Text style={styles.rowBestLabel}>{t('stats.best')}</Text>}
+        <Text style={styles.rowBest}>{played ? `${Math.round(share * 100)}%` : '—'}</Text>
+        {played && (
+          <Text style={styles.rowBestLabel}>{row.progress ? t('stats.cleared') : t('stats.best')}</Text>
+        )}
       </View>
       {onPress && <Icon name="chevronRight" size={15} color={theme.textMuted} />}
     </Container>
