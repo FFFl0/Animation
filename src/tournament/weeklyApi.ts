@@ -44,6 +44,22 @@ async function call(body: Record<string, unknown>): Promise<WeeklyState> {
 }
 
 export const fetchWeekly = () => call({ action: 'state' });
+
+/**
+ * The tournament before this one, or null when there has not been one.
+ *
+ * Same shape as the live state, so everything that reads a tournament —
+ * the bracket, the list of players, who finished where — works on it
+ * unchanged.
+ */
+export async function fetchPreviousWeekly(): Promise<WeeklyState | null> {
+  if (!isSupabaseConfigured || !supabase) return null;
+  const { data, error } = await supabase.functions.invoke('tournament', { body: { action: 'previous' } });
+  if (error) throw new Error(error.message);
+  if (!data || (data as { error?: string }).error) return null;
+  return data as WeeklyState;
+}
+
 export const registerForWeekly = () => call({ action: 'register' });
 export const unregisterFromWeekly = () => call({ action: 'unregister' });
 export const submitGameScore = (matchId: MatchId, score: number) => call({ action: 'submit', matchId, score });

@@ -725,6 +725,27 @@ Deno.serve(async (req) => {
     return json(await readState(admin, after as TournamentRow, user.id));
   }
 
+  /**
+   * The last tournament that finished, in the same shape as the current
+   * one, so the app can read it with the code it already has: the bracket
+   * it draws, the names, who the caller was in it.
+   *
+   * The week being played now is excluded even when it is over — that one
+   * is already on the screen; this is the one before it.
+   */
+  if (payload.action === 'previous') {
+    const { data: last } = await admin
+      .from('weekly_tournaments')
+      .select('*')
+      .eq('status', 'finished')
+      .neq('id', tournament.id)
+      .order('week_start', { ascending: false })
+      .limit(1)
+      .maybeSingle();
+    if (!last) return json(null);
+    return json(await readState(admin, last as TournamentRow, user.id));
+  }
+
   if (payload.action === 'state') {
     if (tournament.status === 'running') await settle(admin, tournament);
     const { data: after } = await admin.from('weekly_tournaments').select('*').eq('id', tournament.id).single();

@@ -7,6 +7,7 @@ import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
+import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import Icon from '../components/Icon';
 import { AnswerTiming } from '../quiz/answerTiming';
@@ -38,6 +39,7 @@ import { useAuth } from '../auth/AuthContext';
 import {
   WeeklyState,
   canPlayWeekly,
+  fetchPreviousWeekly,
   fetchWeekly,
   hasSubmitted,
   openGameOf,
@@ -53,10 +55,10 @@ type Props = {
   onMatchPlayed: (score: number, total: number, timing: AnswerTiming) => void;
 };
 
-type Tab = 'bracket' | 'players' | 'matches' | 'rules';
+type Tab = 'bracket' | 'players' | 'matches' | 'past' | 'rules';
 type Phase = 'loading' | 'offline' | 'view' | 'playing';
 
-const TABS: Tab[] = ['bracket', 'players', 'matches', 'rules'];
+const TABS: Tab[] = ['bracket', 'players', 'matches', 'past', 'rules'];
 
 export const WEEKLY_MATCH_CONFIG: RoundConfig = {
   categoryId: 'mixed',
@@ -77,11 +79,20 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { buzz } = useSound();
   const t = useT();
+  const { language } = useLanguage();
   const { profile, recordTournamentPlace } = useAuth();
 
   const [state, setState] = useState<WeeklyState | null>(null);
   const [phase, setPhase] = useState<Phase>('loading');
   const [tab, setTab] = useState<Tab>('bracket');
+  // The tournament before this one. `undefined` until it has been asked
+  // for — it is only worth a request when somebody opens the tab — and
+  // null when there has never been one.
+  const [past, setPast] = useState<WeeklyState | null | undefined>(undefined);
+  // Where each tab sits along the row, so the one being switched to can be
+  // brought into view — a tab half off the edge reads as a cut-off screen.
+  const tabsRef = useRef<ScrollView>(null);
+  const tabOffsets = useRef<Partial<Record<Tab, number>>>({});
   const [busy, setBusy] = useState(false);
   const [playing, setPlaying] = useState<MatchId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
@@ -99,11 +110,28 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
     bracket && myMatch && mySeat !== null ? (participantsOf(bracket, myMatch)[0] === mySeat ? 'a' : 'b') : null;
   const waiting = !!(state && myMatch && mySide && hasSubmitted(state, myMatch, mySide));
 
+  const pastBracket = useMemo(() => (past ? toDeBracket(past) : null), [past]);
+
   const load = async () => {
     const next = await fetchWeekly();
     setState(next);
     setPhase('view');
   };
+
+  useEffect(() => {
+    const x = tabOffsets.current[tab];
+    if (x === undefined) return;
+    tabsRef.current?.scrollTo({ x: Math.max(0, x - 20), animated: true });
+  }, [tab]);
+
+  // Asked for when the tab is opened and not again: a finished tournament
+  // does not change.
+  useEffect(() => {
+    if (tab !== 'past' || past !== undefined) return;
+    fetchPreviousWeekly()
+      .then(setPast)
+      .catch(() => setPast(null));
+  }, [tab, past]);
 
   useEffect(() => {
     if (!canPlayWeekly) {
@@ -213,17 +241,29 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
 
       {phase === 'view' && state && (
         <>
-          <View style={styles.tabs}>
+          {/* Five of them do not fit across a narrow phone, and a tab
+              whose label wraps looks broken — so the row scrolls instead
+              of dividing the width up. */}
+          <ScrollView
+            ref={tabsRef}
+            horizontal
+            showsHorizontalScrollIndicator={false}
+            style={styles.tabsRow}
+            contentContainerStyle={styles.tabs}
+          >
             {TABS.map((key) => (
               <SoundTouchable
                 key={key}
                 style={[styles.tab, tab === key && styles.tabActive]}
+                onLayout={(event) => {
+                  tabOffsets.current[key] = event.nativeEvent.layout.x;
+                }}
                 onPress={() => setTab(key)}
               >
                 <Text style={[styles.tabText, tab === key && styles.tabTextActive]}>{t(`tournament.tab.${key}`)}</Text>
               </SoundTouchable>
             ))}
-          </View>
+          </ScrollView>
 
           <ScrollView contentContainerStyle={styles.content}>
             {state.tournament.status === 'registration' ? (
@@ -259,6 +299,9 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
             {tab === 'bracket' && bracket && <BracketView bracket={bracket} state={state} styles={styles} theme={theme} t={t} />}
             {tab === 'players' && <Players state={state} styles={styles} theme={theme} t={t} bracket={bracket} />}
             {tab === 'matches' && bracket && <Matches bracket={bracket} state={state} styles={styles} t={t} theme={theme} />}
+            {tab === 'past' && (
+              <Past past={past} bracket={pastBracket} styles={styles} theme={theme} t={t} language={language} />
+            )}
             {tab === 'rules' && <Rules styles={styles} theme={theme} t={t} />}
 
             {record.runs > 0 && (
@@ -282,6 +325,70 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
         </>
       )}
     </SafeAreaView>
+  );
+}
+
+/** Gold, silver, bronze — the same three the medal shelf uses. */
+const PODIUM_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
+
+/**
+ * The tournament before this one: who finished on the podium, and the
+ * bracket that got them there.
+ *
+ * It reads a finished week in exactly the shape the live one comes in, so
+ * the bracket here is the same component, drawing the same matches — only
+ * with nothing left to play.
+ */
+function Past({
+  past,
+  bracket,
+  styles,
+  theme,
+  t,
+  language,
+}: {
+  past: WeeklyState | null | undefined;
+  bracket: DeBracket | null;
+  styles: Styles;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  language: Language;
+}) {
+  if (past === undefined) return <ActivityIndicator color={theme.primary} style={{ marginTop: 32 }} />;
+  if (!past || !bracket) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.pastEmptyTitle')}</Text>
+        <Text style={styles.cardText}>{t('tournament.pastEmpty')}</Text>
+      </View>
+    );
+  }
+
+  const week = new Date(`${past.tournament.weekStart}T00:00:00Z`).toLocaleDateString(
+    language === 'en' ? 'en-US' : 'ru-RU'
+  );
+
+  return (
+    <>
+      <Text style={styles.sectionTitle}>{t('tournament.pastTitle', week)}</Text>
+
+      <View style={styles.podium}>
+        {[1, 2, 3].map((place) => {
+          const entrant = past.entrants.find((e) => placeOf(bracket, e.seed) === place);
+          return (
+            <View key={place} style={styles.podiumRow}>
+              <Icon name="medal" size={16} color={PODIUM_COLORS[place - 1]} />
+              <Text style={styles.podiumPlace}>{placeLabel(place, t)}</Text>
+              <Text style={styles.podiumName} numberOfLines={1}>
+                {entrant ? `${entrant.name}${entrant.isMe ? t('tournament.youSuffix') : ''}` : '—'}
+              </Text>
+            </View>
+          );
+        })}
+      </View>
+
+      <BracketView bracket={bracket} state={past} styles={styles} theme={theme} t={t} />
+    </>
   );
 }
 
@@ -942,11 +1049,12 @@ function makeStyles(theme: Theme) {
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     headerTitle: { fontSize: 24, fontFamily: fontFamily('800'), color: theme.text, marginTop: 4 },
     headerSubtitle: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
+    tabsRow: { flexGrow: 0 },
     tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingBottom: 10 },
     tab: {
-      flex: 1,
       alignItems: 'center',
       paddingVertical: 8,
+      paddingHorizontal: 14,
       borderRadius: radius.pill,
       backgroundColor: theme.card,
       borderWidth: 1.5,
@@ -1016,6 +1124,20 @@ function makeStyles(theme: Theme) {
     },
     ghostOutlineText: { color: theme.text, fontSize: 14, fontFamily: fontFamily('700') },
     sectionTitle: { fontSize: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
+    podium: { gap: 8, marginTop: 10, marginBottom: 6 },
+    podiumRow: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      backgroundColor: theme.card,
+      borderRadius: radius.md,
+      borderWidth: 1,
+      borderColor: theme.border,
+      paddingVertical: 10,
+      paddingHorizontal: 14,
+    },
+    podiumPlace: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted, width: 86 },
+    podiumName: { flex: 1, fontSize: 15, fontFamily: fontFamily('800'), color: theme.text },
     sectionHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 2, marginBottom: 10 },
     recordLine: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 8, textAlign: 'center' },
     medalBanner: {
