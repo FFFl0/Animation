@@ -2,6 +2,7 @@ import { readFileSync } from 'fs';
 import { join } from 'path';
 import { SHOP_ITEMS, needsDelivery } from '../catalogue';
 import { DIGITAL_RUB_ENABLED } from '../payment';
+import { skuOf } from '../products';
 
 /**
  * The Edge Function keeps its own copy of the prices, because the client
@@ -74,5 +75,44 @@ describe('digital rouble switch parity', () => {
     // button the server will refuse.
     expect(onServer).toBeDefined();
     expect(onServer === 'true').toBe(DIGITAL_RUB_ENABLED);
+  });
+});
+
+/**
+ * The function keeps its own copy of the store product ids for the same
+ * reason it keeps the prices: a receipt arrives naming a product, and the
+ * client must not be the one that says which item that product is.
+ *
+ * A product id is permanent — once something has been sold under it, Google
+ * and Apple will not let it be renamed or reused — so a silent drift
+ * between the two copies would hand out the wrong item for real money, with
+ * no way to correct the id afterwards.
+ */
+describe('store product parity', () => {
+  const text = readFileSync(SOURCE, 'utf8');
+  const block = text.slice(text.indexOf('// SKUS-BEGIN'), text.indexOf('// SKUS-END'));
+
+  const server: Record<string, string> = {};
+  for (const line of block.split('\n')) {
+    const match = line.match(/^\s*'([^']+)':\s*'([^']+)',\s*$/);
+    if (match) server[match[1]] = match[2];
+  }
+
+  it('parses the function source at all', () => {
+    expect(Object.keys(server).length).toBeGreaterThan(0);
+  });
+
+  it('names the same product for every item on both sides', () => {
+    const digital = SHOP_ITEMS.filter((item) => !needsDelivery(item));
+    expect(Object.keys(server).sort()).toEqual(digital.map((item) => item.id).sort());
+    for (const item of digital) {
+      expect(server[item.id]).toBe(skuOf(item.id));
+    }
+  });
+
+  it('offers no product id for merch', () => {
+    for (const item of SHOP_ITEMS.filter(needsDelivery)) {
+      expect(server[item.id]).toBeUndefined();
+    }
   });
 });

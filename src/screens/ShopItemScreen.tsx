@@ -14,7 +14,6 @@ import Icon from '../components/Icon';
 import { APPAREL_SIZES, ApparelSize, isStackable, needsDelivery, shopItem } from '../shop/catalogue';
 import { formatRub, pointsPrice } from '../shop/economy';
 import { Currency, useShop } from '../shop/ShopContext';
-import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { ItemPreview, itemDescription, itemTitle } from './ShopScreen';
 
 type Props = {
@@ -30,7 +29,7 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   const { language } = useLanguage();
   const { buzz } = useSound();
   const { profile, updateAvatar } = useAuth();
-  const { balance, ownsItem, countOf, buyDigital, addToCart } = useShop();
+  const { balance, ownsItem, countOf, buyDigital, addToCart, takesMoney, storePriceOf } = useShop();
   const [size, setSize] = useState<ApparelSize>('M');
   const [message, setMessage] = useState<string | null>(null);
   const [busy, setBusy] = useState(false);
@@ -42,9 +41,13 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
   const owned = !stacks && ownsItem(item.id);
   const physical = needsDelivery(item);
   const points = pointsPrice(item.priceRub);
-  // Cosmetics are sold for medals only while the store rule applies — see
-  // DIGITAL_RUB_ENABLED. Showing a price nobody can pay would be a lie.
-  const takesRub = physical || DIGITAL_RUB_ENABLED;
+  // Showing a price nobody can pay would be a lie, so the money price only
+  // appears once there is a till behind it: the acquirer for merch, the
+  // store's own billing for a cosmetic.
+  const takesRub = takesMoney(item);
+  // The store names its own price, in the buyer's currency — ours is the
+  // fallback for before it has answered.
+  const moneyPrice = storePriceOf(item) ?? formatRub(item.priceRub);
   // an owned item has nothing left to be short of
   const missing = owned ? 0 : Math.max(0, points - balance);
   const inStock = item.grant.kind === 'consumable' ? countOf(item.grant.consumable) : 0;
@@ -103,7 +106,7 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
             {takesRub && (
               <>
                 <Text style={styles.priceOr}>{t('shop.or')}</Text>
-                <Text style={styles.priceRub}>{formatRub(item.priceRub)}</Text>
+                <Text style={styles.priceRub}>{moneyPrice}</Text>
               </>
             )}
           </View>
@@ -173,7 +176,7 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
                 activeOpacity={0.88}
                 disabled={busy}
               >
-                <Text style={styles.secondaryButtonText}>{t('shop.buyForRub', formatRub(item.priceRub))}</Text>
+                <Text style={styles.secondaryButtonText}>{t('shop.buyForRub', moneyPrice)}</Text>
               </SoundTouchable>
             )}
           </>

@@ -1536,3 +1536,111 @@ select
 from public.profiles p;
 
 grant select on public.leaderboard_season to authenticated;
+
+-- ============================================================
+-- ПОКУПКА ЗА РЕАЛЬНЫЕ ДЕНЬГИ ЧЕРЕЗ БИЛЛИНГ МАГАЗИНА
+-- (Google Play Billing / Apple StoreKit)
+--
+-- Мерч оплачивается картой через ЮKassa (выше), а косметика и расходники —
+-- через биллинг самого магазина приложений: для цифровых товаров это не
+-- выбор, а требование Google и Apple.
+--
+-- Всё ниже — добавка; таблицы выше не меняются, кроме одного расширенного
+-- check: в paid_with у shop_purchases появляется третье значение.
+-- ============================================================
+
+-- Чем оплачено: медальными очками, картой через эквайринг или биллингом
+-- магазина. Старый check пересоздаётся, потому что `create table if not
+-- exists` на уже существующей базе его бы не тронул.
+--
+-- Только у shop_purchases: через биллинг магазина продаётся лишь цифровое,
+-- а заказ (shop_orders) бывает только на мерч, и 'store' там означал бы
+-- состояние, которого код не создаёт.
+alter table public.shop_purchases drop constraint if exists shop_purchases_paid_with_check;
+alter table public.shop_purchases
+  add constraint shop_purchases_paid_with_check check (paid_with in ('points', 'rub', 'store'));
+
+/*
+ * Каждый платёж, пришедший из магазина приложений.
+ *
+ * Смысл таблицы — ровно в уникальности purchase_key. Клиент приносит чек
+ * столько раз, сколько потребуется (приложение убили посреди оплаты, сеть
+ * пропала после списания, медленный способ оплаты дошёл через три дня), и
+ * повторная попытка обязана выдать предмет один раз, а не каждый раз.
+ * Ключ — purchase token у Google и transaction id у Apple.
+ *
+ * Сумму не храним: покупатель платит в своей валюте по цене, которую
+ * назначает магазин, и единственная достоверная выписка — у магазина.
+ */
+create table if not exists public.shop_store_purchases (
+  id uuid primary key default gen_random_uuid(),
+  user_id uuid not null references auth.users(id) on delete cascade,
+  item_id text not null,
+  store text not null check (store in ('play', 'apple')),
+  purchase_key text not null unique,
+  product_id text not null,
+  store_order_id text,
+  created_at timestamptz not null default now()
+);
+
+alter table public.shop_store_purchases enable row level security;
+
+drop policy if exists "See your own store purchases" on public.shop_store_purchases;
+create policy "See your own store purchases"
+  on public.shop_store_purchases for select
+  using (auth.uid() = user_id);
+
+create index if not exists shop_store_purchases_user_idx on public.shop_store_purchases (user_id);
+
+/*
+ * Выдача предмета по подтверждённому чеку магазина.
+ *
+ * Функцию вызывает Edge Function и только после того, как сама спросила
+ * Google или Apple, был ли платёж. Чек от клиента здесь не проверяется —
+ * к этому моменту он уже проверен у магазина.
+ *
+ * Возвращает 'granted' или 'duplicate'. Второе — не ошибка: значит этот же
+ * платёж уже выдан, и приложению остаётся лишь закрыть транзакцию.
+ */
+create or replace function public.shop_claim_store_purchase(
+  p_user uuid,
+  p_item text,
+  p_store text,
+  p_key text,
+  p_product text,
+  p_order text default null,
+  p_consumable text default null,
+  p_amount int default 0
+)
+returns text
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  -- Гонка решается не проверкой перед вставкой, а самим уникальным
+  -- индексом: два одновременных запроса с одним ключом вставят строку
+  -- один раз, второй уйдёт в do nothing.
+  insert into public.shop_store_purchases (user_id, item_id, store, purchase_key, product_id, store_order_id)
+  values (p_user, p_item, p_store, p_key, p_product, p_order)
+  on conflict (purchase_key) do nothing;
+
+  if not found then
+    return 'duplicate';
+  end if;
+
+  insert into public.shop_purchases (user_id, item_id, paid_with, points_spent, rub_amount)
+  values (p_user, p_item, 'store', 0, 0);
+
+  if p_consumable is not null and p_amount > 0 then
+    insert into public.shop_inventory (user_id, consumable, count)
+    values (p_user, p_consumable, p_amount)
+    on conflict (user_id, consumable) do update set count = public.shop_inventory.count + excluded.count;
+  end if;
+
+  return 'granted';
+end;
+$$;
+
+revoke execute on function public.shop_claim_store_purchase(uuid, text, text, text, text, text, text, int)
+  from anon, authenticated;

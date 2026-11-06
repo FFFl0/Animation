@@ -11,14 +11,26 @@ import { Delivery, Order, PaidWith, deliveryProblems, newOrderId } from './order
 import { EMPTY_SHOP_STATE, LocalShopState, loadShop, saveShop } from './shopStorage';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { ShopError, ShopState, buyItem, fetchShop, isCloudShop, placeOrderRemote, spendItem } from './shopApi';
-import { payRubles } from './payment';
+import { ShopError, ShopState, buyItem, claimStorePurchase, fetchShop, isCloudShop, placeOrderRemote, spendItem } from './shopApi';
+import { isPaymentConfigured, payRubles } from './payment';
+import { ALL_SKUS, isConsumableSku, moneyRail, skuOf } from './products';
+import {
+  StorePurchase,
+  buyFromStore,
+  disconnectStore,
+  finishStorePurchase,
+  isStoreBillingSupported,
+  storeAccount,
+  storePrices,
+  unfinishedPurchases,
+} from './iap';
 
 /** Roubles or medal points — every item takes either. */
 export type Currency = PaidWith;
 
 export type BuyResult =
-  | { ok: true }
+  /** `granted` is false when the item was already there — a receipt claimed twice. */
+  | { ok: true; granted?: boolean }
   | { ok: false; reason: string };
 
 export type OrderResult =
@@ -51,6 +63,19 @@ type ShopContextValue = {
   /** Uses one up, and says whether there was one to use. */
   spendConsumable: (consumable: ConsumableId) => boolean;
   buyDigital: (item: ShopItem, currency: Currency) => Promise<BuyResult>;
+  /** True when this item can be paid for with money on this device, right now. */
+  takesMoney: (item: ShopItem) => boolean;
+  /** True where the store's own till can be reached at all. */
+  storeBilling: boolean;
+  /** Claims anything paid for but never received; returns how many arrived. */
+  restorePurchases: () => Promise<number>;
+  /**
+   * What the store charges for an item, in the buyer's own currency and
+   * wording — "399,00 ₽", "$4.99". Null before the store has answered, or
+   * for an item it does not sell, and then the rouble price is shown
+   * instead.
+   */
+  storePriceOf: (item: ShopItem) => string | null;
   addToCart: (item: ShopItem, size?: ApparelSize) => void;
   setQuantity: (itemId: string, size: ApparelSize | undefined, quantity: number) => void;
   clearCart: () => void;
@@ -80,6 +105,8 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const [local, setLocal] = useState<LocalShopState>(EMPTY_SHOP_STATE);
   const [wallet, setWallet] = useState<ShopState>(EMPTY_WALLET);
   const [ready, setReady] = useState(false);
+  /** Store product id to the price the store itself shows for it. */
+  const [prices, setPrices] = useState<Record<string, string>>({});
 
   const load = async (userId: string) => {
     // The cart is a draft and stays on the device either way; only the
@@ -148,6 +175,69 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     return true;
   };
 
+  /**
+   * Takes a store receipt to the server and, if the item was granted, tells
+   * the store we are done with the purchase.
+   *
+   * The order matters both ways round. Finishing before the grant would
+   * throw away the only proof of payment if the grant then failed; never
+   * finishing at all makes Google refund the purchase after three days. So
+   * it is grant first, finish second — and a receipt the server rejects
+   * outright is finished too, because re-sending it on every visit would
+   * only repeat the same answer for ever.
+   */
+  const claimStore = async (purchase: StorePurchase): Promise<BuyResult> => {
+    try {
+      const next = await claimStorePurchase(purchase);
+      setWallet(next);
+      await finishStorePurchase(purchase, isConsumableSku(purchase.sku));
+      return { ok: true, granted: next.claimed !== 'duplicate' };
+    } catch (e) {
+      const reason = e instanceof ShopError ? e.reason : 'claimFailed';
+      // These three are final answers: sending the same receipt again can
+      // only earn the same refusal, so the transaction is closed rather
+      // than retried on every visit for ever.
+      if (reason === 'receiptRejected' || reason === 'receiptIncomplete' || reason === 'unknownItem') {
+        await finishStorePurchase(purchase, isConsumableSku(purchase.sku));
+      }
+      return { ok: false, reason: reason === 'unknownItem' ? 'receiptRejected' : reason };
+    }
+  };
+
+  /**
+   * Opens the store, learns its prices, and hands over anything already
+   * paid for.
+   *
+   * The second half is what makes the money rail honest: a purchase that
+   * went through while the app was being killed, or on a slow payment
+   * method that settled days later, is sitting with the store unfinished.
+   * It gets claimed here, on the next visit, rather than being lost.
+   */
+  useEffect(() => {
+    if (!profile || !cloud || !isStoreBillingSupported()) return;
+    let cancelled = false;
+    (async () => {
+      const quoted = await storePrices(ALL_SKUS);
+      if (cancelled) return;
+      if (quoted.length) {
+        setPrices(Object.fromEntries(quoted.map((price) => [price.sku, price.displayPrice])));
+      }
+      for (const purchase of await unfinishedPurchases()) {
+        if (cancelled) return;
+        await claimStore(purchase);
+      }
+    })().catch(() => {
+      // A store that will not talk leaves the shop selling for medals.
+    });
+    return () => {
+      cancelled = true;
+    };
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [profile?.id, cloud]);
+
+  // The billing connection lives as long as the shop does.
+  useEffect(() => () => void disconnectStore(), []);
+
   /** Adds what an item grants to the local shelf — stacking it if it stacks. */
   const grantedLocally = (base: LocalShopState, items: ShopItem[]): LocalShopState => {
     const owned = [...base.owned];
@@ -165,6 +255,34 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const buyDigital = async (item: ShopItem, currency: Currency): Promise<BuyResult> => {
     if (needsDelivery(item)) return { ok: false, reason: 'needsDelivery' };
     if (!isStackable(item) && ownsItem(item.id)) return { ok: false, reason: 'owned' };
+
+    // Money for a cosmetic goes through the store's own till, which is
+    // both the stores' rule and the only way the app may charge for one.
+    if (currency === 'rub' && moneyRail(item) === 'store') {
+      const sku = skuOf(item.id);
+      if (!sku) return { ok: false, reason: 'storeBillingUnavailable' };
+      // Without a server there is nobody to check the receipt with, and an
+      // item granted on the phone's word alone would be lost on the next
+      // install — so the money rail waits for the cloud wallet.
+      if (!cloud || !profile) return { ok: false, reason: 'storeBillingUnavailable' };
+
+      // The purchase carries who is buying, and the server checks the
+      // receipt says the same — so a receipt cannot be redeemed on
+      // somebody else's account.
+      const outcome = await buyFromStore(sku, await storeAccount(profile.id));
+      switch (outcome.status) {
+        case 'bought':
+          return claimStore(outcome.purchase);
+        case 'cancelled':
+          return { ok: false, reason: 'cancelled' };
+        case 'pending':
+          return { ok: false, reason: 'paymentPending' };
+        case 'unavailable':
+          return { ok: false, reason: 'storeBillingUnavailable' };
+        default:
+          return { ok: false, reason: 'paymentFailed' };
+      }
+    }
 
     if (cloud) {
       try {
@@ -186,6 +304,39 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     if (outcome.status !== 'paid') return { ok: false, reason: 'paymentUnavailable' };
     commitLocal(grantedLocally(local, [item]));
     return { ok: true };
+  };
+
+  /**
+   * Hands over everything already paid for but not yet received.
+   *
+   * It runs by itself when the shop opens, and this is the same pass behind
+   * a button — which Apple expects an app selling non-consumables to offer,
+   * and which is the honest answer to "I paid and got nothing".
+   */
+  const restorePurchases = async (): Promise<number> => {
+    if (!cloud || !isStoreBillingSupported()) return 0;
+    let granted = 0;
+    for (const purchase of await unfinishedPurchases()) {
+      const result = await claimStore(purchase);
+      if (result.ok && result.granted) granted += 1;
+    }
+    return granted;
+  };
+
+  const storePriceOf = (item: ShopItem): string | null => {
+    const sku = skuOf(item.id);
+    return sku ? prices[sku] ?? null : null;
+  };
+
+  /**
+   * Whether a money price is worth showing. A price nobody can pay would be
+   * a lie, so merch asks about the acquirer and a cosmetic about the store
+   * — and in the shop's case about whether the store knows the product at
+   * all, which it does not until the products are published in the console.
+   */
+  const takesMoney = (item: ShopItem): boolean => {
+    if (moneyRail(item) === 'acquirer') return cloud || isPaymentConfigured;
+    return cloud && isStoreBillingSupported() && storePriceOf(item) !== null;
   };
 
   const addToCart = (item: ShopItem, size?: ApparelSize) => {
@@ -296,6 +447,10 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       countOf,
       spendConsumable,
       buyDigital,
+      takesMoney,
+      storeBilling: cloud && isStoreBillingSupported(),
+      restorePurchases,
+      storePriceOf,
       addToCart,
       setQuantity,
       clearCart,
@@ -303,7 +458,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       recordTournamentRun,
       refresh,
     }),
-    [ready, cloud, wallet, local]
+    [ready, cloud, wallet, local, prices]
   );
 
   return <ShopContext.Provider value={value}>{children}</ShopContext.Provider>;

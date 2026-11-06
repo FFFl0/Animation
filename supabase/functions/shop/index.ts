@@ -13,6 +13,7 @@
 // Deploy with: supabase functions deploy shop
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { accountMatches, acknowledgePlayPurchase, verifyAppleTransaction, verifyPlayPurchase } from '../_shared/iap.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -65,6 +66,39 @@ const PRICES: Record<string, Price> = {
   'merch-figure': { rub: 3290, physical: true },
 };
 // PRICES-END
+
+/**
+ * What each digital item is called in Google Play and App Store Connect.
+ * Mirrors src/shop/products.ts, and the same parity test keeps the two in
+ * step — a product id is permanent once it has been sold, so neither side
+ * may quietly rename one.
+ */
+// SKUS-BEGIN
+const SKUS: Record<string, string> = {
+  'avatar-sakura': 'avatar_sakura',
+  'avatar-shadow': 'avatar_shadow',
+  'avatar-frost': 'avatar_frost',
+  'avatar-ember': 'avatar_ember',
+  'avatar-mint': 'avatar_mint',
+  'avatar-violet': 'avatar_violet',
+  'avatar-sunny': 'avatar_sunny',
+  'avatar-neko': 'avatar_neko',
+  'frame-aurora': 'frame_aurora',
+  'frame-petals': 'frame_petals',
+  'frame-ember': 'frame_ember',
+  'frame-circuit': 'frame_circuit',
+  'frame-champion': 'frame_champion',
+  'frame-eternal': 'frame_eternal',
+  'item-hint-1': 'item_hint_1',
+  'item-hint-5': 'item_hint_5',
+  'item-skip-3': 'item_skip_3',
+  'item-freeze': 'item_freeze',
+};
+// SKUS-END
+
+const ITEM_BY_SKU: Record<string, string> = Object.fromEntries(
+  Object.entries(SKUS).map(([itemId, sku]) => [sku, itemId])
+);
 
 /** A point stands for a rouble of the same value — see src/shop/economy.ts. */
 function pointsPrice(rub: number): number {
@@ -227,7 +261,7 @@ Deno.serve(async (req) => {
   // The caller is whoever the bearer token says, never whoever the body says.
   const { data: userData } = await asCaller.auth.getUser();
   const user = userData?.user;
-  if (!user) return json({ error: 'not signed in' }, 401);
+  if (!user) return json({ error: 'notSignedIn' }, 401);
 
   let payload: {
     action?: string;
@@ -238,11 +272,16 @@ Deno.serve(async (req) => {
     delivery?: Record<string, unknown>;
     /** Where ЮKassa sends the buyer back to once the page is done. */
     returnUrl?: string;
+    /** A receipt from the store's own billing — see the 'claim' action. */
+    platform?: string;
+    productId?: string;
+    purchaseToken?: string;
+    transactionId?: string;
   };
   try {
     payload = await req.json();
   } catch {
-    return json({ error: 'invalid request body' }, 400);
+    return json({ error: 'badRequest' }, 400);
   }
 
   if (payload.action === 'state') {
@@ -251,7 +290,7 @@ Deno.serve(async (req) => {
 
   if (payload.action === 'buy') {
     const price = payload.itemId ? PRICES[payload.itemId] : undefined;
-    if (!price) return json({ error: 'unknown item' }, 400);
+    if (!price) return json({ error: 'unknownItem' }, 400);
     if (price.physical) return json({ error: 'needsDelivery' }, 400);
 
     const currency = payload.currency === 'points' ? 'points' : 'rub';
@@ -278,7 +317,9 @@ Deno.serve(async (req) => {
       p_amount: price.amount ?? 0,
     });
     if (error) {
-      return json({ error: error.message.includes('not enough points') ? 'notEnoughPoints' : 'buyFailed' }, 409);
+      // Postgres raises 'not enough points' by name; anything else is ours.
+      const broke = error.message.includes('not enough points');
+      return json({ error: broke ? 'notEnoughPoints' : 'buyFailed' }, 409);
     }
     return json(await readState(admin, user.id));
   }
@@ -290,7 +331,7 @@ Deno.serve(async (req) => {
     let totalRub = 0;
     for (const line of lines) {
       const price = PRICES[line.itemId];
-      if (!price) return json({ error: 'unknown item' }, 400);
+      if (!price) return json({ error: 'unknownItem' }, 400);
       const quantity = Math.max(1, Math.min(MAX_PER_LINE, Math.floor(line.quantity)));
       totalRub += price.rub * quantity;
     }
@@ -307,7 +348,8 @@ Deno.serve(async (req) => {
       p_paid: currency,
     });
     if (error) {
-      return json({ error: error.message.includes('not enough points') ? 'notEnoughPoints' : 'orderFailed' }, 409);
+      const broke = error.message.includes('not enough points');
+      return json({ error: broke ? 'notEnoughPoints' : 'orderFailed' }, 409);
     }
 
     // Paid with points there is nothing to charge: the order is already
@@ -337,8 +379,80 @@ Deno.serve(async (req) => {
     });
   }
 
+  /**
+   * A purchase made through the store's own billing.
+   *
+   * The app brings a receipt; nothing is granted on its word. The receipt is
+   * taken to Google or Apple first, and only their answer opens the till.
+   *
+   * It is safe to send the same receipt again — and the app does, every time
+   * it finds an unfinished purchase — because the claim is keyed on the
+   * store's own token: a second claim answers 'duplicate' and grants
+   * nothing. That is what makes a purchase survive the app being killed
+   * halfway through.
+   */
+  if (payload.action === 'claim') {
+    const productId = typeof payload.productId === 'string' ? payload.productId : '';
+    const itemId = ITEM_BY_SKU[productId];
+    const price = itemId ? PRICES[itemId] : undefined;
+    if (!price) return json({ error: 'unknownItem' }, 400);
+    // Merch is the acquirer's business and must not go through a store till.
+    if (price.physical) return json({ error: 'unknownItem' }, 400);
+
+    const android = payload.platform !== 'ios';
+    const purchaseToken = typeof payload.purchaseToken === 'string' ? payload.purchaseToken : '';
+    const transactionId = typeof payload.transactionId === 'string' ? payload.transactionId : '';
+
+    // The key the claim is deduped on: Google's purchase token, Apple's
+    // transaction id. Both are unique to one payment and stable across
+    // retries, which is the whole requirement.
+    const key = android ? purchaseToken : transactionId;
+    if (!key) return json({ error: 'receiptIncomplete' }, 400);
+
+    const verdict = android
+      ? await verifyPlayPurchase(productId, purchaseToken)
+      : await verifyAppleTransaction(transactionId);
+
+    if (!verdict.ok) {
+      // Keys missing is ours to fix and says so; a store that would not
+      // answer is worth retrying; anything else means the receipt is no
+      // good — refunded, forged, or for a payment that never happened.
+      const unconfigured = verdict.reason === 'notConfigured';
+      const status = unconfigured ? 409 : verdict.reason === 'storeError' ? 502 : 400;
+      return json({ error: unconfigured ? 'storeBillingUnavailable' : 'receiptRejected' }, status);
+    }
+    // Apple is asked about a transaction rather than a product, so what it
+    // says was bought is checked against what the app claims was bought.
+    if (verdict.productId !== productId) return json({ error: 'receiptRejected' }, 400);
+    // And the receipt has to belong to whoever is asking: a payment is
+    // tagged with its buyer when it starts, and that tag comes back here.
+    if (!(await accountMatches(verdict.accountToken, user.id))) {
+      return json({ error: 'receiptRejected' }, 403);
+    }
+
+    const { data: outcome, error } = await admin.rpc('shop_claim_store_purchase', {
+      p_user: user.id,
+      p_item: itemId,
+      p_store: android ? 'play' : 'apple',
+      p_key: key,
+      p_product: productId,
+      p_order: verdict.storeOrderId,
+      p_consumable: price.consumable ?? null,
+      p_amount: price.amount ?? 0,
+    });
+    if (error) return json({ error: 'claimFailed' }, 409);
+
+    // Google refunds a purchase nobody acknowledged within three days, so
+    // this is done here, the moment the item exists, rather than left to
+    // the app's own finishTransaction — which also runs, and is harmless
+    // twice.
+    if (android) await acknowledgePlayPurchase(productId, purchaseToken);
+
+    return json({ ...(await readState(admin, user.id)), claimed: outcome ?? 'granted' });
+  }
+
   if (payload.action === 'spend') {
-    if (!payload.consumable) return json({ error: 'unknown item' }, 400);
+    if (!payload.consumable) return json({ error: 'unknownItem' }, 400);
     const { data: spent } = await admin.rpc('shop_spend', {
       p_user: user.id,
       p_consumable: payload.consumable,
@@ -347,5 +461,5 @@ Deno.serve(async (req) => {
     return json(await readState(admin, user.id));
   }
 
-  return json({ error: 'unknown action' }, 400);
+  return json({ error: 'unknownAction' }, 400);
 });

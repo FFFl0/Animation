@@ -1,4 +1,4 @@
-import { useMemo } from 'react';
+import { useMemo, useState } from 'react';
 import { ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
@@ -25,7 +25,14 @@ export default function OrdersScreen({ onBack, onOpenItem }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
   const { language } = useLanguage();
-  const { orders, owned, counts } = useShop();
+  const { orders, owned, counts, storeBilling, restorePurchases } = useShop();
+  const [restoreState, setRestoreState] = useState<'idle' | 'busy' | string>('idle');
+
+  const restore = async () => {
+    setRestoreState('busy');
+    const granted = await restorePurchases();
+    setRestoreState(granted > 0 ? t('shop.restoreDone', granted) : t('shop.restoreNone'));
+  };
 
   const ownedItems = owned.flatMap((id) => {
     const item = shopItem(id);
@@ -113,6 +120,27 @@ export default function OrdersScreen({ onBack, onOpenItem }: Props) {
             </View>
           ))
         )}
+        {/* Paid for but never received — a dead app, a dead network, or a
+            slow payment method that settled days later. Apple asks for this
+            to be reachable, and it is the only honest answer to "I paid and
+            got nothing". */}
+        {storeBilling && (
+          <>
+            <SoundTouchable
+              style={[styles.restoreButton, restoreState === 'busy' && styles.restoreBusy]}
+              onPress={restore}
+              disabled={restoreState === 'busy'}
+              accessibilityRole="button"
+            >
+              <Text style={styles.restoreText}>
+                {restoreState === 'busy' ? t('shop.restoring') : t('shop.restore')}
+              </Text>
+            </SoundTouchable>
+            {restoreState !== 'idle' && restoreState !== 'busy' && (
+              <Text style={styles.restoreNote}>{restoreState}</Text>
+            )}
+          </>
+        )}
       </ScrollView>
     </SafeAreaView>
   );
@@ -137,6 +165,24 @@ function makeStyles(theme: Theme) {
     rowDivided: { borderTopWidth: 1, borderTopColor: theme.border },
     rowTitle: { flex: 1, fontSize: 14, fontFamily: fontFamily('700'), color: theme.text },
     rowCount: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.primary },
+    restoreButton: {
+      marginTop: 24,
+      paddingVertical: 14,
+      alignItems: 'center',
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.card,
+    },
+    restoreBusy: { opacity: 0.5 },
+    restoreText: { fontSize: 14, fontFamily: fontFamily('800'), color: theme.text },
+    restoreNote: {
+      fontSize: 12,
+      fontFamily: fontFamily('500'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: 10,
+    },
     card: {
       backgroundColor: theme.card,
       borderWidth: 1.5,

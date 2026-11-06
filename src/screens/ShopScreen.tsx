@@ -24,7 +24,6 @@ import {
   itemsOf,
   needsDelivery,
 } from '../shop/catalogue';
-import { DIGITAL_RUB_ENABLED } from '../shop/payment';
 import { SHOP_IMAGES } from '../shop/shopImages';
 import { formatRub, pointsPrice } from '../shop/economy';
 import { cartCount } from '../shop/cart';
@@ -69,7 +68,7 @@ export default function ShopScreen({
   const { language } = useLanguage();
   const { width } = useWindowDimensions();
   const insets = useSafeAreaInsets();
-  const { balance, spent, medals, cart, orders, ownsItem } = useShop();
+  const { balance, spent, medals, cart, orders, ownsItem, takesMoney, storePriceOf } = useShop();
   const [walletOpen, setWalletOpen] = useState(false);
   const { scrollProps, jumpToTop } = useRememberedScroll(scrollY, onChangeScrollY);
 
@@ -193,6 +192,7 @@ export default function ShopScreen({
                       width={cardWidth}
                       round={columns === 4}
                       owned={ownsItem(item.id)}
+                      moneyPrice={takesMoney(item) ? storePriceOf(item) ?? formatRub(item.priceRub) : null}
                       styles={styles}
                       theme={theme}
                       t={t}
@@ -311,6 +311,7 @@ function ShopCard({
   width,
   round,
   owned,
+  moneyPrice,
   styles,
   theme,
   t,
@@ -321,6 +322,8 @@ function ShopCard({
   width: number;
   round: boolean;
   owned: boolean;
+  /** The store's own price, already formatted, or null when it is not for sale for money. */
+  moneyPrice: string | null;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
@@ -359,8 +362,8 @@ function ShopCard({
             <Icon name="gem" size={12} color={theme.primary} />
             <Text style={styles.pricePoints}>{pointsPrice(item.priceRub)}</Text>
           </View>
-          {(needsDelivery(item) || DIGITAL_RUB_ENABLED) && (
-            <Text style={[styles.priceRub, round && { textAlign: 'center' }]}>{formatRub(item.priceRub)}</Text>
+          {moneyPrice && (
+            <Text style={[styles.priceRub, round && { textAlign: 'center' }]}>{moneyPrice}</Text>
           )}
         </View>
       )}
