@@ -65,3 +65,43 @@ describe('store purchase schema', () => {
     expect(grant).toMatch(/values \(p_user, p_item, 'store', 0, 0\)/);
   });
 });
+
+/**
+ * The acquirer cannot sell a cosmetic, and the code has to refuse rather
+ * than improvise.
+ *
+ * `DIGITAL_RUB_ENABLED` reads like a switch that turns on card payment for
+ * cosmetics. It is not: nothing on the straight-buy path creates a payment,
+ * because a digital item has no order and so never reaches ЮKassa. If the
+ * buy went through on that path it would grant the item and charge nobody.
+ *
+ * This is here because the switch is exactly what somebody reaches for when
+ * shipping to a store with laxer rules than Google's (see BUILD.md →
+ * RuStore), and the cost of getting it wrong is every cosmetic, for free.
+ */
+describe('a cosmetic is never granted for money that was not taken', () => {
+  const buyBranch = FUNCTION.slice(
+    FUNCTION.indexOf("if (payload.action === 'buy')"),
+    FUNCTION.indexOf("if (payload.action === 'order')")
+  );
+
+  it('finds the branch at all', () => {
+    expect(buyBranch).toContain("admin.rpc('shop_buy'");
+  });
+
+  it('refuses roubles before it can grant anything', () => {
+    const refusal = buyBranch.indexOf("currency === 'rub'");
+    const grant = buyBranch.indexOf("admin.rpc('shop_buy'");
+    expect(refusal).toBeGreaterThan(-1);
+    expect(refusal).toBeLessThan(grant);
+    // And the refusal must be a return, not a condition that falls through.
+    const guard = buyBranch.slice(refusal, grant);
+    expect(guard).toMatch(/return json\(\{ error: DIGITAL_RUB_ENABLED \? 'digitalRubNotBuilt' : 'digitalRubDisabled' \}/);
+  });
+
+  it('never creates a payment on this path, which is why it must refuse', () => {
+    // If somebody adds one, this test should be rewritten rather than
+    // deleted — the refusal can go only once the money is really taken.
+    expect(buyBranch).not.toContain('createPayment');
+  });
+});

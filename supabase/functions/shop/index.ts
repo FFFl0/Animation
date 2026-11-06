@@ -294,7 +294,22 @@ Deno.serve(async (req) => {
     if (price.physical) return json({ error: 'needsDelivery' }, 400);
 
     const currency = payload.currency === 'points' ? 'points' : 'rub';
-    if (currency === 'rub' && !DIGITAL_RUB_ENABLED) return json({ error: 'digitalRubDisabled' }, 409);
+    if (currency === 'rub') {
+      // Two different refusals, and the second one matters more.
+      //
+      // DIGITAL_RUB_ENABLED says whether the rules allow selling a
+      // cosmetic through the acquirer. Even with it on, nothing on THIS
+      // path takes any money: a digital item has no order, so no ЮKassa
+      // payment is created and no webhook ever confirms one — the call
+      // below would simply grant the item. Flipping the switch alone would
+      // hand out every cosmetic for free.
+      //
+      // So the switch is not enough on its own, and this refusal stays
+      // until a payment step exists here. See "RuStore" in BUILD.md for
+      // what that would take. Money for a cosmetic goes through the
+      // store's till (the 'claim' action), which is the built path.
+      return json({ error: DIGITAL_RUB_ENABLED ? 'digitalRubNotBuilt' : 'digitalRubDisabled' }, 409);
+    }
 
     // A one-off item cannot be bought twice; a consumable stacks.
     if (!price.consumable) {

@@ -42,9 +42,15 @@ export const isPaymentConfigured = false;
  *
  * It is off because an app distributed through Google Play or the App Store
  * has to sell digital goods through that store's billing, which is what
- * `products.ts` routes them to. Turn it on only for a build that no such
- * store distributes — a direct APK — where the stores' tills are not
- * available anyway.
+ * `products.ts` routes them to. It would only ever be on for a build no
+ * such store distributes — a direct APK, or RuStore, which allows an
+ * acquirer and takes no cut of it.
+ *
+ * Turning it on is NOT enough to sell anything, and the switch is easy to
+ * misread on that point: nothing on the straight-buy path creates a
+ * payment, so the function refuses there rather than granting an item
+ * nobody paid for. BUILD.md → RuStore lists what the acquirer path still
+ * needs; a test keeps the refusal in front of the grant meanwhile.
  */
 export const DIGITAL_RUB_ENABLED = false;
 
