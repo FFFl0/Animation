@@ -265,7 +265,13 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
             ))}
           </ScrollView>
 
-          <ScrollView contentContainerStyle={styles.content}>
+          {/* flex: 1 is what keeps the tab strip above intact. Without it
+              this asks the column for the whole bracket's height, the
+              column is handed more than the screen has, and the strip —
+              the one child with no height of its own — is what gets
+              squeezed. With it, this takes the space left over and
+              scrolls inside it, which is what it was always meant to do. */}
+          <ScrollView style={styles.contentScroll} contentContainerStyle={styles.content}>
             {state.tournament.status === 'registration' ? (
               <Registration
                 state={state}
@@ -1049,10 +1055,26 @@ function makeStyles(theme: Theme) {
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     headerTitle: { fontSize: 24, fontFamily: fontFamily('800'), color: theme.text, marginTop: 4 },
     headerSubtitle: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
-    tabsRow: { flexGrow: 0 },
-    tabs: { flexDirection: 'row', gap: 6, paddingHorizontal: 20, paddingBottom: 10 },
+    // flexShrink keeps the strip off the squeeze list when the screen runs
+    // short; without it the row is the thing that gives way.
+    tabsRow: { flexGrow: 0, flexShrink: 0 },
+    // `alignItems: 'center'` is load-bearing, not decoration. A row's
+    // children stretch by default, so each pill was being given the row's
+    // height instead of asking for its own — and a pill shorter than its
+    // label clips the label, because a border radius crops what overflows
+    // it on Android. That is why the tabs read as cut in half. Centred,
+    // every pill sizes to the text inside it.
+    tabs: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 6,
+      paddingHorizontal: 20,
+      paddingTop: 4,
+      paddingBottom: 10,
+    },
     tab: {
       alignItems: 'center',
+      justifyContent: 'center',
       paddingVertical: 8,
       paddingHorizontal: 14,
       borderRadius: radius.pill,
@@ -1061,8 +1083,12 @@ function makeStyles(theme: Theme) {
       borderColor: theme.border,
     },
     tabActive: { backgroundColor: theme.primary, borderColor: theme.primary },
-    tabText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.textMuted },
+    // An explicit line height so the label's box is never shorter than the
+    // letters in it: Manrope's own metrics are what Android measures
+    // otherwise, and Cyrillic caps do not always fit what it works out.
+    tabText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('700'), color: theme.textMuted },
     tabTextActive: { color: theme.onPrimary },
+    contentScroll: { flex: 1 },
     content: { paddingHorizontal: 20, paddingBottom: 40 },
     card: {
       backgroundColor: theme.card,
