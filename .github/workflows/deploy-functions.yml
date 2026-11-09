@@ -23,7 +23,12 @@ on:
       functions:
         description: 'Which functions to deploy, space separated'
         required: true
-        default: 'tournament send-push'
+        # All of them by default. Deploying one that has not changed costs
+        # a few seconds and nothing else, whereas leaving one behind is
+        # invisible until a screen asks it for something it has never
+        # heard of — which is exactly how the "Прошлый" tab spent a week
+        # insisting there had never been a tournament.
+        default: 'tournament send-push shop yookassa-webhook'
         type: string
 
 jobs:

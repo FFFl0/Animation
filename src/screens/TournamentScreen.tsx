@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -10,6 +10,7 @@ import { useSound } from '../sound/SoundContext';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import Icon from '../components/Icon';
+import FadeIn from '../components/FadeIn';
 import { AnswerTiming } from '../quiz/answerTiming';
 import QuizScreen from './QuizScreen';
 import { RoundConfig } from '../quiz/types';
@@ -55,6 +56,21 @@ type Props = {
   onMatchPlayed: (score: number, total: number, timing: AnswerTiming) => void;
 };
 
+/**
+ * What the "Прошлый" tab knows.
+ *
+ * Four states, not three, and the fourth is the point: a call that failed
+ * is not a history that is empty. Both used to end up as null, so a
+ * function answering 400 — one deployed before this tab existed, say —
+ * showed the same reassuring "no past tournaments yet" as a genuinely
+ * fresh install, and there was nothing on the screen to suggest otherwise.
+ */
+type PastState =
+  | { status: 'idle' }
+  | { status: 'loading' }
+  | { status: 'ready'; value: WeeklyState | null }
+  | { status: 'failed'; message: string };
+
 type Tab = 'bracket' | 'players' | 'matches' | 'past' | 'rules';
 type Phase = 'loading' | 'offline' | 'view' | 'playing';
 
@@ -88,7 +104,8 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   // The tournament before this one. `undefined` until it has been asked
   // for — it is only worth a request when somebody opens the tab — and
   // null when there has never been one.
-  const [past, setPast] = useState<WeeklyState | null | undefined>(undefined);
+  const [pastState, setPastState] = useState<PastState>({ status: 'idle' });
+  const past = pastState.status === 'ready' ? pastState.value : null;
   // Where each tab sits along the row, so the one being switched to can be
   // brought into view — a tab half off the edge reads as a cut-off screen.
   const tabsRef = useRef<ScrollView>(null);
@@ -112,6 +129,15 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
 
   const pastBracket = useMemo(() => (past ? toDeBracket(past) : null), [past]);
 
+  const loadPast = () => {
+    setPastState({ status: 'loading' });
+    fetchPreviousWeekly()
+      .then((value) => setPastState({ status: 'ready', value }))
+      .catch((e: unknown) =>
+        setPastState({ status: 'failed', message: e instanceof Error ? e.message : String(e) })
+      );
+  };
+
   const load = async () => {
     const next = await fetchWeekly();
     setState(next);
@@ -125,13 +151,14 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   }, [tab]);
 
   // Asked for when the tab is opened and not again: a finished tournament
-  // does not change.
+  // does not change. A failed attempt is not retried by itself either —
+  // there is a button for that, and a silent retry loop against a function
+  // that is answering 400 helps nobody.
   useEffect(() => {
-    if (tab !== 'past' || past !== undefined) return;
-    fetchPreviousWeekly()
-      .then(setPast)
-      .catch(() => setPast(null));
-  }, [tab, past]);
+    if (tab !== 'past' || pastState.status !== 'idle') return;
+    loadPast();
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [tab, pastState.status]);
 
   useEffect(() => {
     if (!canPlayWeekly) {
@@ -306,7 +333,15 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
             {tab === 'players' && <Players state={state} styles={styles} theme={theme} t={t} bracket={bracket} />}
             {tab === 'matches' && bracket && <Matches bracket={bracket} state={state} styles={styles} t={t} theme={theme} />}
             {tab === 'past' && (
-              <Past past={past} bracket={pastBracket} styles={styles} theme={theme} t={t} language={language} />
+              <Past
+                state={pastState}
+                bracket={pastBracket}
+                styles={styles}
+                theme={theme}
+                t={t}
+                language={language}
+                onRetry={loadPast}
+              />
             )}
             {tab === 'rules' && <Rules styles={styles} theme={theme} t={t} />}
 
@@ -338,6 +373,51 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
 const PODIUM_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
 
 /**
+ * The medal beside a name that finished on the podium.
+ *
+ * Every one of them springs in when its card first draws, which is what
+ * makes a finished bracket read as a result rather than a table. Gold
+ * then keeps breathing, slowly, and silver and bronze do not: if all
+ * three pulsed, none of them would mean anything, and the eye would have
+ * nowhere to land. One moving thing per bracket is the whole idea.
+ */
+function PodiumMark({ place, size = 11 }: { place: number; size?: number }) {
+  const pop = useRef(new Animated.Value(0)).current;
+  const glow = useRef(new Animated.Value(0)).current;
+  const champion = place === 1;
+
+  useEffect(() => {
+    Animated.spring(pop, { toValue: 1, friction: 5, tension: 140, useNativeDriver: true }).start();
+  }, [pop]);
+
+  useEffect(() => {
+    if (!champion) return;
+    const loop = Animated.loop(
+      Animated.sequence([
+        Animated.timing(glow, { toValue: 1, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+        Animated.timing(glow, { toValue: 0, duration: 1100, easing: Easing.inOut(Easing.quad), useNativeDriver: true }),
+      ])
+    );
+    loop.start();
+    return () => loop.stop();
+  }, [glow, champion]);
+
+  return (
+    <Animated.View
+      style={{
+        opacity: champion ? glow.interpolate({ inputRange: [0, 1], outputRange: [0.7, 1] }) : 1,
+        transform: [
+          { scale: pop.interpolate({ inputRange: [0, 1], outputRange: [0.3, 1] }) },
+          ...(champion ? [{ scale: glow.interpolate({ inputRange: [0, 1], outputRange: [1, 1.18] }) }] : []),
+        ],
+      }}
+    >
+      <Icon name="medal" size={size} color={PODIUM_COLORS[place - 1]} />
+    </Animated.View>
+  );
+}
+
+/**
  * The tournament before this one: who finished on the podium, and the
  * bracket that got them there.
  *
@@ -346,26 +426,60 @@ const PODIUM_COLORS = ['#D4A017', '#9CA3AF', '#B45309'];
  * with nothing left to play.
  */
 function Past({
-  past,
+  state,
   bracket,
   styles,
   theme,
   t,
   language,
+  onRetry,
 }: {
-  past: WeeklyState | null | undefined;
+  state: PastState;
   bracket: DeBracket | null;
   styles: Styles;
   theme: Theme;
   t: ReturnType<typeof useT>;
   language: Language;
+  onRetry: () => void;
 }) {
-  if (past === undefined) return <ActivityIndicator color={theme.primary} style={{ marginTop: 32 }} />;
-  if (!past || !bracket) {
+  if (state.status === 'idle' || state.status === 'loading') {
+    return <ActivityIndicator color={theme.primary} style={{ marginTop: 32 }} />;
+  }
+
+  if (state.status === 'failed') {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.pastFailedTitle')}</Text>
+        <Text style={styles.cardText}>{t('tournament.pastFailed')}</Text>
+        {/* The server's own words. Ugly, and worth every pixel: this is
+            what tells whoever is looking whether the function is old,
+            asleep or unreachable. */}
+        <Text style={styles.pastErrorDetail}>{state.message}</Text>
+        <SoundTouchable style={styles.pastRetry} onPress={onRetry} accessibilityRole="button">
+          <Text style={styles.pastRetryText}>{t('tournament.refresh')}</Text>
+        </SoundTouchable>
+      </View>
+    );
+  }
+
+  const past = state.value;
+  if (!past) {
     return (
       <View style={styles.card}>
         <Text style={styles.cardLabel}>{t('tournament.pastEmptyTitle')}</Text>
         <Text style={styles.cardText}>{t('tournament.pastEmpty')}</Text>
+      </View>
+    );
+  }
+
+  // There was a tournament; its bracket just cannot be drawn, because it
+  // never filled all sixteen seats. Saying "no past tournaments" to that
+  // would be the same lie in a smaller hat.
+  if (!bracket) {
+    return (
+      <View style={styles.card}>
+        <Text style={styles.cardLabel}>{t('tournament.pastEmptyTitle')}</Text>
+        <Text style={styles.cardText}>{t('tournament.pastNoBracket')}</Text>
       </View>
     );
   }
@@ -378,17 +492,21 @@ function Past({
     <>
       <Text style={styles.sectionTitle}>{t('tournament.pastTitle', week)}</Text>
 
+      {/* Bronze, silver, gold — in that order, a beat apart, so the
+          podium fills from the bottom up the way one is read. */}
       <View style={styles.podium}>
         {[1, 2, 3].map((place) => {
           const entrant = past.entrants.find((e) => placeOf(bracket, e.seed) === place);
           return (
-            <View key={place} style={styles.podiumRow}>
-              <Icon name="medal" size={16} color={PODIUM_COLORS[place - 1]} />
-              <Text style={styles.podiumPlace}>{placeLabel(place, t)}</Text>
-              <Text style={styles.podiumName} numberOfLines={1}>
-                {entrant ? `${entrant.name}${entrant.isMe ? t('tournament.youSuffix') : ''}` : '—'}
-              </Text>
-            </View>
+            <FadeIn key={place} delay={(3 - place) * 110} offsetY={8}>
+              <View style={styles.podiumRow}>
+                <PodiumMark place={place} size={16} />
+                <Text style={styles.podiumPlace}>{placeLabel(place, t)}</Text>
+                <Text style={[styles.podiumName, { color: PODIUM_COLORS[place - 1] }]} numberOfLines={1}>
+                  {entrant ? `${entrant.name}${entrant.isMe ? t('tournament.youSuffix') : ''}` : '—'}
+                </Text>
+              </View>
+            </FadeIn>
           );
         })}
       </View>
@@ -899,16 +1017,32 @@ function MatchCard({
     const entrant = seed === null ? null : bracket.entrants[seed];
     const won = done && wins > other;
     const lost = done && wins < other;
+    // Where this player finished the whole tournament, not this match —
+    // null while they are still in it. Gold, silver and bronze are worth
+    // spotting from across the bracket, so they take the name's colour
+    // rather than being left to the podium list further down.
+    const place = seed === null ? null : placeOf(bracket, seed);
+    const podium = place !== null && place <= 3 ? place : null;
     return (
       <View style={styles.matchSide}>
         {/* the seed column is kept even when empty, so the names line up */}
         <Text style={styles.matchSeed}>{entrant ? seed! + 1 : ''}</Text>
         <Text
-          style={[styles.matchName, !entrant && styles.matchNamePending, won && styles.matchNameWon, lost && styles.matchNameLost]}
+          style={[
+            styles.matchName,
+            !entrant && styles.matchNamePending,
+            won && styles.matchNameWon,
+            lost && styles.matchNameLost,
+            // Last, so finishing on the podium outranks having lost the
+            // match being looked at — second place lost its final, and
+            // greying the name out would say the wrong thing about it.
+            podium !== null && { color: PODIUM_COLORS[podium - 1] },
+          ]}
           numberOfLines={1}
         >
           {entrant ? entrant.name : slotLabel(slot, t)}
         </Text>
+        {podium !== null && <PodiumMark place={podium} />}
         <Text style={[styles.matchScore, won && styles.matchNameWon]}>{entrant ? wins : ''}</Text>
       </View>
     );
@@ -919,6 +1053,8 @@ function MatchCard({
       style={[
         styles.matchCard,
         def.bracket === 'gf' && styles.matchCardFinal,
+        // The one match that made a champion, once it has.
+        def.bracket === 'gf' && done && styles.matchCardCrowned,
         mine && styles.matchCardMine,
         live && styles.matchCardLive,
       ]}
@@ -1090,6 +1226,24 @@ function makeStyles(theme: Theme) {
     tabTextActive: { color: theme.onPrimary },
     contentScroll: { flex: 1 },
     content: { paddingHorizontal: 20, paddingBottom: 40 },
+    pastErrorDetail: {
+      fontSize: 11,
+      lineHeight: 15,
+      fontFamily: fontFamily('500'),
+      color: theme.danger,
+      marginTop: 10,
+    },
+    pastRetry: {
+      marginTop: 14,
+      alignSelf: 'flex-start',
+      paddingVertical: 10,
+      paddingHorizontal: 18,
+      borderRadius: radius.pill,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      backgroundColor: theme.background,
+    },
+    pastRetryText: { fontSize: 13, fontFamily: fontFamily('800'), color: theme.text },
     card: {
       backgroundColor: theme.card,
       borderWidth: 1.5,
@@ -1211,6 +1365,7 @@ function makeStyles(theme: Theme) {
     },
     matchCardMine: { borderColor: theme.primary, backgroundColor: theme.primaryLight },
     matchCardFinal: { backgroundColor: theme.primaryLight, borderColor: theme.primaryLight },
+    matchCardCrowned: { borderColor: PODIUM_COLORS[0] },
     matchCardLive: { borderColor: theme.success },
     liveDot: {
       position: 'absolute',
