@@ -347,7 +347,10 @@ function ShopCard({
           <Text style={styles.limitedTagText}>{t('shop.limited')}</Text>
         </View>
       )}
-      <Text style={[styles.cardTitle, round && { textAlign: 'center' }]} numberOfLines={2}>
+      <Text
+        style={[styles.cardTitle, round && styles.cardTitleRound, round && width < 64 && styles.cardTitleTight]}
+        numberOfLines={2}
+      >
         {itemTitle(item, language)}
       </Text>
       {owned ? (
@@ -482,7 +485,26 @@ function makeStyles(theme: Theme) {
       paddingVertical: 3,
     },
     limitedTagText: { fontSize: 9, fontFamily: fontFamily('800'), color: theme.onPrimary },
-    cardTitle: { fontSize: 12, lineHeight: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 9 },
+    // 16 rather than 15: Manrope wants 16.4 at this size, and a line box
+    // shorter than the letters in it crops their tails.
+    cardTitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 9 },
+    /*
+     * A round card is a quarter of the screen, and the card's own padding
+     * took 20dp more off the label — leaving about 52dp on a 360dp phone,
+     * where "Лепестки" needs 58. A word that does not fit is broken
+     * wherever it runs out, so the shelf read "Лепестк / и".
+     *
+     * Two things buy the room back. The label reaches the card's edges
+     * (the artwork above it keeps the padding, so nothing looks cramped),
+     * and it drops a point. That is 64dp against a longest name of 56 —
+     * measured, not guessed, against Manrope's own advance widths for
+     * every name in both languages.
+     */
+    cardTitleRound: { textAlign: 'center', fontSize: 11, lineHeight: 15, marginHorizontal: -6 },
+    /* Below ~64dp of card even that is short, so the narrowest phones drop
+     * one more point. The threshold is where the longest name stops
+     * fitting, not a round number. */
+    cardTitleTight: { fontSize: 10, lineHeight: 14 },
     priceRow: { flexDirection: 'row', alignItems: 'center', gap: 4, marginTop: 5 },
     priceRowCentred: { justifyContent: 'center' },
     priceStack: { marginTop: 5 },

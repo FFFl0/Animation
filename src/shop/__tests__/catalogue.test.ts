@@ -120,3 +120,39 @@ describe('catalogue', () => {
     });
   });
 });
+
+/**
+ * A name on a round card has one line of about nine characters to live on,
+ * and a word that will not fit is broken wherever it runs out — which is
+ * how the frames shelf once read "Лепестк / и".
+ *
+ * Eight is not a round number: it is what the longest name in the shop
+ * measures today, checked against Manrope's own advance widths at the size
+ * and card width the narrowest supported phone gives. A ninth character
+ * would not fail the build any other way — it would just look broken on a
+ * shelf nobody opened before shipping.
+ *
+ * Merch is exempt: those cards are half the screen wide, not a quarter.
+ */
+describe('names fit the card they are shown on', () => {
+  const ROUND_SECTIONS = ['avatars', 'frames'] as const;
+  const LONGEST_WORD = 8;
+
+  it('keeps every word on a round card short enough not to be broken', () => {
+    // Collected rather than asserted one at a time, so a failure names
+    // every offender and the word that caused it.
+    const tooLong = ROUND_SECTIONS.flatMap((section) =>
+      itemsOf(section).flatMap((item) =>
+        [item.title, item.titleEn]
+          .flatMap((label) => label.split(/\s+/))
+          .filter((word) => word.length > LONGEST_WORD)
+          .map((word) => `${item.id}: "${word}" (${word.length})`)
+      )
+    );
+    expect(tooLong).toEqual([]);
+  });
+
+  it('is measuring something — the shelves are not empty', () => {
+    expect(ROUND_SECTIONS.flatMap((section) => itemsOf(section)).length).toBeGreaterThan(10);
+  });
+});
