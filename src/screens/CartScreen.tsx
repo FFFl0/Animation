@@ -233,7 +233,10 @@ function makeStyles(theme: Theme) {
     },
     row: { flexDirection: 'row', alignItems: 'center', gap: 12, paddingVertical: 14 },
     rowDivided: { borderTopWidth: 1, borderTopColor: theme.border },
-    thumb: { width: 56, height: 42, borderRadius: radius.md },
+    // Stated as a ratio, not a height: the artwork is 4:3 and `cover`
+    // crops whatever does not match, so a box that drifts out of step
+    // silently slices the top and bottom off every product.
+    thumb: { width: 56, aspectRatio: 4 / 3, borderRadius: radius.md },
     rowTitle: { fontSize: 13, lineHeight: 17, fontFamily: fontFamily('700'), color: theme.text },
     rowMeta: { fontSize: 11, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
     rowPrice: { fontSize: 12, fontFamily: fontFamily('800'), color: theme.textMuted, marginTop: 2 },

@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Animated, Easing, ScrollView, StyleSheet, Text, View } from 'react-native';
+import { ActivityIndicator, Animated, Easing, PixelRatio, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -1191,9 +1191,23 @@ function makeStyles(theme: Theme) {
     backText: { color: theme.text, fontSize: 15, fontFamily: fontFamily('700') },
     headerTitle: { fontSize: 24, fontFamily: fontFamily('800'), color: theme.text, marginTop: 4 },
     headerSubtitle: { fontSize: 12, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
-    // flexShrink keeps the strip off the squeeze list when the screen runs
-    // short; without it the row is the thing that gives way.
-    tabsRow: { flexGrow: 0, flexShrink: 0 },
+    /*
+     * Three separate guards, because this row has collapsed twice now and
+     * each guard covers a different way of getting there.
+     *
+     * flexShrink keeps it off the squeeze list when the column runs short.
+     * minHeight means that even if something does squeeze it, there is a
+     * floor it cannot go below — and the floor is computed, not typed in:
+     * the pill is two borders, two paddings and a line of text, and the
+     * text grows with the reader's font setting, so the floor has to grow
+     * with it too. A hard 49 would crop the labels of anyone running large
+     * text, which is the same bug wearing a different hat.
+     */
+    tabsRow: {
+      flexGrow: 0,
+      flexShrink: 0,
+      minHeight: 4 + 10 + 2 * 1.5 + 2 * 8 + 16 * PixelRatio.getFontScale(),
+    },
     // `alignItems: 'center'` is load-bearing, not decoration. A row's
     // children stretch by default, so each pill was being given the row's
     // height instead of asking for its own — and a pill shorter than its
