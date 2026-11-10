@@ -1737,3 +1737,289 @@ drop trigger if exists round_results_guard on public.round_results;
 create trigger round_results_guard
   before insert on public.round_results
   for each row execute function public.round_results_guard();
+
+-- ============================================================
+-- МОДЕРАЦИЯ: БЛОКИРОВКА И ЖАЛОБЫ
+--
+-- В приложении есть личные сообщения, группы, фото и голосовые — то есть
+-- пользовательский контент. И Google, и Apple требуют для такого двух
+-- вещей: возможности заблокировать человека и возможности пожаловаться на
+-- сообщение или на автора. Здесь обе.
+--
+-- Блокировка действует на сервере, а не «скрывает в приложении»: правила
+-- вставки ниже не дадут заблокированному написать, позвать в друзья, в
+-- битву или в группу, каким бы клиентом он ни пользовался.
+-- ============================================================
+
+create table if not exists public.user_blocks (
+  blocker_id uuid not null references auth.users(id) on delete cascade,
+  blocked_id uuid not null references auth.users(id) on delete cascade,
+  created_at timestamptz not null default now(),
+  primary key (blocker_id, blocked_id),
+  constraint user_blocks_no_self check (blocker_id <> blocked_id)
+);
+
+alter table public.user_blocks enable row level security;
+
+-- Видит блокировку только тот, кто её поставил. Заблокированному таблица
+-- не скажет ничего — узнать, кто тебя заблокировал, отсюда нельзя.
+-- Вставки и удаления идут через функции ниже, поэтому политик на них нет.
+drop policy if exists "See who you have blocked" on public.user_blocks;
+create policy "See who you have blocked"
+  on public.user_blocks for select
+  using (auth.uid() = blocker_id);
+
+create index if not exists user_blocks_blocked_idx on public.user_blocks (blocked_id);
+
+/*
+ * Стоит ли между двумя людьми блокировка — в любую сторону.
+ *
+ * security definer, потому что спрашивать приходится и заблокированному:
+ * его вставку проверяет политика, а строку блокировки он читать не вправе.
+ * Чтобы функцией нельзя было выведывать чужие отношения, она отвечает
+ * только тому, кто сам один из двоих; про любую другую пару — всегда «нет».
+ */
+create or replace function public.blocked_between(p_a uuid, p_b uuid)
+returns boolean
+language sql
+stable
+security definer
+set search_path = public
+as $$
+  select auth.uid() in (p_a, p_b) and exists (
+    select 1 from public.user_blocks
+     where (blocker_id = p_a and blocked_id = p_b)
+        or (blocker_id = p_b and blocked_id = p_a)
+  );
+$$;
+
+revoke all on function public.blocked_between(uuid, uuid) from public;
+grant execute on function public.blocked_between(uuid, uuid) to authenticated;
+
+/*
+ * Заблокировать. Одной транзакцией ставит блокировку и рвёт всё, что этих
+ * двоих связывало: дружбу (или заявку) в любую сторону и неотвеченные
+ * приглашения в битву. Иначе заблокированный оставался бы в друзьях — с
+ * чатом в списке и правом вызвать на бой.
+ */
+create or replace function public.block_user(p_user uuid)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_me uuid := auth.uid();
+begin
+  if v_me is null then
+    raise exception 'not signed in' using errcode = 'P0001';
+  end if;
+  if p_user = v_me then
+    raise exception 'cannot block yourself' using errcode = 'P0001';
+  end if;
+
+  insert into public.user_blocks (blocker_id, blocked_id)
+  values (v_me, p_user)
+  on conflict do nothing;
+
+  delete from public.friendships
+   where (requester_id = v_me and addressee_id = p_user)
+      or (requester_id = p_user and addressee_id = v_me);
+
+  delete from public.battle_invites
+   where status = 'pending'
+     and ((from_user_id = v_me and to_user_id = p_user)
+       or (from_user_id = p_user and to_user_id = v_me));
+end;
+$$;
+
+revoke all on function public.block_user(uuid) from public;
+grant execute on function public.block_user(uuid) to authenticated;
+
+-- Разблокировать. Дружбу не возвращает: это решение обеих сторон заново.
+create or replace function public.unblock_user(p_user uuid)
+returns void
+language sql
+security definer
+set search_path = public
+as $$
+  delete from public.user_blocks where blocker_id = auth.uid() and blocked_id = p_user;
+$$;
+
+revoke all on function public.unblock_user(uuid) from public;
+grant execute on function public.unblock_user(uuid) to authenticated;
+
+-- Правила вставки: всё то же, что было, плюс «между вами нет блокировки».
+-- Имена политик прежние, поэтому определения выше по файлу заменяются.
+
+drop policy if exists "Send messages as yourself" on public.messages;
+create policy "Send messages as yourself"
+  on public.messages for insert
+  with check (auth.uid() = sender_id and not public.blocked_between(sender_id, recipient_id));
+
+drop policy if exists "Send friend requests as yourself" on public.friendships;
+create policy "Send friend requests as yourself"
+  on public.friendships for insert
+  with check (auth.uid() = requester_id and not public.blocked_between(requester_id, addressee_id));
+
+drop policy if exists "Send battle invites as yourself" on public.battle_invites;
+create policy "Send battle invites as yourself"
+  on public.battle_invites for insert
+  with check (auth.uid() = from_user_id and not public.blocked_between(from_user_id, to_user_id));
+
+-- В группу нельзя добавить того, с кем стоит блокировка: иначе её обходили
+-- бы, создав «группу на двоих».
+drop policy if exists "Owner adds members" on public.chat_group_members;
+create policy "Owner adds members"
+  on public.chat_group_members for insert
+  with check (
+    exists (select 1 from public.chat_groups g where g.id = group_id and g.owner_id = auth.uid())
+    and not public.blocked_between(auth.uid(), user_id)
+  );
+
+/*
+ * Жалобы.
+ *
+ * В строке лежит снимок того, на что пожаловались: текст и путь вложения
+ * на момент жалобы. Сообщение после этого можно отредактировать или
+ * удалить — разбирать тогда было бы нечего, а именно так и поступит тот,
+ * на кого пожаловались.
+ *
+ * Политик нет вовсе: приложение сюда не читает и напрямую не пишет. Пишет
+ * функция report_content, читает разработчик — представлением
+ * moderation_queue из панели Supabase.
+ */
+create table if not exists public.content_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references auth.users(id) on delete cascade,
+  target_user_id uuid not null references auth.users(id) on delete cascade,
+  kind text not null check (kind in ('direct_message', 'group_message', 'user')),
+  -- Без внешнего ключа намеренно: жалоба должна пережить удаление сообщения.
+  message_id uuid,
+  group_id uuid,
+  reason text not null check (reason in ('spam', 'abuse', 'inappropriate', 'other')),
+  comment text check (comment is null or char_length(comment) <= 500),
+  body_snapshot text,
+  attachment_snapshot text,
+  status text not null default 'open' check (status in ('open', 'actioned', 'dismissed')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.content_reports enable row level security;
+
+-- Одно сообщение один человек обжалует один раз.
+create unique index if not exists content_reports_once
+  on public.content_reports (reporter_id, message_id) where message_id is not null;
+create index if not exists content_reports_open_idx on public.content_reports (status, created_at desc);
+create index if not exists content_reports_target_idx on public.content_reports (target_user_id);
+
+/*
+ * Пожаловаться на сообщение или на человека.
+ *
+ * Функция сама находит сообщение и сама решает, на кого жалоба: клиент
+ * присылает только id. Пожаловаться можно лишь на то, что видишь — на
+ * личное сообщение из своей переписки или на сообщение группы, в которой
+ * состоишь, — и нельзя на самого себя.
+ */
+create or replace function public.report_content(
+  p_kind text,
+  p_message uuid,
+  p_user uuid,
+  p_reason text,
+  p_comment text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_me uuid := auth.uid();
+  v_target uuid;
+  v_body text;
+  v_attachment text;
+  v_group uuid;
+begin
+  if v_me is null then
+    raise exception 'not signed in' using errcode = 'P0001';
+  end if;
+  if p_reason not in ('spam', 'abuse', 'inappropriate', 'other') then
+    raise exception 'unknown reason' using errcode = 'P0001';
+  end if;
+
+  -- Жалоба — не оружие: тридцать в сутки хватит любому добросовестному
+  -- человеку и не даст завалить очередь одному недобросовестному.
+  if (select count(*) from public.content_reports
+       where reporter_id = v_me and created_at > now() - interval '24 hours') >= 30 then
+    raise exception 'too many reports' using errcode = 'P0001';
+  end if;
+
+  if p_kind = 'direct_message' then
+    select sender_id, body, attachment_path into v_target, v_body, v_attachment
+      from public.messages
+     where id = p_message and (sender_id = v_me or recipient_id = v_me);
+    if not found then
+      raise exception 'message not found' using errcode = 'P0001';
+    end if;
+  elsif p_kind = 'group_message' then
+    select m.sender_id, m.body, m.attachment_path, m.group_id into v_target, v_body, v_attachment, v_group
+      from public.group_messages m
+     where m.id = p_message and public.is_group_member(m.group_id, v_me);
+    if not found then
+      raise exception 'message not found' using errcode = 'P0001';
+    end if;
+  elsif p_kind = 'user' then
+    select id into v_target from public.profiles where id = p_user;
+    if not found then
+      raise exception 'user not found' using errcode = 'P0001';
+    end if;
+    p_message := null;
+  else
+    raise exception 'unknown kind' using errcode = 'P0001';
+  end if;
+
+  if v_target = v_me then
+    raise exception 'cannot report yourself' using errcode = 'P0001';
+  end if;
+
+  insert into public.content_reports
+    (reporter_id, target_user_id, kind, message_id, group_id, reason, comment, body_snapshot, attachment_snapshot)
+  values
+    (v_me, v_target, p_kind, p_message, v_group, p_reason, nullif(left(btrim(coalesce(p_comment, '')), 500), ''), v_body, v_attachment)
+  on conflict (reporter_id, message_id) where message_id is not null do nothing;
+end;
+$$;
+
+revoke all on function public.report_content(text, uuid, uuid, text, text) from public;
+grant execute on function public.report_content(text, uuid, uuid, text, text) to authenticated;
+
+/*
+ * Очередь разбора — для панели Supabase, не для приложения.
+ *
+ * security_invoker: представление читает с правами смотрящего, а у
+ * игроков политик на content_reports нет, так что даже при случайно
+ * выданном праве оно вернуло бы им пустоту. Права всё равно отозваны.
+ */
+drop view if exists public.moderation_queue;
+create view public.moderation_queue with (security_invoker = true) as
+select
+  r.id,
+  r.created_at,
+  r.status,
+  r.kind,
+  r.reason,
+  r.comment,
+  reporter.username as reporter,
+  target.username as target,
+  r.target_user_id,
+  r.body_snapshot,
+  r.attachment_snapshot,
+  r.message_id,
+  r.group_id,
+  (select count(*) from public.content_reports x where x.target_user_id = r.target_user_id) as reports_on_target
+from public.content_reports r
+left join public.profiles reporter on reporter.id = r.reporter_id
+left join public.profiles target on target.id = r.target_user_id
+order by r.created_at desc;
+
+revoke all on public.moderation_queue from anon, authenticated;

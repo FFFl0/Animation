@@ -90,6 +90,11 @@ type Props<T extends BubbleMessage> = {
   canDelete: (message: T) => boolean;
   /** Called as the composer is typed into, so the other side can be told. */
   onTyping?: () => void;
+  /**
+   * Opens the report flow for somebody else's message. Left out, the menu
+   * simply has no such entry — a local-only chat has nobody to report to.
+   */
+  onReport?: (message: T) => void;
 };
 
 /**
@@ -119,6 +124,7 @@ export default function ChatRoom<T extends BubbleMessage>({
   onDelete,
   canDelete,
   onTyping,
+  onReport,
 }: Props<T>) {
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
@@ -917,6 +923,22 @@ export default function ChatRoom<T extends BubbleMessage>({
                   >
                     <Icon name="trash" size={18} color={theme.danger} />
                     <Text style={[styles.menuActionText, { color: theme.danger }]}>{t('chat.delete')}</Text>
+                  </SoundTouchable>
+                )}
+
+                {/* Only on other people's messages: reporting oneself is
+                    not a thing, and the server would refuse it anyway. */}
+                {onReport && menuFor.senderId !== meId && (
+                  <SoundTouchable
+                    style={styles.menuAction}
+                    onPress={() => {
+                      const target = menuFor;
+                      setMenuFor(null);
+                      onReport(target);
+                    }}
+                  >
+                    <Icon name="bell" size={18} color={theme.danger} />
+                    <Text style={[styles.menuActionText, { color: theme.danger }]}>{t('moderation.report')}</Text>
                   </SoundTouchable>
                 )}
               </>

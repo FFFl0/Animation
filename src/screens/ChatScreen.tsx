@@ -21,6 +21,8 @@ import {
   toggleReaction,
 } from '../chat/chatApi';
 import ChatRoom from '../chat/ChatRoom';
+import ReportSheet from '../moderation/ReportSheet';
+import { useModeration } from '../moderation/ModerationContext';
 import { Attachment, MediaScope } from '../chat/attachments';
 import { removeAttachment } from '../chat/attachmentStorage';
 import { useReactions } from '../chat/useReactions';
@@ -44,6 +46,9 @@ export default function ChatScreen({ friend, onBack, onOpenProfile }: Props) {
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
   const t = useT();
+  const moderation = useModeration();
+  /** The message being reported, while the report sheet is open. */
+  const [reportFor, setReportFor] = useState<string | null>(null);
   const [messages, setMessages] = useState<ChatMessage[]>([]);
   const meId = profile?.id ?? '';
 
@@ -130,6 +135,7 @@ export default function ChatScreen({ friend, onBack, onOpenProfile }: Props) {
   const subtitle = typingNames.length > 0 ? t('chat.typing') : formatLastSeen(presence.lastSeenAt, presence.online, language);
 
   return (
+    <>
     <ChatRoom
       onBack={onBack}
       conversationKey={friend.id}
@@ -160,7 +166,17 @@ export default function ChatScreen({ friend, onBack, onOpenProfile }: Props) {
       onDelete={handleDelete}
       canDelete={(m) => m.senderId === meId}
       onTyping={notifyTyping}
+      onReport={moderation.available ? (m) => setReportFor(m.id) : undefined}
     />
+    <ReportSheet
+      target={reportFor ? { kind: 'direct_message', messageId: reportFor } : null}
+      authorId={friend.id}
+      authorName={friend.username}
+      onClose={() => setReportFor(null)}
+      // Blocked from the sheet: there is no conversation left to be in.
+      onBlocked={onBack}
+    />
+    </>
   );
 }
 

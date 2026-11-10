@@ -23,6 +23,8 @@ import WalletSheet from '../components/WalletSheet';
 import { useShop } from '../shop/ShopContext';
 import AnimeAvatar from '../components/AnimeAvatar';
 import Icon from '../components/Icon';
+import BlockedUsersSheet from '../moderation/BlockedUsersSheet';
+import { useModeration } from '../moderation/ModerationContext';
 import RareAchievements from '../components/RareAchievements';
 import { unlockedIds } from '../data/achievements';
 import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
@@ -46,6 +48,8 @@ export default function ProfileScreen({
   const { musicEnabled, sfxEnabled, hapticsEnabled, toggleMusic, toggleSfx, toggleHaptics } = useSound();
   const { language, setLanguage } = useLanguage();
   const t = useT();
+  const moderation = useModeration();
+  const [blockedOpen, setBlockedOpen] = useState(false);
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const [search, setSearch] = useState('');
   const [photoBusy, setPhotoBusy] = useState(false);
@@ -398,6 +402,14 @@ export default function ProfileScreen({
         <Text style={styles.linkText}>{t('legal.privacyTitle')}</Text>
         <Icon name="chevronRight" size={15} color={theme.textMuted} />
       </SoundTouchable>
+      {moderation.available && (
+        <SoundTouchable style={styles.linkRow} onPress={() => setBlockedOpen(true)} accessibilityRole="button">
+          <Icon name="users" size={16} color={theme.primary} />
+          <Text style={styles.linkText}>{t('moderation.blockedTitle')}</Text>
+          <Icon name="chevronRight" size={15} color={theme.textMuted} />
+        </SoundTouchable>
+      )}
+      <BlockedUsersSheet visible={blockedOpen} onClose={() => setBlockedOpen(false)} />
 
       <SoundTouchable style={styles.logout} onPress={logout} activeOpacity={0.85}>
         <Text style={styles.logoutText}>{t('profile.logout')}</Text>

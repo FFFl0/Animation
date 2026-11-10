@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useModeration } from '../moderation/ModerationContext';
 import { RefreshControl, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
@@ -44,6 +45,7 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
   const { badgeCount } = useNotifications();
 
   const [chats, setChats] = useState<ChatSummary[] | null>(null);
+  const { isBlocked } = useModeration();
   const [refreshing, setRefreshing] = useState(false);
   const [query, setQuery] = useState('');
 
@@ -75,12 +77,17 @@ export default function ChatsScreen({ onOpenDirect, onOpenGroup, onOpenContacts 
   const needle = query.trim().toLowerCase();
   const shown = useMemo(() => {
     if (!chats) return [];
-    if (!needle) return chats;
-    return chats.filter(
+    // A blocked person's conversation is history nobody asked to keep
+    // seeing. Groups stay: they are shared, and inside one the blocked
+    // person's messages are hidden instead.
+    const open = chats.filter((chat) => chat.kind !== 'direct' || !isBlocked(chat.id));
+    if (!needle) return open;
+    return open.filter(
       (chat) =>
         chat.title.toLowerCase().includes(needle) || (chat.lastMessage?.body ?? '').toLowerCase().includes(needle)
     );
-  }, [chats, needle]);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [chats, needle, isBlocked]);
 
   const emptyText = !isSupabaseConfigured ? t('chats.emptyLocal') : needle ? t('chats.searchEmpty') : t('chats.empty');
 

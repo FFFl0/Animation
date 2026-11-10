@@ -10,7 +10,7 @@ export type PolicySection = { title: string; body: string[] };
  *
  * When the app starts collecting something new, this is the file to change.
  */
-export const POLICY_UPDATED = '2026-09-11';
+export const POLICY_UPDATED = '2026-11-10';
 
 const RU: PolicySection[] = [
   {
@@ -27,6 +27,7 @@ const RU: PolicySection[] = [
       'Аккаунт: имя пользователя, дата регистрации и пароль в виде хеша (сам пароль мы не видим). Почту указывать не обязательно — она нужна только чтобы восстановить пароль. При входе через Google мы получаем от него адрес почты.',
       'Профиль: аватарка (ваша картинка или одна из готовых), рамка, любимый персонаж, игровая статистика, серия дней и достижения.',
       'Общение: список друзей, личные и групповые сообщения, реакции на них, группы, в которых вы состоите.',
+      'Блокировки и жалобы: кого вы заблокировали и какие жалобы отправили. В жалобе сохраняется копия сообщения, на которое вы пожаловались, — чтобы её можно было разобрать, даже если сообщение потом изменят или удалят. Тот, на кого пожаловались, не узнаёт, кто это сделал.',
       'Приложение на устройстве: тема оформления, язык, настройки звука и вибрации, недавно использованные эмодзи, включены ли напоминания. Это остаётся на телефоне и никуда не отправляется.',
     ],
   },
@@ -112,6 +113,7 @@ const EN: PolicySection[] = [
       'Account: username, sign-up date, and your password as a hash (we never see the password itself). An email address is optional and only used to reset a password. If you sign in with Google, we receive your email address from them.',
       'Profile: avatar (your own picture or one of the ready-made ones), frame, favourite character, game stats, day streak and achievements.',
       'Talking: your friends, direct and group messages, reactions to them, and the groups you belong to.',
+      'Blocks and reports: who you have blocked and which reports you have sent. A report keeps a copy of the message it is about, so it can be looked into even if the message is later edited or deleted. The person reported is not told who reported them.',
       'On the device: theme, language, sound and vibration settings, recently used emoji, whether reminders are on. This stays on your phone and is never sent anywhere.',
     ],
   },

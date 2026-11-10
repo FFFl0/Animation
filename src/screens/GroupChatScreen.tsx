@@ -28,6 +28,8 @@ import {
   toggleGroupReaction,
 } from '../chat/groupApi';
 import ChatRoom from '../chat/ChatRoom';
+import ReportSheet from '../moderation/ReportSheet';
+import { useModeration } from '../moderation/ModerationContext';
 import { Attachment, MediaScope } from '../chat/attachments';
 import { removeAttachment } from '../chat/attachmentStorage';
 import GroupAvatar from '../chat/GroupAvatar';
@@ -54,6 +56,9 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const t = useT();
+  const moderation = useModeration();
+  /** The message being reported, while the report sheet is open. */
+  const [reportFor, setReportFor] = useState<GroupMessage | null>(null);
   const [group, setGroup] = useState(initialGroup);
   const [messages, setMessages] = useState<GroupMessage[]>([]);
   const [members, setMembers] = useState<PlayerSummary[]>([]);
@@ -207,6 +212,14 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
 
   const addable = friends.filter(({ player }) => !members.some((m) => m.id === player.id));
 
+  // A group is shared, so a block cannot remove somebody from it — but it
+  // can stop their messages being shown to the person who blocked them.
+  const visibleMessages = useMemo(
+    () => messages.filter((m) => !moderation.isBlocked(m.senderId)),
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+    [messages, moderation]
+  );
+
   return (
     <>
       <ChatRoom
@@ -224,7 +237,7 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
             <Icon name="chevronRight" size={16} color={theme.textMuted} />
           </SoundTouchable>
         }
-        messages={messages}
+        messages={visibleMessages}
         meId={meId}
         myName={profile.username}
         labelFor={labelFor}
@@ -239,6 +252,14 @@ export default function GroupChatScreen({ group: initialGroup, onBack, onLeft }:
         onDelete={handleDeleteMessage}
         canDelete={(m) => m.senderId === meId}
         onTyping={notifyTyping}
+        onReport={moderation.available ? setReportFor : undefined}
+      />
+
+      <ReportSheet
+        target={reportFor ? { kind: 'group_message', messageId: reportFor.id } : null}
+        authorId={reportFor?.senderId}
+        authorName={reportFor ? labelFor(reportFor.senderId) : undefined}
+        onClose={() => setReportFor(null)}
       />
 
       <Modal visible={sheet !== 'none'} transparent animationType="fade" onRequestClose={() => setSheet('none')}>

@@ -38,6 +38,7 @@ import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
 import { NotificationTarget } from './src/notifications/notificationRoute';
 import { useNotificationTaps } from './src/notifications/useNotificationTaps';
 import TournamentScreen from './src/screens/TournamentScreen';
+import { ModerationProvider } from './src/moderation/ModerationContext';
 import { WEEKLY_MATCH_CONFIG } from './src/tournament/matchConfig';
 import ShopScreen from './src/screens/ShopScreen';
 import { ShopTab } from './src/shop/catalogue';
@@ -909,6 +910,7 @@ export default function App() {
             <SoundProvider>
               <AuthProvider>
                 <ShopProvider>
+                <ModerationProvider>
                 <PresenceProvider>
                   <NotificationsProvider>
                     <ResponsiveShell>
@@ -927,6 +929,7 @@ export default function App() {
                     </ResponsiveShell>
                   </NotificationsProvider>
                 </PresenceProvider>
+                </ModerationProvider>
                 </ShopProvider>
               </AuthProvider>
             </SoundProvider>

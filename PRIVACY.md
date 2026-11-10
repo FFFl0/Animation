@@ -3,7 +3,7 @@
 <!-- Этот файл генерируется из src/legal/privacyPolicy.ts.
      Правьте там и запускайте node scripts/generate-privacy.mjs. -->
 
-Обновлено: 2026-09-11
+Обновлено: 2026-11-10
 
 ## Русский
 
@@ -22,6 +22,8 @@ AnimeQuiz — викторина по аниме. Мы храним ровно �
 Профиль: аватарка (ваша картинка или одна из готовых), рамка, любимый персонаж, игровая статистика, серия дней и достижения.
 
 Общение: список друзей, личные и групповые сообщения, реакции на них, группы, в которых вы состоите.
+
+Блокировки и жалобы: кого вы заблокировали и какие жалобы отправили. В жалобе сохраняется копия сообщения, на которое вы пожаловались, — чтобы её можно было разобрать, даже если сообщение потом изменят или удалят. Тот, на кого пожаловались, не узнаёт, кто это сделал.
 
 Приложение на устройстве: тема оформления, язык, настройки звука и вибрации, недавно использованные эмодзи, включены ли напоминания. Это остаётся на телефоне и никуда не отправляется.
 
@@ -102,6 +104,8 @@ Account: username, sign-up date, and your password as a hash (we never see the p
 Profile: avatar (your own picture or one of the ready-made ones), frame, favourite character, game stats, day streak and achievements.
 
 Talking: your friends, direct and group messages, reactions to them, and the groups you belong to.
+
+Blocks and reports: who you have blocked and which reports you have sent. A report keeps a copy of the message it is about, so it can be looked into even if the message is later edited or deleted. The person reported is not told who reported them.
 
 On the device: theme, language, sound and vibration settings, recently used emoji, whether reminders are on. This stays on your phone and is never sent anywhere.
 

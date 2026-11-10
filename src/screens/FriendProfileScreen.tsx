@@ -28,6 +28,8 @@ import Icon from '../components/Icon';
 import RareAchievements from '../components/RareAchievements';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
+import ReportSheet from '../moderation/ReportSheet';
+import { useModeration } from '../moderation/ModerationContext';
 import { categoryTitle } from '../data/categories';
 
 type Props = {
@@ -53,6 +55,30 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
   // flashing "add friend" at somebody who is already a friend reads as a
   // bug even though it corrects itself a moment later.
   const [known, setKnown] = useState(friendship !== null);
+  const moderation = useModeration();
+  const blocked = moderation.isBlocked(player.id);
+  const [reporting, setReporting] = useState(false);
+  // Blocking ends the friendship, so it is asked twice: the first tap arms
+  // the button, the second one does it.
+  const [confirmingBlock, setConfirmingBlock] = useState(false);
+
+  const toggleBlock = async () => {
+    if (blocked) {
+      await moderation.unblock(player.id);
+      return;
+    }
+    if (!confirmingBlock) {
+      setConfirmingBlock(true);
+      return;
+    }
+    setConfirmingBlock(false);
+    if (await moderation.block(player.id)) {
+      // The server has just ended whatever was between the two; the screen
+      // says the same without waiting to be reloaded.
+      setStatus('none');
+      setId(null);
+    }
+  };
 
   // Opened from a chat, this screen is handed the person but not what they
   // are to us — the chat list knows one and not the other. Offering to
@@ -123,6 +149,11 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
           <Text style={styles.levelLine}>{t('friendProfile.levelLine', level, title)}</Text>
         </View>
 
+        {blocked && <Text style={styles.blockedNote}>{t('moderation.blockedNote')}</Text>}
+
+        {/* Nothing to offer a blocked person: every one of these would be
+            refused by the server, and offering them would be a tease. */}
+        {!blocked && (
         <View style={styles.actionsRow}>
           {known && status === 'accepted' && (
             <>
@@ -141,6 +172,7 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
             </>
           )}
         </View>
+        )}
 
         {/* Their rating, as the ranking has it. Only the number: the
             workings behind it are their own business, and the breakdown
@@ -194,10 +226,36 @@ export default function FriendProfileScreen({ player, friendship, onBack, onComp
           </>
         )}
 
-        {status === 'accepted' && (
+        {status === 'accepted' && !blocked && (
           <PillButton title={t('friendProfile.challenge')} variant="primary" icon="⚔" onPress={onChallenge} style={{ marginTop: 24 }} />
         )}
+
+        {/* At the bottom and quiet on purpose: needed rarely, but it has to
+            be findable on every profile, not only a friend's. */}
+        {moderation.available && (
+          <View style={styles.moderationRow}>
+            <SoundTouchable onPress={() => setReporting(true)} accessibilityRole="button" style={styles.moderationButton}>
+              <Text style={styles.moderationText}>{t('moderation.reportUser')}</Text>
+            </SoundTouchable>
+            <SoundTouchable onPress={toggleBlock} accessibilityRole="button" style={styles.moderationButton}>
+              <Text style={[styles.moderationText, !blocked && styles.moderationDanger]}>
+                {t(blocked ? 'moderation.unblock' : confirmingBlock ? 'moderation.blockConfirm' : 'moderation.block')}
+              </Text>
+            </SoundTouchable>
+          </View>
+        )}
       </ScrollView>
+
+      <ReportSheet
+        target={reporting ? { kind: 'user', userId: player.id } : null}
+        authorId={player.id}
+        authorName={player.username}
+        onClose={() => setReporting(false)}
+        onBlocked={() => {
+          setStatus('none');
+          setId(null);
+        }}
+      />
     </SafeAreaView>
   );
 }
@@ -211,6 +269,18 @@ function makeStyles(theme: Theme) {
     name: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 12 },
     levelLine: { fontSize: 13, fontFamily: fontFamily('600'), color: theme.textMuted, marginTop: 2 },
     actionsRow: { flexDirection: 'row', gap: 10, marginBottom: 20 },
+    blockedNote: {
+      fontSize: 13,
+      lineHeight: 19,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginBottom: 20,
+    },
+    moderationRow: { flexDirection: 'row', justifyContent: 'center', gap: 24, marginTop: 32 },
+    moderationButton: { paddingVertical: 8 },
+    moderationText: { fontSize: 13, fontFamily: fontFamily('700'), color: theme.textMuted },
+    moderationDanger: { color: theme.danger },
     actionButton: { flex: 1 },
     ratingWrap: { marginBottom: 12 },
     statsRow: { flexDirection: 'row', gap: 10, marginBottom: 24 },
