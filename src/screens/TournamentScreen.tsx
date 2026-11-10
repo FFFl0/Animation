@@ -13,7 +13,7 @@ import Icon from '../components/Icon';
 import FadeIn from '../components/FadeIn';
 import { AnswerTiming } from '../quiz/answerTiming';
 import QuizScreen from './QuizScreen';
-import { RoundConfig } from '../quiz/types';
+import { WEEKLY_MATCH_CONFIG } from '../tournament/matchConfig';
 import {
   DeBracket,
   GAME_QUESTIONS,
@@ -38,7 +38,10 @@ import MedalShelf from '../components/MedalShelf';
 import { useShop } from '../shop/ShopContext';
 import { useAuth } from '../auth/AuthContext';
 import {
+  GameTicket,
+  WeeklyError,
   WeeklyState,
+  canPlayTicket,
   canPlayWeekly,
   fetchPreviousWeekly,
   fetchWeekly,
@@ -46,7 +49,8 @@ import {
   openGameOf,
   registerForWeekly,
   secondsUntil,
-  submitGameScore,
+  startGame,
+  submitGamePicks,
   toDeBracket,
   unregisterFromWeekly,
 } from '../tournament/weeklyApi';
@@ -76,11 +80,6 @@ type Phase = 'loading' | 'offline' | 'view' | 'playing';
 
 const TABS: Tab[] = ['bracket', 'players', 'matches', 'past', 'rules'];
 
-export const WEEKLY_MATCH_CONFIG: RoundConfig = {
-  categoryId: 'mixed',
-  questionCount: GAME_QUESTIONS,
-  timerSeconds: 15,
-};
 
 /** Re-reads the bracket while a match is waiting on an opponent. */
 const POLL_MS = 5000;
@@ -111,6 +110,52 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
   const tabsRef = useRef<ScrollView>(null);
   const tabOffsets = useRef<Partial<Record<Tab, number>>>({});
   const [busy, setBusy] = useState(false);
+  /** The game the server dealt: its seed is the only quiz that will be marked. */
+  const [ticket, setTicket] = useState<GameTicket | null>(null);
+  /** Why the last attempt to play or hand in was refused, in the reader's words. */
+  const [notice, setNotice] = useState<string | null>(null);
+  // Memoised because the quiz is rebuilt whenever its config changes
+  // identity — a fresh object every render would deal new questions under
+  // a player who is halfway through answering the old ones.
+  const playConfig = useMemo(
+    () => (ticket ? { ...WEEKLY_MATCH_CONFIG, seed: ticket.seed } : WEEKLY_MATCH_CONFIG),
+    [ticket]
+  );
+
+  /** A refusal from the server, said in words — or a plain apology for one it has no words for. */
+  const explain = (e: unknown): string => {
+    const reason = e instanceof WeeklyError ? e.reason : 'network';
+    const text = t(`tournament.playError.${reason}`);
+    return text.startsWith('tournament.playError') ? t('tournament.playError.generic') : text;
+  };
+
+  /**
+   * Asks the server to deal the game before a single question is shown.
+   * The quiz is no longer the app's to invent: what gets played is the one
+   * the dealt seed produces, because that is the one the server can mark.
+   */
+  const play = async (match: MatchId) => {
+    setNotice(null);
+    setBusy(true);
+    try {
+      const dealt = await startGame(match);
+      // A build whose questions differ from the server's answer key would
+      // be marked against the wrong sheet, so it does not start at all.
+      if (!canPlayTicket(dealt)) {
+        setNotice(t('tournament.playError.updateRequired'));
+        return;
+      }
+      setTicket(dealt);
+      setQuizKey((k) => k + 1);
+      setPlaying(match);
+      setPhase('playing');
+    } catch (e) {
+      setNotice(explain(e));
+      await load().catch(() => {});
+    } finally {
+      setBusy(false);
+    }
+  };
   const [playing, setPlaying] = useState<MatchId | null>(null);
   const [quizKey, setQuizKey] = useState(0);
   const [tick, setTick] = useState(0);
@@ -212,17 +257,21 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
     setBusy(false);
   };
 
-  const finishGame = async (score: number, timing: AnswerTiming) => {
+  const finishGame = async (score: number, timing: AnswerTiming, picks: number[]) => {
     const match = playing;
     setPlaying(null);
+    setTicket(null);
     if (!match) return;
     onMatchPlayed(score, GAME_QUESTIONS, timing);
     setPhase('view');
     setBusy(true);
     try {
-      setState(await submitGameScore(match, score));
+      // The answers go up, not the score: the number on this phone is for
+      // the player's own eyes, and the one that counts is worked out there.
+      setState(await submitGamePicks(match, picks));
       buzz('success');
-    } catch {
+    } catch (e) {
+      setNotice(explain(e));
       await load().catch(() => {});
     }
     setBusy(false);
@@ -235,10 +284,14 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
           // a bought hint against another player is an advantage nobody agreed to
           allowItems={false}
           key={quizKey}
-          config={WEEKLY_MATCH_CONFIG}
-          onFinish={(score, _total, outcome) => finishGame(score, outcome.timing)}
+          config={playConfig}
+          onFinish={(score, _total, outcome) => finishGame(score, outcome.timing, outcome.picks)}
           onClose={() => {
+            // Leaving is allowed, but it is not free any more: the deal is
+            // spent. Better to hear that now than at the third attempt.
+            if (ticket) setNotice(t('tournament.attemptsLeft', ticket.attemptsLeft));
             setPlaying(null);
+            setTicket(null);
             setPhase('view');
           }}
         />
@@ -299,6 +352,12 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
               squeezed. With it, this takes the space left over and
               scrolls inside it, which is what it was always meant to do. */}
           <ScrollView style={styles.contentScroll} contentContainerStyle={styles.content}>
+            {notice && (
+              <SoundTouchable style={styles.notice} onPress={() => setNotice(null)} accessibilityRole="button">
+                <Icon name="globe" size={15} color={theme.danger} />
+                <Text style={styles.noticeText}>{notice}</Text>
+              </SoundTouchable>
+            )}
             {state.tournament.status === 'registration' ? (
               <Registration
                 state={state}
@@ -321,9 +380,7 @@ export default function TournamentScreen({ onBack, onMatchPlayed }: Props) {
                 t={t}
                 busy={busy}
                 onPlay={() => {
-                  setQuizKey((k) => k + 1);
-                  setPhase('playing');
-                  setPlaying(myMatch);
+                  if (myMatch) play(myMatch);
                 }}
                 onRefresh={() => load().catch(() => {})}
               />
@@ -1167,6 +1224,7 @@ function Rules({ styles, theme, t }: { styles: Styles; theme: Theme; t: ReturnTy
     t('tournament.rule.double'),
     t('tournament.rule.series'),
     t('tournament.rule.deadline'),
+    t('tournament.rule.attempts'),
     t('tournament.rule.bots'),
   ];
   return (
@@ -1239,6 +1297,18 @@ function makeStyles(theme: Theme) {
     tabText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('700'), color: theme.textMuted },
     tabTextActive: { color: theme.onPrimary },
     contentScroll: { flex: 1 },
+    notice: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 10,
+      padding: 14,
+      marginBottom: 12,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.danger,
+      backgroundColor: theme.card,
+    },
+    noticeText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: fontFamily('600'), color: theme.text },
     content: { paddingHorizontal: 20, paddingBottom: 40 },
     pastErrorDetail: {
       fontSize: 11,

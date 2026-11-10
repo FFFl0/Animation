@@ -34,6 +34,12 @@ export type RoundOutcome = {
   lost: boolean;
   /** The same thinking time unaveraged, for the profile's own running mean. */
   timing: AnswerTiming;
+  /**
+   * Which option was tapped on each question, in order; -1 where the clock
+   * ran out or the question was skipped. A tournament game is marked from
+   * these on the server rather than from the score above.
+   */
+  picks: number[];
 };
 
 type Props = {
@@ -84,6 +90,8 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
    * a re-render per tick is exactly what a quiz does not need. */
   const askedAt = useRef(Date.now());
   const answerTimes = useRef<number[]>([]);
+  /** What was tapped on each question — see RoundOutcome.picks. */
+  const picks = useRef<number[]>([]);
   /** Set while a timed-out question is showing its answer before moving on. */
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
 
@@ -147,6 +155,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     // other answer so a battle opponent sees the progress.
     stopTimer();
     recordAnswerTime();
+    picks.current[index] = -1;
     setSelected(-1);
     playWrong();
     if (hasLives) setLives((l) => Math.max(0, l - 1));
@@ -166,6 +175,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
     // still ticking under a revealed answer only reads as a bug.
     stopTimer();
     recordAnswerTime();
+    picks.current[index] = optionIndex;
     setSelected(optionIndex);
     const correct = optionIndex === question.correctIndex;
     const nextScore = correct ? score + 1 : score;
@@ -187,6 +197,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
         averageAnswerMs: averageAnswerMs(answerTimes.current),
         lost: outOfLives,
         timing: answerTiming(answerTimes.current),
+        picks: [...picks.current],
       });
       return;
     }
@@ -213,11 +224,13 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const useSkip = () => {
     if (selected !== null || !spendConsumable('skipQuestion')) return;
     buzz('tap');
+    picks.current[index] = -1;
     if (isLast) {
       onFinish(score, index - skipped, {
         averageAnswerMs: averageAnswerMs(answerTimes.current),
         lost: false,
         timing: answerTiming(answerTimes.current),
+        picks: [...picks.current],
       });
       return;
     }

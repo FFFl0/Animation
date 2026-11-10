@@ -1644,3 +1644,96 @@ $$;
 
 revoke execute on function public.shop_claim_store_purchase(uuid, text, text, text, text, text, text, int)
   from anon, authenticated;
+
+-- ============================================================
+-- ТУРНИР: СЧЁТ СЧИТАЕТ СЕРВЕР
+--
+-- Раньше приложение само присылало счёт сыгранной партии, и функция ему
+-- верила — любому целому от 0 до 7. Теперь партию сначала «сдают»: функция
+-- выдаёт сид, приложение играет ровно ту викторину, что из него получается,
+-- и присылает, какой вариант выбран в каждом вопросе. Счёт считает функция
+-- по ключу ответов (supabase/functions/_shared/tournamentKey.ts).
+-- ============================================================
+
+/*
+ * Что и когда было сдано игроку на конкретную партию.
+ *
+ * Строка одна на (партию, сторону) и перезаписывается при каждом новом
+ * старте: засчитывается только последняя раздача. attempts считает старты —
+ * без потолка можно было бы открывать партию, смотреть первый вопрос и
+ * выходить, пока не выпадет лёгкий набор.
+ *
+ * Политик нет намеренно: читает и пишет таблицу только функция, сервисным
+ * ключом. Сид игроку она отдаёт сама, а чужой сид никому не нужен.
+ */
+create table if not exists public.tournament_tickets (
+  tournament_id uuid not null references public.weekly_tournaments(id) on delete cascade,
+  match_id text not null,
+  game_no int not null,
+  side text not null check (side in ('a', 'b')),
+  seed int not null,
+  attempts int not null default 1,
+  issued_at timestamptz not null default now(),
+  primary key (tournament_id, match_id, game_no, side)
+);
+
+alter table public.tournament_tickets enable row level security;
+
+-- ============================================================
+-- РЕЗУЛЬТАТЫ РАУНДОВ: ГРАНИЦЫ
+--
+-- round_results пишет приложение игрока, и проверить обычный раунд сервер
+-- не может — он играется на телефоне. Сделать эти строки правдой нельзя,
+-- но можно сделать их правдоподобными: счёт не больше длины раунда, раунд
+-- не длиннее самого длинного режима, время ставит сервер, и строк не
+-- больше, чем человек успевает сыграть.
+--
+-- До этого сюда принималось что угодно: score = 1 000 000, дата из
+-- прошлого сезона, тысяча строк в секунду — и недельная с сезонной
+-- таблицы показывали бы это как есть.
+-- ============================================================
+
+-- 30 — самый длинный раунд в игре (режим с жизнями, src/data/modes.ts);
+-- тест сверяет число с режимами. NOT VALID: правило действует на новые
+-- строки, а уже лежащие не перепроверяются — иначе одна старая кривая
+-- строка не дала бы прогнать схему.
+alter table public.round_results drop constraint if exists round_results_bounds;
+alter table public.round_results
+  add constraint round_results_bounds check (total between 1 and 30 and score between 0 and total) not valid;
+
+create or replace function public.round_results_guard()
+returns trigger
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_last timestamptz;
+  v_day int;
+begin
+  -- Время ставит сервер. Иначе раунд можно «сыграть» задним числом — в
+  -- прошлую неделю или в сезон, который уже подведён.
+  new.created_at := now();
+
+  select max(created_at) into v_last from public.round_results where user_id = new.user_id;
+  -- Самый короткий раунд — шесть вопросов; за пять секунд его не сыграть.
+  if v_last is not null and v_last > now() - interval '5 seconds' then
+    raise exception 'round logged too soon after the last one' using errcode = 'P0001';
+  end if;
+
+  select count(*) into v_day
+    from public.round_results
+   where user_id = new.user_id and created_at > now() - interval '24 hours';
+  -- Шестьсот раундов в сутки — это больше шести часов игры без пауз.
+  if v_day >= 600 then
+    raise exception 'daily round limit reached' using errcode = 'P0001';
+  end if;
+
+  return new;
+end;
+$$;
+
+drop trigger if exists round_results_guard on public.round_results;
+create trigger round_results_guard
+  before insert on public.round_results
+  for each row execute function public.round_results_guard();

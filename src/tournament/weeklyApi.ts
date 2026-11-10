@@ -1,5 +1,7 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { DE_SIZE, DeBracket, Entrant, Game, MatchId } from './doubleElim';
+import { reasonOf } from '../auth/functionReason';
+import { TOURNAMENT_KEY_VERSION } from './keyVersion';
 
 export type WeeklyStatus = 'registration' | 'seeding' | 'running' | 'finished';
 
@@ -36,11 +38,41 @@ export type WeeklyState = {
 
 export const canPlayWeekly = isSupabaseConfigured;
 
-async function call(body: Record<string, unknown>): Promise<WeeklyState> {
+/** A refusal the function gave by name, so the screen can say what it was. */
+export class WeeklyError extends Error {
+  constructor(public reason: string) {
+    super(reason);
+  }
+}
+
+async function invoke<T>(body: Record<string, unknown>): Promise<T> {
   const { data, error } = await supabase!.functions.invoke('tournament', { body });
-  if (error) throw new Error(error.message);
-  if (data?.error) throw new Error(String(data.error));
-  return data as WeeklyState;
+  if (error) throw new WeeklyError(await reasonOf(error));
+  if (data?.error) throw new WeeklyError(String(data.error));
+  return data as T;
+}
+
+const call = (body: Record<string, unknown>) => invoke<WeeklyState>(body);
+
+/**
+ * A dealt game: the seed of the one quiz whose answers the server will
+ * accept for it, and the answer key that quiz has to agree with.
+ */
+export type GameTicket = { seed: number; keyVersion: string; attemptsLeft: number };
+
+/**
+ * Asks the server to deal the game. The app no longer makes up its own
+ * tournament quiz: it plays the one this seed produces, and the server —
+ * which holds the answers to it — does the marking.
+ */
+export async function startGame(matchId: MatchId): Promise<GameTicket> {
+  const { ticket } = await invoke<{ ticket: GameTicket }>({ action: 'start', matchId });
+  return ticket;
+}
+
+/** True when this build's generator produces the quiz the server will mark. */
+export function canPlayTicket(ticket: GameTicket): boolean {
+  return ticket.keyVersion === TOURNAMENT_KEY_VERSION;
 }
 
 export const fetchWeekly = () => call({ action: 'state' });
@@ -62,7 +94,13 @@ export async function fetchPreviousWeekly(): Promise<WeeklyState | null> {
 
 export const registerForWeekly = () => call({ action: 'register' });
 export const unregisterFromWeekly = () => call({ action: 'unregister' });
-export const submitGameScore = (matchId: MatchId, score: number) => call({ action: 'submit', matchId, score });
+/**
+ * Hands a played game in: which option was tapped on each question, -1
+ * where the clock ran out. Not the score — that is the server's to work
+ * out, which is the whole point.
+ */
+export const submitGamePicks = (matchId: MatchId, picks: number[]) =>
+  call({ action: 'submit', matchId, picks, keyVersion: TOURNAMENT_KEY_VERSION });
 
 /**
  * Turns the server's rows into the bracket the engine understands, so every

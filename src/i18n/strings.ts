@@ -421,6 +421,22 @@ const ru: StringDict = {
     format: 'BO16 · двойное выбывание',
     back: 'Назад',
     tab: { bracket: 'Сетка', players: 'Участники', matches: 'Матчи', past: 'Прошлый', rules: 'Правила' },
+    attemptsLeft: (n: number) =>
+      n > 0
+        ? `Партия прервана. Осталось попыток начать её заново: ${n}.`
+        : 'Партия прервана, и попыток больше нет. Если её не сыграть до срока, она уйдёт сопернику.',
+    playError: {
+      generic: 'Не получилось. Попробуйте ещё раз.',
+      network: 'Нет связи с сервером. Попробуйте ещё раз.',
+      updateRequired: 'Обновите приложение: вопросы турнира изменились, и эта версия играет по старым.',
+      noAttemptsLeft: 'Попытки на эту партию закончились. Если она не сыграна до срока, уйдёт сопернику.',
+      alreadyPlayed: 'Эта партия уже сыграна — ждём соперника.',
+      tooFast: 'Ответы пришли быстрее, чем их можно прочитать. Партия не засчитана — начните заново.',
+      ticketExpired: 'Партия шла слишком долго и не засчитана. Начните заново.',
+      noTicket: 'Партию нужно начать заново.',
+      badPicks: 'Ответы пришли неполными. Начните партию заново.',
+      startFailed: 'Не удалось начать партию. Попробуйте ещё раз.',
+    },
     pastTitle: (week: string) => `Турнир недели ${week}`,
     pastEmptyTitle: 'Прошлых турниров нет',
     pastEmpty: 'Как только первый турнир доиграют до конца, его призёры и сетка останутся здесь.',
@@ -481,6 +497,7 @@ const ru: StringDict = {
       double: 'Двойное выбывание: первое поражение — в нижнюю сетку, второе — вылет.',
       series: 'Матч идёт до двух побед, каждая партия — 7 вопросов.',
       deadline: 'На партию даётся 90 минут. Не сыграли — она уходит сопернику.',
+      attempts: 'Партию можно начать не больше трёх раз, и каждый раз вопросы новые. Вышли посреди партии — попытка сгорела.',
       bots: 'Если записалось меньше 16, свободные места занимают боты.',
     },
     offlineTitle: 'Нужен облачный аккаунт',
@@ -1176,6 +1193,22 @@ const en: StringDict = {
     format: 'BO16 · double elimination',
     back: 'Back',
     tab: { bracket: 'Bracket', players: 'Players', matches: 'Matches', past: 'Last', rules: 'Rules' },
+    attemptsLeft: (n: number) =>
+      n > 0
+        ? `Game abandoned. Attempts left to start it again: ${n}.`
+        : 'Game abandoned, and no attempts are left. If it is not played in time it goes to your opponent.',
+    playError: {
+      generic: 'That did not work. Try again.',
+      network: 'No connection to the server. Try again.',
+      updateRequired: 'Update the app: the tournament questions have changed and this version plays the old ones.',
+      noAttemptsLeft: 'No attempts left for this game. If it is not played in time it goes to your opponent.',
+      alreadyPlayed: 'This game is already played — waiting for your opponent.',
+      tooFast: 'The answers came in faster than they can be read. The game did not count — start again.',
+      ticketExpired: 'The game took too long and did not count. Start again.',
+      noTicket: 'The game has to be started again.',
+      badPicks: 'The answers came through incomplete. Start the game again.',
+      startFailed: 'Could not start the game. Try again.',
+    },
     pastTitle: (week: string) => `Tournament of ${week}`,
     pastEmptyTitle: 'No past tournaments',
     pastEmpty: 'Once the first tournament is played out, its podium and bracket stay here.',
@@ -1235,6 +1268,7 @@ const en: StringDict = {
       double: 'Double elimination: the first loss drops you to the losers bracket, the second sends you home.',
       series: 'A match is first to two wins; every game is 7 questions.',
       deadline: 'You get 90 minutes per game. Miss it and the game goes to your opponent.',
+      attempts: 'A game can be started three times at most, with new questions each time. Leave halfway and the attempt is spent.',
       bots: 'If fewer than 16 sign up, bots take the remaining seats.',
     },
     offlineTitle: 'Cloud Account Required',

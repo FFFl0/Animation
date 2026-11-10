@@ -14,6 +14,7 @@
 // runtime.
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
+import { ANSWER_KEY, KEY_POOL, KEY_QUESTIONS, KEY_VERSION } from '../_shared/tournamentKey.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -28,6 +29,34 @@ const START_WEEKDAY = 6;
 const START_HOUR_UTC = 15;
 /** How long a player has to hand in a score before the game is decided without them. */
 const GAME_DEADLINE_MINUTES = 90;
+
+/**
+ * How many times one game may be started. Each start deals a fresh quiz,
+ * so without a limit a player could look at the first question, leave, and
+ * come back for an easier hand until one suited them. Three leaves room for
+ * a crash or a dropped call without making re-rolling a strategy.
+ */
+const MAX_ATTEMPTS = 3;
+
+/**
+ * The window a dealt quiz may be handed in within.
+ *
+ * The floor is a tripwire, not a wall: seven questions cannot be read and
+ * answered in four seconds by a person, so anything faster is a script —
+ * though a script that waits walks straight past it. The ceiling is the
+ * useful one: the clock in the app stops when the app is put away, and ten
+ * minutes for a hundred seconds of questions is as long as that pause can
+ * be stretched.
+ */
+// The key is cut for a game of exactly this length. If the two ever part
+// company every game would be marked against the wrong digits, so the
+// function refuses to start at all rather than do that quietly.
+if (KEY_QUESTIONS !== GAME_QUESTIONS) {
+  throw new Error(`answer key is for ${KEY_QUESTIONS}-question games, the tournament plays ${GAME_QUESTIONS}`);
+}
+
+const MIN_GAME_MS = 4_000;
+const MAX_GAME_MS = 10 * 60_000;
 
 const BOT_NAMES = [
   'Kenshin', 'SakuraFan', 'ShonenKing', 'OtakuNo1', 'RamenLover', 'BlueExorcist',
@@ -310,6 +339,47 @@ async function ensureWeek(admin: SupabaseClient): Promise<{ tournament: Tourname
 
 type Entrant = { seed: number; user_id: string | null; name: string; rating: number };
 
+/*
+ * What a seat is decided on, and how far it can be trusted.
+ *
+ * The number comes from `stats`, and `stats` is written by the player's own
+ * app — the server cannot check an ordinary round, because ordinary rounds
+ * are played on the phone, offline if need be. So it cannot be made true;
+ * what it can be made is *bounded*. Every record is held to the length of
+ * the round it claims to be from, and only the categories and tiers that
+ * exist are counted, so a forged profile can at most look like a player who
+ * has perfected everything — it cannot outrank one, and inventing a
+ * thousand categories of fifteen points each buys nothing.
+ *
+ * Both lists mirror the app (src/data/categories.ts, src/data/difficulty.ts,
+ * src/data/modes.ts) and a test keeps them in step.
+ */
+// SEATING-BEGIN
+const CATEGORY_IDS = ['anime', 'characters', 'openings', 'quotes', 'battles', 'world', 'hard', 'mixed'];
+const TIER_LENGTH: Record<string, number> = { novice: 6, fan: 8, otaku: 10, expert: 12, legend: 15 };
+const MAX_ROUND = 30;
+// SEATING-END
+
+function boundedBest(stats: Record<string, unknown>, key: string, cap: number): number {
+  const best = Number((stats[key] as { bestScore?: unknown } | undefined)?.bestScore);
+  return Number.isFinite(best) ? Math.max(0, Math.min(cap, Math.floor(best))) : 0;
+}
+
+function seatingScore(stats: unknown): number {
+  if (!stats || typeof stats !== 'object') return 0;
+  const record = stats as Record<string, unknown>;
+  let total = 0;
+  for (const category of CATEGORY_IDS) {
+    // A round played outside the ladder — a mode — is banked under the bare
+    // category, and the longest of those is MAX_ROUND questions.
+    total += boundedBest(record, `cat:${category}`, MAX_ROUND);
+    for (const [tier, length] of Object.entries(TIER_LENGTH)) {
+      total += boundedBest(record, `cat:${category}:${tier}`, length);
+    }
+  }
+  return total;
+}
+
 /**
  * Closes registration and fixes the bracket: the highest rated sixteen who
  * signed up take the seats, and bots fill whatever is left so a quiet week
@@ -335,12 +405,14 @@ async function seedBracket(admin: SupabaseClient, tournament: TournamentRow): Pr
   if (ids.length) {
     const { data: rows } = await admin
       .from('leaderboard')
-      .select('id, username, total_score')
+      .select('id, username, stats')
       .in('id', ids);
-    rated = ((rows ?? []) as { id: string; username: string; total_score: number }[]).map((r) => ({
+    rated = ((rows ?? []) as { id: string; username: string; stats: unknown }[]).map((r) => ({
       user_id: r.id,
       name: r.username,
-      rating: r.total_score ?? 0,
+      // Counted here, bounded, rather than read as the view's own sum —
+      // see seatingScore for why that sum cannot be taken at its word.
+      rating: seatingScore(r.stats),
     }));
   }
 
@@ -593,6 +665,78 @@ async function readState(admin: SupabaseClient, tournament: TournamentRow, userI
   };
 }
 
+/**
+ * Marks a handed-in quiz. `picks[q]` is the option tapped on question q,
+ * or -1 where the clock ran out; the key holds the index of the right one.
+ */
+function scorePicks(seed: number, picks: number[]): number {
+  let score = 0;
+  for (let q = 0; q < KEY_QUESTIONS; q++) {
+    if (String(picks[q]) === ANSWER_KEY[(seed - 1) * KEY_QUESTIONS + q]) score++;
+  }
+  return score;
+}
+
+/** Seven whole numbers, each an option index or the "ran out of time" -1. */
+function readPicks(value: unknown): number[] | null {
+  if (!Array.isArray(value) || value.length !== KEY_QUESTIONS) return null;
+  for (const pick of value) {
+    if (typeof pick !== 'number' || !Number.isInteger(pick) || pick < -1 || pick > 3) return null;
+  }
+  return value as number[];
+}
+
+/** A seed from the pool, drawn where the caller cannot predict or steer it. */
+function drawSeed(): number {
+  const word = new Uint32Array(1);
+  crypto.getRandomValues(word);
+  return 1 + (word[0] % KEY_POOL);
+}
+
+type OpenGame =
+  | { ok: false; error: string; status: number }
+  | { ok: true; side: 'a' | 'b'; gameNo: number; alreadyIn: boolean };
+
+/**
+ * The game a player is entitled to play right now, or why there is none.
+ * Starting a game and handing one in ask exactly the same question, so
+ * they ask it here once.
+ */
+async function openGameFor(
+  admin: SupabaseClient,
+  tournament: TournamentRow,
+  userId: string,
+  matchId: string | undefined
+): Promise<OpenGame> {
+  if (tournament.status !== 'running') return { ok: false, error: 'no tournament is running', status: 409 };
+  if (!matchId || !DEF_BY_ID.has(matchId)) return { ok: false, error: 'unknown match', status: 400 };
+
+  const { data: entrantRows } = await admin
+    .from('tournament_entrants')
+    .select('seed, user_id')
+    .eq('tournament_id', tournament.id);
+  const mySeat = ((entrantRows ?? []) as { seed: number; user_id: string | null }[]).find(
+    (e) => e.user_id === userId
+  )?.seed;
+  if (mySeat === undefined) return { ok: false, error: 'not in this tournament', status: 403 };
+
+  const { data: gameRows } = await admin
+    .from('tournament_games')
+    .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
+    .eq('tournament_id', tournament.id);
+  const bracket = new Bracket((gameRows ?? []) as GameRow[]);
+
+  if (!bracket.isPlayable(matchId)) return { ok: false, error: 'match is not open', status: 409 };
+  const [seatA, seatB] = bracket.participants(matchId);
+  const side = seatA === mySeat ? 'a' : seatB === mySeat ? 'b' : null;
+  if (!side) return { ok: false, error: 'not your match', status: 403 };
+
+  const open = bracket.openGame(matchId);
+  if (!open) return { ok: false, error: 'no game to play', status: 409 };
+
+  return { ok: true, side, gameNo: open.game_no, alreadyIn: (side === 'a' ? open.score_a : open.score_b) !== null };
+}
+
 Deno.serve(async (req) => {
   if (req.method === 'OPTIONS') return new Response('ok', { headers: corsHeaders });
 
@@ -601,7 +745,14 @@ Deno.serve(async (req) => {
     global: { headers: { Authorization: req.headers.get('Authorization') ?? '' } },
   });
 
-  let payload: { action?: string; matchId?: string; score?: number };
+  let payload: {
+    action?: string;
+    matchId?: string;
+    /** Which option was tapped on each question, -1 where the clock ran out. */
+    picks?: unknown;
+    /** The answer key the app's generator agrees with — see _shared/tournamentKey.ts. */
+    keyVersion?: string;
+  };
   try {
     payload = await req.json();
   } catch {
@@ -673,51 +824,98 @@ Deno.serve(async (req) => {
     return json(await readState(admin, tournament, user.id));
   }
 
+  /**
+   * Deals a game.
+   *
+   * The app used to make up its own quiz and report its own score. Now it
+   * asks here first and is handed a seed; the quiz that seed produces is
+   * the only one whose answers will be accepted for this game, and the
+   * marking is done on this side when it comes back.
+   *
+   * Each start deals afresh and replaces the last deal, so a game cut short
+   * by a crash can be played again — but only MAX_ATTEMPTS times, or
+   * leaving and coming back would be a way to shop for easy questions.
+   */
+  if (payload.action === 'start') {
+    const game = await openGameFor(admin, tournament, user.id, payload.matchId);
+    if (!game.ok) return json({ error: game.error }, game.status);
+    if (game.alreadyIn) return json({ error: 'alreadyPlayed' }, 409);
+
+    const ticketOf = admin
+      .from('tournament_tickets')
+      .select('attempts')
+      .eq('tournament_id', tournament.id)
+      .eq('match_id', payload.matchId!)
+      .eq('game_no', game.gameNo)
+      .eq('side', game.side);
+    const { data: existing } = await ticketOf.maybeSingle();
+    const used = (existing as { attempts: number } | null)?.attempts ?? 0;
+    if (used >= MAX_ATTEMPTS) return json({ error: 'noAttemptsLeft' }, 409);
+
+    const seed = drawSeed();
+    const { error } = await admin.from('tournament_tickets').upsert(
+      {
+        tournament_id: tournament.id,
+        match_id: payload.matchId,
+        game_no: game.gameNo,
+        side: game.side,
+        seed,
+        attempts: used + 1,
+        issued_at: new Date().toISOString(),
+      },
+      { onConflict: 'tournament_id,match_id,game_no,side' }
+    );
+    if (error) return json({ error: 'startFailed' }, 500);
+
+    return json({ ticket: { seed, keyVersion: KEY_VERSION, attemptsLeft: MAX_ATTEMPTS - used - 1 } });
+  }
+
   if (payload.action === 'submit') {
-    if (tournament.status !== 'running') return json({ error: 'no tournament is running' }, 409);
+    // A build whose generator disagrees with the key — or one from before
+    // there was a key, which sends a bare score — cannot be marked fairly:
+    // its questions are not the ones these answers belong to. It is told
+    // to update rather than being scored against the wrong sheet.
+    if (payload.keyVersion !== KEY_VERSION) return json({ error: 'updateRequired' }, 409);
+    const picks = readPicks(payload.picks);
+    if (!picks) return json({ error: 'badPicks' }, 400);
 
-    const score = payload.score;
-    const matchId = payload.matchId;
-    if (!matchId || !DEF_BY_ID.has(matchId)) return json({ error: 'unknown match' }, 400);
-    if (typeof score !== 'number' || !Number.isInteger(score) || score < 0 || score > GAME_QUESTIONS) {
-      return json({ error: 'bad score' }, 400);
-    }
+    const game = await openGameFor(admin, tournament, user.id, payload.matchId);
+    if (!game.ok) return json({ error: game.error }, game.status);
 
-    const { data: entrantRows } = await admin
-      .from('tournament_entrants')
-      .select('seed, user_id')
-      .eq('tournament_id', tournament.id);
-    const mySeat = ((entrantRows ?? []) as { seed: number; user_id: string | null }[]).find((e) => e.user_id === user.id)?.seed;
-    if (mySeat === undefined) return json({ error: 'not in this tournament' }, 403);
-
-    const { data: gameRows } = await admin
-      .from('tournament_games')
-      .select('match_id, game_no, score_a, score_b, submitted_a, submitted_b, winner, deadline')
-      .eq('tournament_id', tournament.id);
-    const bracket = new Bracket((gameRows ?? []) as GameRow[]);
-
-    if (!bracket.isPlayable(matchId)) return json({ error: 'match is not open' }, 409);
-    const [seatA, seatB] = bracket.participants(matchId);
-    const side = seatA === mySeat ? 'a' : seatB === mySeat ? 'b' : null;
-    if (!side) return json({ error: 'not your match' }, 403);
-
-    const open = bracket.openGame(matchId);
-    if (!open) return json({ error: 'no game to play' }, 409);
-    // Only ever the first submission: a second would be a replay of the same
+    // Only ever the first hand-in: a second would be a replay of the same
     // game with a better score.
-    const already = side === 'a' ? open.score_a : open.score_b;
-    if (already === null) {
+    if (!game.alreadyIn) {
+      const { data: ticket } = await admin
+        .from('tournament_tickets')
+        .select('seed, issued_at')
+        .eq('tournament_id', tournament.id)
+        .eq('match_id', payload.matchId!)
+        .eq('game_no', game.gameNo)
+        .eq('side', game.side)
+        .maybeSingle();
+      const dealt = ticket as { seed: number; issued_at: string } | null;
+      // Answers to a quiz nobody was dealt are answers to nothing.
+      if (!dealt) return json({ error: 'noTicket' }, 409);
+
+      const elapsed = Date.now() - Date.parse(dealt.issued_at);
+      if (elapsed < MIN_GAME_MS) return json({ error: 'tooFast' }, 409);
+      if (elapsed > MAX_GAME_MS) return json({ error: 'ticketExpired' }, 409);
+
+      const score = scorePicks(dealt.seed, picks);
       await admin
         .from('tournament_games')
         .update(
-          side === 'a'
+          game.side === 'a'
             ? { score_a: score, submitted_a: new Date().toISOString() }
             : { score_b: score, submitted_b: new Date().toISOString() }
         )
         .eq('tournament_id', tournament.id)
-        .eq('match_id', matchId)
-        .eq('game_no', open.game_no)
-        .is('winner', null);
+        .eq('match_id', payload.matchId!)
+        .eq('game_no', game.gameNo)
+        .is('winner', null)
+        // and only into an empty slot: two hand-ins racing each other must
+        // not leave the second one's score standing over the first.
+        .is(game.side === 'a' ? 'score_a' : 'score_b', null);
     }
 
     await settle(admin, tournament);

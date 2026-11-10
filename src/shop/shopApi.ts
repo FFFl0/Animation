@@ -5,6 +5,9 @@ import { ConsumableId } from './consumables';
 import { CartLine } from './cart';
 import { Delivery, Order } from './orders';
 import { StorePurchase } from './iap';
+import { reasonOf } from '../auth/functionReason';
+
+export { reasonOf };
 
 /** Where to send the buyer to pay, when an order needs paying for. */
 export type PaymentConfirmation = { url: string; orderId: string };
@@ -30,30 +33,6 @@ export class ShopError extends Error {
   constructor(public reason: string) {
     super(reason);
   }
-}
-
-/**
- * The reason the function gave, out of the error the client wraps it in.
- *
- * supabase-js treats any non-2xx as one error — "Edge Function returned a
- * non-2xx status code" — and hands the untouched Response over as
- * `context`. Without reading it, every refusal the function spells out
- * (not enough points, this receipt was rejected, the store is not
- * configured) reaches the screen as "no connection to the server", which
- * is both wrong and unhelpful. So the body is read here, and only a
- * genuinely unreadable answer is reported as a network problem.
- */
-export async function reasonOf(error: unknown): Promise<string> {
-  const context = (error as { context?: unknown })?.context;
-  if (typeof Response !== 'undefined' && context instanceof Response) {
-    try {
-      const body = await context.clone().json();
-      if (typeof body?.error === 'string') return body.error;
-    } catch {
-      // Not JSON, or already read — fall through to 'network'.
-    }
-  }
-  return 'network';
 }
 
 async function call(body: Record<string, unknown>): Promise<ShopState> {
