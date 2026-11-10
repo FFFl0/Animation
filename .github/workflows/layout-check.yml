@@ -1,0 +1,36 @@
+# Looks at the app at phone widths and reports text that is broken
+# mid-word, cut off, or running off the screen — see scripts/check-layout.mjs.
+#
+# Started by hand (Actions → Layout check → Run workflow). The screenshots
+# come back as an artifact whether or not anything was found, because a
+# person looking at them catches what a rule cannot.
+name: Layout check
+
+on:
+  workflow_dispatch:
+
+jobs:
+  layout:
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+          cache: npm
+
+      - run: npm ci
+
+      # Not a dependency of the app, so it is fetched here rather than
+      # carried in package.json.
+      - run: npm install --no-save playwright
+      - run: npx playwright install --with-deps chromium
+
+      - run: npm run check:layout
+
+      - uses: actions/upload-artifact@v4
+        if: always()
+        with:
+          name: layout-shots
+          path: layout-shots/

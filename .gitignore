@@ -9,3 +9,6 @@ web-build/
 
 # Supabase CLI scratch
 supabase/.temp/
+
+# Screenshots from `npm run check:layout`
+layout-shots/

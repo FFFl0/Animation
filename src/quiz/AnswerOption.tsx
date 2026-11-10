@@ -81,6 +81,9 @@ export default function AnswerOption({
         onPressIn={() => Animated.spring(press, { toValue: 0.97, useNativeDriver: useNative, friction: 7 }).start()}
         onPressOut={() => Animated.spring(press, { toValue: 1, useNativeDriver: useNative, friction: 7 }).start()}
         accessibilityRole="button"
+        // Named so the layout check can press an answer without knowing what the
+        // answers are this time.
+        testID="answer-option"
       >
         <Animated.Text style={textStyle}>{label}</Animated.Text>
       </Pressable>

@@ -332,7 +332,7 @@ function ShopCard({
 }) {
   const art = round ? width - 20 : width - 20;
   return (
-    <SoundTouchable style={[styles.card, { width }]} onPress={onPress} activeOpacity={0.86}>
+    <SoundTouchable style={[styles.card, round && styles.cardRound, { width }]} onPress={onPress} activeOpacity={0.86}>
       <View style={[styles.cardArt, round && { borderRadius: art / 2, alignSelf: 'center' }]}>
         <ItemPreview item={item} size={art} theme={theme} />
         {/* the play mark says "this one moves" — same as a video thumbnail */}
@@ -489,18 +489,23 @@ function makeStyles(theme: Theme) {
     // shorter than the letters in it crops their tails.
     cardTitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 9 },
     /*
-     * A round card is a quarter of the screen, and the card's own padding
-     * took 20dp more off the label — leaving about 52dp on a 360dp phone,
-     * where "Лепестки" needs 58. A word that does not fit is broken
-     * wherever it runs out, so the shelf read "Лепестк / и".
+     * A round card is a quarter of the screen — 72.5dp on a 360dp phone —
+     * and with the card's usual 10dp of padding the label was left about
+     * 50dp, where "Лепестки" needs 53.5 even a point smaller. A word that
+     * does not fit is broken wherever it runs out, so the shelf read
+     * "Лепестк / и".
      *
-     * Two things buy the room back. The label reaches the card's edges
-     * (the artwork above it keeps the padding, so nothing looks cramped),
-     * and it drops a point. That is 64dp against a longest name of 56 —
-     * measured, not guessed, against Manrope's own advance widths for
-     * every name in both languages.
+     * The room comes from the card itself: a round card pads its sides by 4
+     * instead of 10. The artwork is a fixed size and centred, so it does not
+     * move; only the label gains, and it gains in every layout engine.
+     *
+     * The first attempt widened the label with negative margins instead.
+     * That does nothing in a browser — the box keeps its width and merely
+     * shifts — and the layout check is what said so, on the first run it
+     * ever made.
      */
-    cardTitleRound: { textAlign: 'center', fontSize: 11, lineHeight: 15, marginHorizontal: -6 },
+    cardRound: { paddingHorizontal: 4 },
+    cardTitleRound: { textAlign: 'center', fontSize: 11, lineHeight: 15 },
     /* Below ~64dp of card even that is short, so the narrowest phones drop
      * one more point. The threshold is where the longest name stops
      * fitting, not a round number. */
