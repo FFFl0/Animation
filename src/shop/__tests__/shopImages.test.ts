@@ -37,7 +37,10 @@ function jpegSize(bytes: Buffer): { width: number; height: number } | null {
 }
 
 describe('shop artwork', () => {
-  const files = readdirSync(SHOP_DIR).filter((name) => name.startsWith('merch-') && name.endsWith('.jpg'));
+  /** Every product picture. hero.jpg is the shop's banner, not a product. */
+  const files = readdirSync(SHOP_DIR).filter(
+    (name) => name.endsWith('.jpg') && (name.startsWith('merch-') || name.startsWith('item-'))
+  );
 
   it('has a picture for every physical item', () => {
     const wanted = SHOP_ITEMS.filter(needsDelivery).map((item) => `${item.id}.jpg`);
@@ -45,16 +48,24 @@ describe('shop artwork', () => {
     for (const name of wanted) expect(files).toContain(name);
   });
 
-  it.each(['merch-tee', 'merch-hoodie', 'merch-mug', 'merch-poster', 'merch-stickers', 'merch-figure'])(
-    '%s is 4:3, so nothing is cropped off it',
-    (id) => {
-      const size = jpegSize(readFileSync(join(SHOP_DIR, `${id}.jpg`)));
-      expect(size).not.toBeNull();
-      // A couple of pixels of slack for a photograph that was cropped by
-      // hand; anything further off will visibly lose its edges.
-      expect(size!.width / size!.height).toBeCloseTo(4 / 3, 2);
-    }
-  );
+  it('has a picture for every game item', () => {
+    const wanted = SHOP_ITEMS.filter((item) => item.grant.kind === 'consumable').map((item) => `${item.id}.jpg`);
+    expect(wanted.length).toBeGreaterThan(0);
+    for (const name of wanted) expect(files).toContain(name);
+  });
+
+  it('names nothing the catalogue has never heard of', () => {
+    const ids = new Set(SHOP_ITEMS.map((item) => item.id));
+    for (const name of files) expect(ids).toContain(name.replace(/\.jpg$/, ''));
+  });
+
+  it.each(files)('%s is 4:3, so nothing is cropped off it', (name) => {
+    const size = jpegSize(readFileSync(join(SHOP_DIR, name)));
+    expect(size).not.toBeNull();
+    // A couple of pixels of slack for a photograph cropped by hand;
+    // anything further off will visibly lose its edges.
+    expect(size!.width / size!.height).toBeCloseTo(4 / 3, 2);
+  });
 
   it('keeps the files small enough to ship', () => {
     for (const name of files) {
