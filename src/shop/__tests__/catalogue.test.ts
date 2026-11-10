@@ -48,9 +48,14 @@ describe('catalogue', () => {
     }
   });
 
-  it('ships a picture for everything you can hold, and none for what you cannot', () => {
+  it('ships a picture for everything that cannot draw itself', () => {
+    // Merch and the game items are pictures; a frame or an avatar is not.
+    // Those two are animations, shown live and in motion, and a still of
+    // one would be a worse version of the thing it is selling — so the
+    // absence of a file for them is the design, not a gap in it.
     for (const item of SHOP_ITEMS) {
-      expect(SHOP_IMAGES[item.id] !== undefined).toBe(needsDelivery(item));
+      const drawsItself = item.grant.kind === 'animatedAvatar' || item.grant.kind === 'animatedFrame';
+      expect(SHOP_IMAGES[item.id] !== undefined).toBe(!drawsItself);
     }
     // and carries no picture for an item that no longer exists
     for (const id of Object.keys(SHOP_IMAGES)) expect(shopItem(id)).toBeDefined();
