@@ -67,13 +67,19 @@ jobs:
       - name: Link EAS project (idempotent)
         run: npx eas-cli init --non-interactive --force
 
+      # The progress lines go to stderr and are copied to a file as they
+      # come: if this job runs out of time while EAS is still queued or
+      # building, the JSON on stdout never arrives, and the "See logs" line
+      # is the only place left that says where the build is.
       - name: Build
+        shell: bash
         run: |
+          set -o pipefail
           npx eas-cli build \
             --platform ${{ matrix.platform }} \
             --profile ${{ github.event.inputs.profile }} \
             ${{ github.event.inputs.wait == 'false' && '--no-wait' || '' }} \
-            --non-interactive --json > build-output.json
+            --non-interactive --json > build-output.json 2> >(tee build-log.txt >&2)
 
       - name: Publish download link to job summary
         if: always()
@@ -98,7 +104,22 @@ jobs:
               else write('\nStatus: ' + b.status + '. See the log above or your expo.dev dashboard.');
             "
           else
-            echo "Build output was empty — check the log above for the error." >> "$GITHUB_STEP_SUMMARY"
+            # Stopping this job does not stop the build: it was handed to EAS
+            # at upload and carries on there whatever happens to the runner.
+            link=$(grep -o 'https://expo.dev/accounts/[^ ]*/builds/[0-9a-f-]*' build-log.txt 2>/dev/null | head -1 || true)
+            if [ -n "$link" ]; then
+              {
+                echo
+                echo "This job stopped waiting, but **the build itself carries on at EAS** — it is not cancelled."
+                echo "It was most likely waiting in the free-plan queue. The APK will be here when it is done:"
+                echo
+                echo "[Open the build on expo.dev]($link)"
+                echo
+                echo "No need to start another build: each one goes to the back of the same queue."
+              } >> "$GITHUB_STEP_SUMMARY"
+            else
+              echo "Build output was empty — check the log above for the error." >> "$GITHUB_STEP_SUMMARY"
+            fi
           fi
 
       - name: Upload build metadata
