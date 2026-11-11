@@ -11,7 +11,8 @@ import { Delivery, Order, PaidWith, deliveryProblems, newOrderId } from './order
 import { EMPTY_SHOP_STATE, LocalShopState, loadShop, saveShop } from './shopStorage';
 import * as Linking from 'expo-linking';
 import * as WebBrowser from 'expo-web-browser';
-import { ShopError, ShopState, buyItem, claimStorePurchase, fetchShop, isCloudShop, placeOrderRemote, spendItem } from './shopApi';
+import { ShopError, ShopState, buyItem, claimDaily, claimStorePurchase, fetchShop, isCloudShop, placeOrderRemote, spendItem } from './shopApi';
+import { rewardForDay } from '../quests/quests';
 import { isPaymentConfigured, payRubles } from './payment';
 import { ALL_SKUS, isConsumableSku, moneyRail, skuOf } from './products';
 import {
@@ -80,6 +81,12 @@ type ShopContextValue = {
   setQuantity: (itemId: string, size: ApparelSize | undefined, quantity: number) => void;
   clearCart: () => void;
   placeOrder: (delivery: Delivery, currency: Currency) => Promise<OrderResult>;
+  /**
+   * Hands over the reward for the day's quests: one consumable, and which
+   * one follows from the date. 'alreadyClaimed' means the day's reward is
+   * gone — collected here earlier or on another device.
+   */
+  claimDailyReward: (day: string) => Promise<'granted' | 'alreadyClaimed' | 'failed'>;
   /** Banks a finished tournament run. A no-op in the cloud, which did it already. */
   recordTournamentRun: (place: number, runId: string) => void;
   refresh: () => void;
@@ -418,6 +425,22 @@ export function ShopProvider({ children }: { children: ReactNode }) {
     return { ok: true, order };
   };
 
+  const claimDailyReward = async (day: string): Promise<'granted' | 'alreadyClaimed' | 'failed'> => {
+    if (cloud) {
+      try {
+        setWallet(await claimDaily(day));
+        return 'granted';
+      } catch (e) {
+        return e instanceof ShopError && e.reason === 'dailyClaimed' ? 'alreadyClaimed' : 'failed';
+      }
+    }
+    // On a local account the device is the only record there is, and the
+    // quests' own "claimed" flag is what stops a second helping.
+    const consumable = rewardForDay(day);
+    commitLocal({ ...local, counts: { ...local.counts, [consumable]: (local.counts[consumable] ?? 0) + 1 } });
+    return 'granted';
+  };
+
   const recordTournamentRun = (place: number, runId: string) => {
     // In the cloud the tournament function already wrote the medal when the
     // bracket finished; the app only has to re-read it.
@@ -455,6 +478,7 @@ export function ShopProvider({ children }: { children: ReactNode }) {
       setQuantity,
       clearCart,
       placeOrder,
+      claimDailyReward,
       recordTournamentRun,
       refresh,
     }),

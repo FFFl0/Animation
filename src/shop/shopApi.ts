@@ -76,3 +76,10 @@ export const claimStorePurchase = (purchase: StorePurchase) =>
     purchaseToken: purchase.token,
     transactionId: purchase.transactionId,
   });
+
+/**
+ * Collects the reward for the day's quests. The server hands out one a
+ * day and decides for itself which item it is; all the app says is which
+ * day it is asking about.
+ */
+export const claimDaily = (day: string) => call({ action: 'daily', day });

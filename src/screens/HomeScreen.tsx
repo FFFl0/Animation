@@ -15,6 +15,7 @@ import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
 import StreakCard from '../components/StreakCard';
+import DailyQuestsCard from '../components/DailyQuestsCard';
 import FadeIn from '../components/FadeIn';
 import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
@@ -114,6 +115,8 @@ export default function HomeScreen({
         </SoundTouchable>
 
         <StreakCard days={profile.streak.count} />
+
+        <DailyQuestsCard />
 
         <Text style={styles.sectionTitle}>{t('home.sectionCategory')}</Text>
         <View style={styles.grid}>

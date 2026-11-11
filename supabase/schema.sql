@@ -2023,3 +2023,55 @@ left join public.profiles target on target.id = r.target_user_id
 order by r.created_at desc;
 
 revoke all on public.moderation_queue from anon, authenticated;
+
+-- ============================================================
+-- ЕЖЕДНЕВНЫЕ ЗАДАНИЯ: НАГРАДА
+--
+-- Три задания в день выбирает само приложение по дате, прогресс по ним
+-- оно же и считает — раунды играются на телефоне, и проверить их сервер
+-- не может. Поэтому сервер не проверяет, а ограничивает: награда одна в
+-- день, и какая именно — решает он сам, по дате. Худшее, чего добьётся
+-- нечестный клиент, — один расходник в сутки, который ему и так полагался
+-- бы за три сыгранных раунда.
+-- ============================================================
+
+create table if not exists public.daily_rewards (
+  user_id uuid not null references auth.users(id) on delete cascade,
+  day date not null,
+  consumable text not null,
+  created_at timestamptz not null default now(),
+  primary key (user_id, day)
+);
+
+-- Политик нет: таблицу читает и пишет только функция shop.
+alter table public.daily_rewards enable row level security;
+
+/*
+ * Выдать награду дня. Возвращает false, если за этот день она уже выдана:
+ * первичный ключ (игрок, день) и есть вся защита от повторной выдачи, в
+ * том числе от двух одновременных запросов.
+ */
+create or replace function public.shop_claim_daily(p_user uuid, p_day date, p_consumable text)
+returns boolean
+language plpgsql
+security definer
+set search_path = public
+as $$
+begin
+  insert into public.daily_rewards (user_id, day, consumable)
+  values (p_user, p_day, p_consumable)
+  on conflict (user_id, day) do nothing;
+
+  if not found then
+    return false;
+  end if;
+
+  insert into public.shop_inventory (user_id, consumable, count)
+  values (p_user, p_consumable, 1)
+  on conflict (user_id, consumable) do update set count = public.shop_inventory.count + 1;
+
+  return true;
+end;
+$$;
+
+revoke execute on function public.shop_claim_daily(uuid, date, text) from anon, authenticated;

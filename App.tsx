@@ -39,6 +39,7 @@ import { NotificationTarget } from './src/notifications/notificationRoute';
 import { useNotificationTaps } from './src/notifications/useNotificationTaps';
 import TournamentScreen from './src/screens/TournamentScreen';
 import { ModerationProvider } from './src/moderation/ModerationContext';
+import { QuestsProvider, useQuests } from './src/quests/QuestsContext';
 import { WEEKLY_MATCH_CONFIG } from './src/tournament/matchConfig';
 import ShopScreen from './src/screens/ShopScreen';
 import { ShopTab } from './src/shop/catalogue';
@@ -161,6 +162,7 @@ function useTransitionDirection(screen: Screen): TransitionDirection {
 function AppShell() {
   const { profile, loading, recordRoundResult } = useAuth();
   const { countOf, spendConsumable } = useShop();
+  const { noteRound } = useQuests();
   const { theme, resolvedScheme } = useTheme();
   const { setMusicContext } = useSound();
   const t = useT();
@@ -489,6 +491,8 @@ function AppShell() {
     });
 
     if (roundConfig) {
+      // Today's quests hear about every finished round, whatever it was.
+      noteRound({ categoryId: roundConfig.categoryId, score, total });
       // A streak freeze is offered to the streak, and only spent if the
       // streak actually needed rescuing.
       const { unlocked, freezeUsed } = await recordRoundResult(
@@ -599,6 +603,7 @@ function AppShell() {
               onMatchPlayed={async (score, total, timing) => {
                 // A tournament game is still seven real questions, so it feeds
                 // stats, XP and achievements like any other round.
+                noteRound({ categoryId: WEEKLY_MATCH_CONFIG.categoryId, score, total });
                 const { unlocked, freezeUsed } = await recordRoundResult(
                   WEEKLY_MATCH_CONFIG,
                   null,
@@ -910,6 +915,7 @@ export default function App() {
             <SoundProvider>
               <AuthProvider>
                 <ShopProvider>
+                <QuestsProvider>
                 <ModerationProvider>
                 <PresenceProvider>
                   <NotificationsProvider>
@@ -930,6 +936,7 @@ export default function App() {
                   </NotificationsProvider>
                 </PresenceProvider>
                 </ModerationProvider>
+                </QuestsProvider>
                 </ShopProvider>
               </AuthProvider>
             </SoundProvider>

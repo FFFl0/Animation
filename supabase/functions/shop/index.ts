@@ -108,6 +108,15 @@ function pointsPrice(rub: number): number {
 const MAX_PER_LINE = 9;
 
 /**
+ * What finishing the day's three quests earns, by turns. Mirrors
+ * CONSUMABLE_IDS in src/shop/consumables.ts — the app works the same answer
+ * out from the date to show it, and a test keeps the two lists in step.
+ */
+// DAILY-BEGIN
+const DAILY_REWARDS = ['hint5050', 'skipQuestion', 'streakFreeze'];
+// DAILY-END
+
+/**
  * Selling digital goods for money inside an app distributed through Google
  * Play has to go through Play Billing — an alternative payment method for
  * them is grounds for removal, whether it replaces the store's or sits
@@ -272,6 +281,8 @@ Deno.serve(async (req) => {
     delivery?: Record<string, unknown>;
     /** Where ЮKassa sends the buyer back to once the page is done. */
     returnUrl?: string;
+    /** The day a daily reward is claimed for, YYYY-MM-DD — see the 'daily' action. */
+    day?: string;
     /** A receipt from the store's own billing — see the 'claim' action. */
     platform?: string;
     productId?: string;
@@ -464,6 +475,34 @@ Deno.serve(async (req) => {
     if (android) await acknowledgePlayPurchase(productId, purchaseToken);
 
     return json({ ...(await readState(admin, user.id)), claimed: outcome ?? 'granted' });
+  }
+
+  /**
+   * The reward for the day's quests.
+   *
+   * Whether the quests were really done is not checked, because it cannot
+   * be: rounds are played on the phone. What is enforced is the size of
+   * the prize — one item a day, and which item is decided here from the
+   * date, not taken from the request. The day itself comes from the app,
+   * since "today" depends on its clock, but only a day within one of the
+   * server's own is accepted, so the calendar cannot be walked backwards
+   * to collect a year of rewards in an afternoon.
+   */
+  if (payload.action === 'daily') {
+    const day = typeof payload.day === 'string' ? payload.day : '';
+    if (!/^\d{4}-\d{2}-\d{2}$/.test(day)) return json({ error: 'badRequest' }, 400);
+    const dayNo = Math.floor(Date.parse(`${day}T00:00:00Z`) / 86_400_000);
+    const todayNo = Math.floor(Date.now() / 86_400_000);
+    if (!Number.isFinite(dayNo) || Math.abs(dayNo - todayNo) > 1) return json({ error: 'badRequest' }, 400);
+
+    const { data: granted, error } = await admin.rpc('shop_claim_daily', {
+      p_user: user.id,
+      p_day: day,
+      p_consumable: DAILY_REWARDS[dayNo % DAILY_REWARDS.length],
+    });
+    if (error) return json({ error: 'claimFailed' }, 409);
+    if (!granted) return json({ error: 'dailyClaimed' }, 409);
+    return json(await readState(admin, user.id));
   }
 
   if (payload.action === 'spend') {
