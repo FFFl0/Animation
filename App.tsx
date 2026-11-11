@@ -63,6 +63,7 @@ import { identifyForCrashReports } from './src/monitoring/sentry';
 import { ChatGroup } from './src/chat/groupApi';
 import { CategoryId, getCategory, categoryTitle } from './src/data/categories';
 import { TierId, getTier, tierLabel } from './src/data/difficulty';
+import { UNTIERED_ROUND_LENGTH } from './src/data/roundPreview';
 import { GAME_MODES, ModeId, getMode, modeTitle } from './src/data/modes';
 import { categoryStatsKey, getStat } from './src/quiz/statsKey';
 import { RoundConfig } from './src/quiz/types';
@@ -450,7 +451,7 @@ function AppShell() {
     const config: RoundConfig = {
       categoryId,
       tier,
-      questionCount: tier ? getTier(tier).questionsPerRound : 15,
+      questionCount: tier ? getTier(tier).questionsPerRound : UNTIERED_ROUND_LENGTH,
       // Only the last tier sets one; everywhere else this stays undefined
       // and the round has no clock.
       timerSeconds: rules?.timerSeconds,

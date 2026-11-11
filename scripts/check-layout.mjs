@@ -218,7 +218,13 @@ const STEPS = [
   }],
   ['home', async (h) => h.tap('Пропустить')],
   ['home-lower', async (h) => h.scrollDown()],
+  ['category-hard', async (h) => {
+    await h.scrollTop();
+    await h.tap('Сложные', 'first');
+  }],
+  ['category-hard-lower', async (h) => h.scrollDown()],
   ['category', async (h) => {
+    await h.tap('Назад', 'first');
     await h.scrollTop();
     await h.tap('Персонажи');
   }],

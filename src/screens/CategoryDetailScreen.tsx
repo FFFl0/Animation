@@ -1,5 +1,5 @@
 import { useMemo } from 'react';
-import { ScrollView, StyleSheet, Text, View } from 'react-native';
+import { Image, ScrollView, StyleSheet, Text, View } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -14,7 +14,20 @@ import { bestRecord, bestShare } from '../auth/types';
 import { ToriiIcon } from '../components/SakuraDecor';
 import PillButton from '../components/PillButton';
 import ProgressBar from '../components/ProgressBar';
-import Icon from '../components/Icon';
+import Icon, { IconName } from '../components/Icon';
+import AnimeAvatar from '../components/AnimeAvatar';
+import ImageScrim from '../components/ImageScrim';
+import FadeIn from '../components/FadeIn';
+import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
+import { Category, QuestionType } from '../data/categories';
+import { Profile } from '../auth/types';
+import {
+  UNTIERED_ROUND_LENGTH,
+  characterPoolOf,
+  questionKindsOf,
+  sampleFaces,
+  seriesCountOf,
+} from '../data/roundPreview';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 
@@ -112,12 +125,151 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
             })}
           </View>
         ) : (
-          <View style={styles.startWrap}>
-            <PillButton title={t('categoryDetail.startQuiz')} variant="ink" onPress={() => onStartTier(categoryId, undefined)} />
-          </View>
+          <RoundPreview
+            category={category}
+            profile={profile}
+            styles={styles}
+            theme={theme}
+            t={t}
+            onStart={() => onStartTier(categoryId, undefined)}
+          />
         )}
       </ScrollView>
     </SafeAreaView>
+  );
+}
+
+/** What each kind of question is drawn with in the list of kinds. */
+const KIND_ICON: Record<QuestionType, IconName> = {
+  guessSeries: 'book',
+  guessCharacterFull: 'character',
+  guessCharacterSilhouette: 'user',
+  guessCharacterEyes: 'eye',
+  guessQuote: 'quote',
+  guessAbility: 'swords',
+  guessFaction: 'globe',
+  openingTrivia: 'music',
+  guessSeriesByVideo: 'film',
+};
+
+const FACES = 6;
+
+/**
+ * The page for a category with no difficulty levels — Hard and Mixed.
+ *
+ * Those used to be a title and a single button, which read as a page that
+ * had not finished loading. This says what the round is before it starts:
+ * how long, what rules, which kinds of question, a few of the faces it can
+ * ask about, and how the player has done here so far.
+ */
+function RoundPreview({
+  category,
+  profile,
+  styles,
+  theme,
+  t,
+  onStart,
+}: {
+  category: Category;
+  profile: Profile | null;
+  styles: ReturnType<typeof makeStyles>;
+  theme: Theme;
+  t: ReturnType<typeof useT>;
+  onStart: () => void;
+}) {
+  const pool = characterPoolOf(category.id);
+  // Drawn once per visit, so the faces do not reshuffle on every render.
+  const faces = useMemo(() => sampleFaces(pool, FACES), [category.id]); // eslint-disable-line react-hooks/exhaustive-deps
+  const kinds = questionKindsOf(category.id);
+  const stat = profile ? getStat(profile, categoryStatsKey(category.id)) : undefined;
+  const record = stat && stat.gamesPlayed > 0 ? bestRecord(stat, UNTIERED_ROUND_LENGTH) : null;
+  const accuracy =
+    stat && stat.totalQuestions > 0 ? Math.round((stat.totalCorrect / stat.totalQuestions) * 100) : null;
+  const poolText = (category.id === 'hard' ? 'categoryDetail.poolHard' : 'categoryDetail.poolMixed') as string;
+
+  return (
+    <View style={styles.preview}>
+      <FadeIn duration={260}>
+        <View style={[styles.hero, { borderColor: category.color }]}>
+          <Image source={CATEGORY_BACKGROUNDS[category.id]} style={styles.heroImage} resizeMode="cover" />
+          <ImageScrim />
+          <View style={styles.heroChips}>
+            <HeroChip icon="target" label={t('categoryDetail.factQuestions', UNTIERED_ROUND_LENGTH)} styles={styles} />
+            <HeroChip icon="infinity" label={t('categoryDetail.factNoTimer')} styles={styles} />
+            <HeroChip icon="sparkles" label={t('categoryDetail.factItems')} styles={styles} />
+          </View>
+        </View>
+      </FadeIn>
+
+      <View style={styles.startWrap}>
+        <PillButton title={t('categoryDetail.startQuiz')} variant="ink" onPress={onStart} />
+      </View>
+
+      <FadeIn duration={300} delay={80}>
+        <View style={styles.infoCard}>
+          <Text style={styles.infoTitle}>{t('categoryDetail.inRound')}</Text>
+          <Text style={styles.infoText}>{t(poolText, pool.length, seriesCountOf(category.id))}</Text>
+
+          <Text style={styles.infoSubtitle}>{t('categoryDetail.kinds')}</Text>
+          <View style={styles.kindRow}>
+            {kinds.map((kind) => (
+              <View key={kind} style={[styles.kindChip, { backgroundColor: category.colorBg }]}>
+                <Icon name={KIND_ICON[kind]} size={13} color={category.color} />
+                <Text style={[styles.kindText, { color: category.color }]}>{t(`categoryDetail.kind.${kind}`)}</Text>
+              </View>
+            ))}
+          </View>
+
+          <Text style={styles.infoSubtitle}>{t('categoryDetail.faces')}</Text>
+          <View style={styles.faceRow}>
+            {faces.map((character, i) => (
+              <View key={character.id} style={[styles.face, i > 0 && styles.faceOverlap, { borderColor: theme.card }]}>
+                <AnimeAvatar avatar={character.avatar} characterId={character.id} size={44} />
+              </View>
+            ))}
+            {pool.length > faces.length && (
+              <View style={[styles.face, styles.faceOverlap, styles.faceMore, { borderColor: theme.card }]}>
+                <Text style={styles.faceMoreText}>{t('categoryDetail.facesMore', pool.length - faces.length)}</Text>
+              </View>
+            )}
+          </View>
+        </View>
+      </FadeIn>
+
+      <FadeIn duration={300} delay={160}>
+        <View style={styles.infoCard}>
+          <View style={styles.recordHead}>
+            <Icon name="trophy" size={17} color={category.color} />
+            <Text style={styles.infoTitle}>{t('categoryDetail.record')}</Text>
+          </View>
+          {record && stat ? (
+            <>
+              <View style={styles.recordRow}>
+                <Text style={styles.recordValue}>{t('categoryDetail.recordValue', record.score, record.outOf)}</Text>
+                <View style={styles.recordBar}>
+                  <ProgressBar progress={record.outOf ? record.score / record.outOf : 0} color={category.color} height={6} />
+                </View>
+              </View>
+              <Text style={styles.infoText}>
+                {t('categoryDetail.played', stat.gamesPlayed)}
+                {accuracy !== null ? ` · ${t('categoryDetail.accuracy', accuracy)}` : ''}
+              </Text>
+            </>
+          ) : (
+            <Text style={styles.infoText}>{t('categoryDetail.noRecord')}</Text>
+          )}
+        </View>
+      </FadeIn>
+    </View>
+  );
+}
+
+function HeroChip({ icon, label, styles }: { icon: IconName; label: string; styles: ReturnType<typeof makeStyles> }) {
+  return (
+    <View style={styles.heroChip}>
+      <Icon name={icon} size={12} color="#FFFFFF" />
+      <Text style={styles.heroChipText}>{label}</Text>
+    </View>
   );
 }
 
@@ -168,6 +320,42 @@ function makeStyles(theme: Theme) {
     tierProgressBar: { flex: 1 },
     tierScore: { fontSize: 11, fontFamily: fontFamily('700'), color: theme.textMuted, minWidth: 34, textAlign: 'right' },
     chevron: { fontSize: 22, color: theme.textMuted, fontFamily: fontFamily('700') },
-    startWrap: { marginTop: 12 },
+    startWrap: { marginTop: 4 },
+    preview: { gap: 14 },
+    hero: { height: 180, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1.5 },
+    heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+    heroChips: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    heroChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: radius.pill,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    heroChipText: { fontSize: 11, lineHeight: 14, fontFamily: fontFamily('800'), color: '#FFFFFF' },
+    infoCard: {
+      backgroundColor: theme.card,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 16,
+    },
+    infoTitle: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily('800'), color: theme.text },
+    infoText: { fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4 },
+    infoSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 14, marginBottom: 8 },
+    kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    kindChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill },
+    kindText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('700') },
+    faceRow: { flexDirection: 'row', alignItems: 'center' },
+    face: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+    faceOverlap: { marginLeft: -10 },
+    faceMore: { backgroundColor: theme.primaryLight },
+    faceMoreText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.primary },
+    recordHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    recordRow: { flexDirection: 'row', alignItems: 'center', gap: 12, marginTop: 8 },
+    recordValue: { fontSize: 20, lineHeight: 26, fontFamily: fontFamily('800'), color: theme.text },
+    recordBar: { flex: 1 },
   });
 }
