@@ -99,6 +99,8 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
   /** The question a mistake is being reported in, while its sheet is open. */
   const [reporting, setReporting] = useState<Question | null>(null);
+  /** Why an item button did nothing, shown under the buttons until the next question. */
+  const [itemNote, setItemNote] = useState<string | null>(null);
   /** Questions already reported this round, so the offer is not made twice. */
   const [reported, setReported] = useState<string[]>([]);
 
@@ -127,6 +129,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
 
   useEffect(() => {
     askedAt.current = Date.now();
+    setItemNote(null);
   }, [index]);
 
   // Leaving mid-question must not drag the round on behind a closed screen.
@@ -256,28 +259,52 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const hints = countOf('hint5050');
   const skips = countOf('skipQuestion');
   const canUseItems = allowItems && selected === null;
-  const itemsRow =
-    canUseItems && hints + skips > 0 ? (
+  const hintSpent = hidden.length > 0;
+
+  /** Pressing an item there is none of explains where they come from,
+   * rather than doing nothing — the buttons are always on show precisely
+   * so that players find out the items exist. */
+  const pressItem = (count: number, use: () => void) => {
+    if (count > 0) {
+      setItemNote(null);
+      use();
+    } else {
+      buzz('error');
+      setItemNote(t('items.noneLeft'));
+    }
+  };
+
+  const itemsRow = canUseItems ? (
+    <View>
       <View style={styles.itemsRow}>
-        {hints > 0 && (
-          <SoundTouchable
-            style={[styles.itemButton, hidden.length > 0 && styles.itemButtonSpent]}
-            onPress={useHint}
-            disabled={hidden.length > 0}
-            activeOpacity={0.85}
-          >
-            <Icon name="sparkles" size={14} color={theme.primary} />
-            <Text style={styles.itemButtonText}>{t('quiz.hint5050', hints)}</Text>
-          </SoundTouchable>
-        )}
-        {skips > 0 && (
-          <SoundTouchable style={styles.itemButton} onPress={useSkip} activeOpacity={0.85}>
-            <Icon name="shuffle" size={14} color={theme.primary} />
-            <Text style={styles.itemButtonText}>{t('quiz.skipQuestion', skips)}</Text>
-          </SoundTouchable>
-        )}
+        <SoundTouchable
+          style={[styles.itemButton, (hints === 0 || hintSpent) && styles.itemButtonSpent]}
+          onPress={() => pressItem(hints, useHint)}
+          disabled={hintSpent}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={hintSpent ? t('items.hintUsed') : t('items.hintLabel')}
+          accessibilityState={{ disabled: hintSpent }}
+          testID="quiz-item-hint"
+        >
+          <Icon name="sparkles" size={14} color={hints > 0 ? theme.primary : theme.textMuted} />
+          <Text style={styles.itemButtonText}>{t('items.hint', hints)}</Text>
+        </SoundTouchable>
+        <SoundTouchable
+          style={[styles.itemButton, skips === 0 && styles.itemButtonSpent]}
+          onPress={() => pressItem(skips, useSkip)}
+          activeOpacity={0.85}
+          accessibilityRole="button"
+          accessibilityLabel={t('items.skipLabel')}
+          testID="quiz-item-skip"
+        >
+          <Icon name="shuffle" size={14} color={skips > 0 ? theme.primary : theme.textMuted} />
+          <Text style={styles.itemButtonText}>{t('items.skip', skips)}</Text>
+        </SoundTouchable>
       </View>
-    ) : null;
+      {itemNote && <Text style={styles.itemNote}>{itemNote}</Text>}
+    </View>
+  ) : null;
 
   return (
     <SafeAreaView style={styles.safe}>
@@ -489,7 +516,16 @@ function makeStyles(theme: Theme) {
       paddingVertical: 8,
     },
     itemButtonSpent: { opacity: 0.45 },
-    itemButtonText: { fontSize: 12, fontFamily: fontFamily('700'), color: theme.text },
+    itemButtonText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('700'), color: theme.text },
+    itemNote: {
+      fontSize: 12,
+      lineHeight: 17,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+      textAlign: 'center',
+      marginTop: -4,
+      marginBottom: 10,
+    },
     option: {
       backgroundColor: theme.card,
       borderWidth: 1.5,

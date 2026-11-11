@@ -17,6 +17,8 @@ import ImageScrim from '../components/ImageScrim';
 import StreakCard from '../components/StreakCard';
 import DailyQuestsCard from '../components/DailyQuestsCard';
 import UpdateBanner from '../updates/UpdateBanner';
+import StreakFreezeRow from '../components/StreakFreezeRow';
+import { useShop } from '../shop/ShopContext';
 import FadeIn from '../components/FadeIn';
 import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
@@ -36,6 +38,8 @@ type Props = {
   onOpenSettings: () => void;
   onOpenBattle: () => void;
   onOpenTournament: () => void;
+  /** Opens one item's page in the shop — here, the streak freeze. */
+  onOpenShopItem: (itemId: string) => void;
 };
 
 function categoryCount(id: CategoryId, t: ReturnType<typeof useT>): string {
@@ -67,8 +71,10 @@ export default function HomeScreen({
   onOpenSettings,
   onOpenBattle,
   onOpenTournament,
+  onOpenShopItem,
 }: Props) {
   const { profile } = useAuth();
+  const { countOf } = useShop();
   const { theme } = useTheme();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
@@ -118,6 +124,11 @@ export default function HomeScreen({
         <UpdateBanner />
 
         <StreakCard days={profile.streak.count} />
+        <StreakFreezeRow
+          streak={profile.streak}
+          freezes={countOf('streakFreeze')}
+          onOpenShop={() => onOpenShopItem('item-freeze')}
+        />
 
         <DailyQuestsCard />
 

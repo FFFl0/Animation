@@ -168,21 +168,8 @@ function toProfile(account: Account): Profile {
   return profile;
 }
 
-/**
- * `useFreeze` is a streak freeze bought in the shop: it only matters on the
- * day a streak would otherwise break, and the caller is told whether it was
- * needed so it is not spent for nothing.
- */
-export function bumpStreak(streak: Streak, useFreeze = false): { streak: Streak; freezeUsed: boolean } {
-  const today = todayDateStr();
-  if (streak.lastPlayedDate === today) return { streak, freezeUsed: false };
-  const yesterday = new Date(Date.now() - 86400000).toISOString().slice(0, 10);
-  const kept = streak.lastPlayedDate === yesterday;
-  // A freeze does not add a day, it only stops the count going back to one.
-  const rescued = !kept && useFreeze && streak.count > 0 && streak.lastPlayedDate !== null;
-  const count = kept ? streak.count + 1 : rescued ? streak.count : 1;
-  return { streak: { count, lastPlayedDate: today }, freezeUsed: rescued };
-}
+/** The streak rules, freezes included, live in one place: data/streakFreeze. */
+export { bumpStreak } from '../data/streakFreeze';
 
 /** No period-scoped leaderboard for the local-only backend — there's no
  * shared table to log rounds into, and nobody else's device to compare

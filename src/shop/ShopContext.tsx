@@ -62,7 +62,8 @@ type ShopContextValue = {
   ownsItem: (id: string) => boolean;
   countOf: (consumable: ConsumableId) => number;
   /** Uses one up, and says whether there was one to use. */
-  spendConsumable: (consumable: ConsumableId) => boolean;
+  /** Uses up `amount` of an item; false, and nothing spent, if there are fewer than that. */
+  spendConsumable: (consumable: ConsumableId, amount?: number) => boolean;
   buyDigital: (item: ShopItem, currency: Currency) => Promise<BuyResult>;
   /** True when this item can be paid for with money on this device, right now. */
   takesMoney: (item: ShopItem) => boolean;
@@ -169,15 +170,26 @@ export function ShopProvider({ children }: { children: ReactNode }) {
   const ownsItem = (id: string) => wallet.owned.includes(id);
   const countOf = (consumable: ConsumableId) => wallet.counts[consumable] ?? 0;
 
-  const spendConsumable = (consumable: ConsumableId): boolean => {
-    if (countOf(consumable) <= 0) return false;
+  const spendConsumable = (consumable: ConsumableId, amount = 1): boolean => {
+    if (amount < 1 || countOf(consumable) < amount) return false;
     // Spent on the spot so the quiz does not wait on the network; the
     // server is told straight after and its answer replaces this guess.
-    setWallet((w) => ({ ...w, counts: { ...w.counts, [consumable]: (w.counts[consumable] ?? 1) - 1 } }));
+    setWallet((w) => ({ ...w, counts: { ...w.counts, [consumable]: (w.counts[consumable] ?? amount) - amount } }));
     if (cloud) {
-      spendItem(consumable).then(setWallet).catch(() => refresh());
+      // The server takes one at a time. In order, so its last answer is the
+      // count after all of them; more than one only happens for freezes
+      // covering several missed days.
+      void (async () => {
+        try {
+          let latest: ShopState | null = null;
+          for (let i = 0; i < amount; i++) latest = await spendItem(consumable);
+          if (latest) setWallet(latest);
+        } catch {
+          refresh();
+        }
+      })();
     } else {
-      commitLocal({ ...local, counts: { ...local.counts, [consumable]: countOf(consumable) - 1 } });
+      commitLocal({ ...local, counts: { ...local.counts, [consumable]: countOf(consumable) - amount } });
     }
     return true;
   };

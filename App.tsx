@@ -19,6 +19,7 @@ import { LanguageProvider, useLanguage } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
 import AchievementToastHost from './src/components/AchievementToast';
+import NoticeToast from './src/components/NoticeToast';
 import OnboardingTour from './src/components/OnboardingTour';
 import ResponsiveShell from './src/components/ResponsiveShell';
 import WelcomeScreen from './src/screens/WelcomeScreen';
@@ -174,6 +175,10 @@ function AppShell() {
   const [preAuthScreen, setPreAuthScreen] = useState<'welcome' | 'auth' | 'privacy'>('welcome');
   const [screen, setScreen] = useState<Screen>('home');
   const [shopItemId, setShopItemId] = useState<string | null>(null);
+  /** Where an item page was opened from, so Back returns there. */
+  const [shopItemFrom, setShopItemFrom] = useState<'shop' | 'home'>('shop');
+  /** How many streak freezes the last round used, for the notice that says so. */
+  const [freezeNotice, setFreezeNotice] = useState<number | null>(null);
   // The shop's open tab lives here, not in the screen: the screen unmounts
   // while an item is on top of it, so coming back would otherwise always
   // land on the first tab instead of the shelf the shopper was browsing.
@@ -333,6 +338,8 @@ function AppShell() {
           setScreen('home');
           return true;
         case 'shopItem':
+          setScreen(shopItemFrom);
+          return true;
         case 'orders':
           setScreen('shop');
           return true;
@@ -495,15 +502,18 @@ function AppShell() {
       noteRound({ categoryId: roundConfig.categoryId, score, total });
       // A streak freeze is offered to the streak, and only spent if the
       // streak actually needed rescuing.
-      const { unlocked, freezeUsed } = await recordRoundResult(
+      const { unlocked, freezesUsed } = await recordRoundResult(
         roundConfig,
         activeModeId,
         score,
         total,
         outcome.timing,
-        countOf('streakFreeze') > 0
+        countOf('streakFreeze')
       );
-      if (freezeUsed) spendConsumable('streakFreeze');
+      if (freezesUsed > 0) {
+        spendConsumable('streakFreeze', freezesUsed);
+        setFreezeNotice(freezesUsed);
+      }
       if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
     }
     setScreen('result');
@@ -554,6 +564,11 @@ function AppShell() {
                 setScreen('battle');
               }}
               onOpenTournament={() => setScreen('tournament')}
+              onOpenShopItem={(id) => {
+                setShopItemId(id);
+                setShopItemFrom('home');
+                setScreen('shopItem');
+              }}
             />
           )}
           {screen === 'shop' && (
@@ -565,6 +580,7 @@ function AppShell() {
               onBack={() => setScreen('home')}
               onOpenItem={(id) => {
                 setShopItemId(id);
+                setShopItemFrom('shop');
                 setScreen('shopItem');
               }}
               onOpenCart={() => setScreen('cart')}
@@ -575,7 +591,7 @@ function AppShell() {
           {screen === 'shopItem' && shopItemId && (
             <ShopItemScreen
               itemId={shopItemId}
-              onBack={() => setScreen('shop')}
+              onBack={() => setScreen(shopItemFrom)}
               onOpenCart={() => setScreen('cart')}
             />
           )}
@@ -592,6 +608,7 @@ function AppShell() {
               onBack={() => setScreen('shop')}
               onOpenItem={(id) => {
                 setShopItemId(id);
+                setShopItemFrom('shop');
                 setScreen('shopItem');
               }}
             />
@@ -604,15 +621,18 @@ function AppShell() {
                 // A tournament game is still seven real questions, so it feeds
                 // stats, XP and achievements like any other round.
                 noteRound({ categoryId: WEEKLY_MATCH_CONFIG.categoryId, score, total });
-                const { unlocked, freezeUsed } = await recordRoundResult(
+                const { unlocked, freezesUsed } = await recordRoundResult(
                   WEEKLY_MATCH_CONFIG,
                   null,
                   score,
                   total,
                   timing,
-                  countOf('streakFreeze') > 0
+                  countOf('streakFreeze')
                 );
-                if (freezeUsed) spendConsumable('streakFreeze');
+                if (freezesUsed > 0) {
+                  spendConsumable('streakFreeze', freezesUsed);
+                  setFreezeNotice(freezesUsed);
+                }
                 if (unlocked.length) setAchievementQueue((q) => [...q, ...unlocked]);
               }}
             />
@@ -838,6 +858,7 @@ function AppShell() {
         />
       )}
       <AchievementToastHost queue={achievementQueue} onShown={() => setAchievementQueue((q) => q.slice(1))} />
+      <NoticeToast text={freezeNotice ? t('items.freezeUsed', freezeNotice) : null} onShown={() => setFreezeNotice(null)} />
       <OnboardingTour profileId={profile.id} />
       <StatusBar style={resolvedScheme === 'dark' ? 'light' : 'dark'} />
     </View>

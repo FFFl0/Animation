@@ -428,6 +428,38 @@ const ru: StringDict = {
       streakFreeze: 'Заморозка серии',
     },
   },
+  items: {
+    title: 'Мои предметы',
+    count: (n: number) => `×${n}`,
+    how: {
+      hint5050: 'В квизе — кнопка над ответами. Убирает два неверных варианта.',
+      skipQuestion: 'В квизе — кнопка над ответами. Вопрос не идёт ни в плюс, ни в минус.',
+      streakFreeze: 'Срабатывает сама: одна заморозка закрывает один пропущенный день.',
+    },
+    whereFrom: 'Предметы дают за задания дня и продают здесь, в магазине. В турнире, битвах и на уровне «Легенда» они не работают.',
+    getMore: 'Пополнить',
+    // quiz
+    hint: (n: number) => `50/50 · ${n}`,
+    skip: (n: number) => `Пропуск · ${n}`,
+    hintLabel: 'Подсказка 50/50: убрать два неверных ответа',
+    skipLabel: 'Пропустить вопрос без ошибки',
+    noneLeft: 'Закончились. Их дают за задания дня и продают в магазине.',
+    hintUsed: 'Подсказка уже использована на этом вопросе',
+    // streak card
+    freezeSafe: (n: number) => `Заморозок: ${n}. Пропустишь день — сработает сама.`,
+    freezeRescuable: (missed: number) =>
+      missed === 1
+        ? 'Вчера ты не играл. Сыграй раунд — заморозка спасёт серию.'
+        : `Пропущено дней: ${missed}. Сыграй раунд — заморозки спасут серию.`,
+    freezeBroken: (missed: number, have: number) =>
+      have > 0
+        ? `Пропущено дней: ${missed}, а заморозок ${have} — не хватит. Серия начнётся заново.`
+        : 'Серия прервалась — сыграй раунд, чтобы начать новую.',
+    freezeNone: 'Нет заморозки: пропустишь день — серия сгорит.',
+    freezeShop: 'В магазин',
+    // after a round
+    freezeUsed: (n: number) => (n === 1 ? 'Заморозка спасла серию ❄' : `Заморозки спасли серию: −${n} ❄`),
+  },
   quests: {
     title: 'Задания дня',
     hint: 'Выполни все три — получишь предмет. Завтра задания сменятся.',
@@ -1282,6 +1314,35 @@ const en: StringDict = {
       skipQuestion: 'Skip question',
       streakFreeze: 'Streak freeze',
     },
+  },
+  items: {
+    title: 'My items',
+    count: (n: number) => `×${n}`,
+    how: {
+      hint5050: 'In a quiz — the button above the answers. Removes two wrong options.',
+      skipQuestion: 'In a quiz — the button above the answers. The question counts neither for nor against you.',
+      streakFreeze: 'Works by itself: one freeze covers one missed day.',
+    },
+    whereFrom: 'Items come from daily quests and are sold here in the shop. They are off in the tournament, battles and on Legend.',
+    getMore: 'Get more',
+    hint: (n: number) => `50/50 · ${n}`,
+    skip: (n: number) => `Skip · ${n}`,
+    hintLabel: '50/50 hint: remove two wrong answers',
+    skipLabel: 'Skip the question without a mistake',
+    noneLeft: 'None left. They come from daily quests and the shop.',
+    hintUsed: 'The hint is already used on this question',
+    freezeSafe: (n: number) => `Freezes: ${n}. Miss a day and one kicks in by itself.`,
+    freezeRescuable: (missed: number) =>
+      missed === 1
+        ? 'You did not play yesterday. Play a round — a freeze will save the streak.'
+        : `Days missed: ${missed}. Play a round — freezes will save the streak.`,
+    freezeBroken: (missed: number, have: number) =>
+      have > 0
+        ? `Days missed: ${missed}, freezes: ${have} — not enough. The streak starts over.`
+        : 'The streak is broken — play a round to start a new one.',
+    freezeNone: 'No freeze: miss a day and the streak is gone.',
+    freezeShop: 'Shop',
+    freezeUsed: (n: number) => (n === 1 ? 'A freeze saved your streak ❄' : `Freezes saved your streak: −${n} ❄`),
   },
   quests: {
     title: 'Today’s quests',

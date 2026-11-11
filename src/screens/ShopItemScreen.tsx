@@ -98,6 +98,9 @@ export default function ShopItemScreen({ itemId, onBack, onOpenCart }: Props) {
           )}
         </View>
         <Text style={styles.description}>{itemDescription(item, language)}</Text>
+        {item.grant.kind === 'consumable' && (
+          <Text style={styles.howTo}>{t(`items.how.${item.grant.consumable}`)}</Text>
+        )}
 
         <View style={styles.priceCard}>
           <View style={styles.priceRow}>
@@ -206,6 +209,16 @@ function makeStyles(theme: Theme) {
     limitedTag: { backgroundColor: theme.primary, borderRadius: radius.pill, paddingHorizontal: 10, paddingVertical: 4 },
     limitedTagText: { fontSize: 10, fontFamily: fontFamily('800'), color: theme.onPrimary },
     description: { fontSize: 14, lineHeight: 20, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 6 },
+    howTo: {
+      fontSize: 13,
+      lineHeight: 19,
+      fontFamily: fontFamily('700'),
+      color: theme.text,
+      marginTop: 10,
+      padding: 12,
+      borderRadius: radius.md,
+      backgroundColor: theme.primaryLight,
+    },
     priceCard: {
       backgroundColor: theme.card,
       borderWidth: 1.5,

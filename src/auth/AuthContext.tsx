@@ -14,9 +14,9 @@ import { todayDateStr } from '../quiz/today';
 
 export { AuthError } from './backend';
 
-/** What a finished round produced: new unlocks, and whether a streak freeze
- * was actually needed (so the caller only spends one when it was). */
-export type RoundOutcome = { unlocked: Achievement[]; freezeUsed: boolean };
+/** What a finished round produced: new unlocks, and how many streak
+ * freezes it used up to keep the streak alive — one per missed day. */
+export type RoundOutcome = { unlocked: Achievement[]; freezesUsed: number };
 
 type AuthContextValue = {
   profile: Profile | null;
@@ -33,7 +33,8 @@ type AuthContextValue = {
     score: number,
     total: number,
     timing?: AnswerTiming | null,
-    useFreeze?: boolean
+    /** Streak freezes the player owns and may spend on missed days. */
+    freezes?: number
   ) => Promise<RoundOutcome>;
   /** A tournament that has finished, by the place it finished in. Safe to
    * call on every read of a finished bracket: the run is banked once. */
@@ -140,9 +141,9 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     score: number,
     total: number,
     timing: AnswerTiming | null = null,
-    useFreeze = false
+    freezes = 0
   ): Promise<RoundOutcome> => {
-    if (!profile) return { unlocked: [], freezeUsed: false };
+    if (!profile) return { unlocked: [], freezesUsed: 0 };
     const keys = [categoryStatsKey(config.categoryId, config.tier)];
     if (modeId) keys.push(modeStatsKey(modeId));
 
@@ -151,7 +152,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
       nextStats[key] = Storage.mergeStat(nextStats[key], score, total, timing);
     }
 
-    const { streak: nextStreak, freezeUsed } = Storage.bumpStreak(profile.streak, useFreeze);
+    const { streak: nextStreak, freezesUsed } = Storage.bumpStreak(profile.streak, freezes);
 
     const unlockedBefore = new Set(ACHIEVEMENTS.filter((a) => isUnlocked(a, profile)).map((a) => a.id));
 
@@ -186,7 +187,7 @@ export function AuthProvider({ children }: { children: ReactNode }) {
     setProfile(p);
     Storage.logRoundResult(profile.id, score, total);
 
-    return { unlocked, freezeUsed };
+    return { unlocked, freezesUsed };
   };
 
   // Won against other people rather than answered alone, and the other half

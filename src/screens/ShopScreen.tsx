@@ -14,6 +14,7 @@ import Icon from '../components/Icon';
 import AnimatedFrame from '../components/AnimatedFrame';
 import AnimatedAvatar from '../components/AnimatedAvatar';
 import WalletSheet from '../components/WalletSheet';
+import ItemsInventory from '../components/ItemsInventory';
 import {
   SHOP_SECTIONS,
   SHOP_TABS,
@@ -172,6 +173,10 @@ export default function ShopScreen({
               <Icon name="sparkles" size={26} color={theme.primary} />
             </View>
           )}
+
+          {/* On the items shelf, what is already owned and how it is used
+              comes before what is for sale. */}
+          {tab === 'items' && <ItemsInventory onOpenItem={onOpenItem} />}
 
           {blocks.map((block) => {
             const { columns, cardWidth } = widthFor(block.key);
