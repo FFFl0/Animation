@@ -2244,3 +2244,26 @@ group by r.question_key, r.language
 order by count(*) desc, max(r.created_at) desc;
 
 revoke all on public.question_report_queue from anon, authenticated;
+
+-- ============================================================
+-- УВЕДОМЛЕНИЯ О ЖАЛОБАХ В TELEGRAM
+--
+-- Функция report-notify отправляет разработчику в Telegram каждую новую
+-- жалобу — на сообщение, на игрока и на вопрос — и отмечает её здесь,
+-- чтобы не отправить дважды. null — о жалобе ещё не сообщили.
+-- ============================================================
+
+alter table public.content_reports add column if not exists notified_at timestamptz;
+alter table public.question_reports add column if not exists notified_at timestamptz;
+
+create index if not exists content_reports_unnotified_idx
+  on public.content_reports (created_at) where notified_at is null;
+create index if not exists question_reports_unnotified_idx
+  on public.question_reports (created_at) where notified_at is null;
+
+-- Жалобы, поданные до появления уведомлений, уже лежат в очереди, и их
+-- видно в панели. Слать их в Telegram пачкой при первом запуске незачем.
+update public.content_reports set notified_at = created_at
+ where notified_at is null and created_at < now() - interval '1 day';
+update public.question_reports set notified_at = created_at
+ where notified_at is null and created_at < now() - interval '1 day';

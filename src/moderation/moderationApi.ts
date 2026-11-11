@@ -1,4 +1,5 @@
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
+import { pokeReportNotify } from './reportNotify';
 import { PlayerSummary, fetchPlayers } from '../friends/friendsApi';
 import { ReportReason, ReportTarget, reportArgs } from './reports';
 
@@ -57,4 +58,5 @@ export async function unblockUser(userId: string): Promise<void> {
 export async function sendReport(target: ReportTarget, reason: ReportReason, comment: string): Promise<void> {
   const { error } = await supabase!.rpc('report_content', reportArgs(target, reason, comment));
   if (error) throw new Error(error.message);
+  pokeReportNotify();
 }

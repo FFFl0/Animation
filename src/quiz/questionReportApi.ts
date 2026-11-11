@@ -1,4 +1,5 @@
 import Constants from 'expo-constants';
+import { pokeReportNotify } from '../moderation/reportNotify';
 import * as Application from 'expo-application';
 import { supabase, isSupabaseConfigured } from '../auth/supabaseClient';
 import { isLayoutCheck } from '../monitoring/layoutCheck';
@@ -29,4 +30,5 @@ export async function sendQuestionReport(
     questionReportArgs(question, { language, picked, reason, comment, appVersion: appVersion() })
   );
   if (error) throw error;
+  pokeReportNotify();
 }

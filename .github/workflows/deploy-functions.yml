@@ -15,6 +15,11 @@
 #   TOURNAMENT_TICK_SECRET  set here too, and the same value is written to
 #                           the project's function secrets below, so the
 #                           scheduled poke and the function agree.
+#
+# Optional, for reports to arrive in Telegram (see BUILD.md, "Жалобы в
+# Telegram"); both are copied into the project's function secrets:
+#   TELEGRAM_BOT_TOKEN      the bot's token from @BotFather
+#   TELEGRAM_CHAT_ID        who the bot writes to
 name: Deploy functions
 
 on:
@@ -28,8 +33,13 @@ on:
         # invisible until a screen asks it for something it has never
         # heard of — which is exactly how the "Прошлый" tab spent a week
         # insisting there had never been a tournament.
-        default: 'tournament send-push shop yookassa-webhook'
+        default: 'tournament send-push shop yookassa-webhook report-notify'
         type: string
+      telegram_test:
+        description: 'Send a test message to the Telegram chat for reports'
+        required: false
+        default: false
+        type: boolean
 
 jobs:
   deploy:
@@ -81,3 +91,38 @@ jobs:
             exit 0
           fi
           supabase secrets set "TOURNAMENT_TICK_SECRET=$TICK_SECRET" --remote="$PROJECT_REF" --yes
+
+      # The bot token never enters the app or the database: it lives here
+      # and in the project's function secrets, nowhere else.
+      - name: Keep the Telegram secrets for reports in step with this repository
+        env:
+          SUPABASE_ACCESS_TOKEN: ${{ secrets.SUPABASE_ACCESS_TOKEN }}
+          PROJECT_REF: ${{ secrets.SUPABASE_PROJECT_REF }}
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "No TELEGRAM_BOT_TOKEN / TELEGRAM_CHAT_ID in this repository — reports stay in the database only."
+            exit 0
+          fi
+          supabase secrets set "TELEGRAM_BOT_TOKEN=$BOT_TOKEN" "TELEGRAM_CHAT_ID=$CHAT_ID" --remote="$PROJECT_REF" --yes
+
+      - name: Send a Telegram test message
+        if: ${{ inputs.telegram_test }}
+        env:
+          BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          if [ -z "$BOT_TOKEN" ] || [ -z "$CHAT_ID" ]; then
+            echo "::error::TELEGRAM_BOT_TOKEN and TELEGRAM_CHAT_ID have to be set as repository secrets first."
+            exit 1
+          fi
+          # Telegram's answer says exactly what is wrong — a bad token, or a
+          # chat the bot may not write to because nobody pressed Start.
+          answer=$(curl -sS "https://api.telegram.org/bot${BOT_TOKEN}/sendMessage" \
+            --data-urlencode "chat_id=${CHAT_ID}" \
+            --data-urlencode "text=✅ AnimeQuiz: уведомления о жалобах настроены. Новые жалобы будут приходить сюда.")
+          echo "$answer" | grep -q '"ok":true' && { echo "Sent."; exit 0; }
+          echo "::error::Telegram refused: $(echo "$answer" | sed 's/.*"description":"\([^"]*\)".*/\1/')"
+          exit 1
+
