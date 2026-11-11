@@ -24,12 +24,44 @@ export function textIn(copy: PushCopy, language: string): PushText {
   return copy[language] ?? copy.ru;
 }
 
-/** Every device a set of players has registered, or every device there is
- * when no players are named. */
-export async function tokensFor(admin: SupabaseClient, userIds?: string[]): Promise<TokenRow[]> {
+// PUSH-CATEGORIES-BEGIN
+/**
+ * What a player can switch off in the app. Every notice belongs to one, and
+ * a device that has muted it is left out before anything is sent.
+ *
+ * The app keeps the same list in src/notifications/notificationSettings.ts,
+ * and a test fails if the two drift apart.
+ */
+export const PUSH_CATEGORIES = ['friends', 'battles', 'tournament'] as const;
+// PUSH-CATEGORIES-END
+
+export type PushCategory = (typeof PUSH_CATEGORIES)[number];
+
+/**
+ * The devices to send a notice of this category to: those of the players
+ * named, or every device there is when nobody is named — minus any that
+ * have the category switched off.
+ *
+ * The category comes first and is not optional, so a new notice cannot be
+ * added without deciding which switch silences it.
+ */
+export async function tokensFor(
+  admin: SupabaseClient,
+  category: PushCategory,
+  userIds?: string[]
+): Promise<TokenRow[]> {
   if (userIds && userIds.length === 0) return [];
-  const query = admin.from('push_tokens').select('token, language');
-  const { data } = userIds ? await query.in('user_id', userIds) : await query;
+  const rows = () => {
+    const query = admin.from('push_tokens').select('token, language');
+    return userIds ? query.in('user_id', userIds) : query;
+  };
+
+  const wanted = await rows().not('muted', 'cs', `{${category}}`);
+  if (!wanted.error) return (wanted.data ?? []) as TokenRow[];
+
+  // The only way that filter fails is a database without the `muted` column
+  // — one where nobody can have muted anything yet. Send as before.
+  const { data } = await rows();
   return (data ?? []) as TokenRow[];
 }
 

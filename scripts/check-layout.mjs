@@ -66,7 +66,7 @@ function build() {
     stdio: ['ignore', 'ignore', 'inherit'],
     // No server on purpose: the walk signs up a local account, and a
     // configured backend would send it looking for one that is not there.
-    env: { ...process.env, EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '' },
+    env: { ...process.env, EXPO_PUBLIC_SUPABASE_URL: '', EXPO_PUBLIC_SUPABASE_ANON_KEY: '', EXPO_PUBLIC_LAYOUT_CHECK: '1' },
   });
   if (result.status !== 0) {
     console.error('The web export failed.');
@@ -224,7 +224,9 @@ const STEPS = [
   }],
   ['quiz-question', async (h) => h.tap('Новичок', 'first')],
   ['quiz-answered', async (h) => h.tapFirstOption()],
+  ['quiz-report', async (h) => h.tap('Ошибка в вопросе?')],
   ['stats', async (h) => {
+    await h.tap('Отмена');
     await h.leaveQuiz();
     // Out of the quiz lands on the category it was started from, which has
     // no tab bar; one step further back does.
@@ -247,6 +249,7 @@ const STEPS = [
     await h.tap('Профиль', 'last');
   }],
   ['profile-lower', async (h) => h.scrollDown()],
+  ['profile-notifications', async (h) => h.scrollDown()],
   ['chats', async (h) => h.tap('Чаты', 'last')],
 ];
 

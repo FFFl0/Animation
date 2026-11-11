@@ -450,7 +450,7 @@ async function seedBracket(admin: SupabaseClient, tournament: TournamentRow): Pr
   // tournament to be told about.
   const playing = entrants.map((e) => e.user_id).filter((id): id is string => !!id);
   if (playing.length > 0) {
-    await pushToTokens(admin, await tokensFor(admin, playing), TOURNAMENT_STARTED, { kind: 'tournamentStarted' });
+    await pushToTokens(admin, await tokensFor(admin, 'tournament', playing), TOURNAMENT_STARTED, { kind: 'tournamentStarted' });
   }
 }
 
@@ -769,7 +769,7 @@ Deno.serve(async (req) => {
     if (opened) {
       // Everybody, not only last week's entrants: the point of this one is
       // to reach the people who are not in it yet.
-      await pushToTokens(admin, await tokensFor(admin), SIGNUPS_OPEN, { kind: 'tournamentSignups' });
+      await pushToTokens(admin, await tokensFor(admin, 'tournament'), SIGNUPS_OPEN, { kind: 'tournamentSignups' });
     }
     if (current.status === 'registration' && Date.parse(current.starts_at) <= Date.now()) {
       await seedBracket(admin, current);

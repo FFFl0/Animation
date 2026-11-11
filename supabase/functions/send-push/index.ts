@@ -13,7 +13,7 @@
 // automatically by the Edge Function runtime — no manual config needed.
 
 import { createClient } from 'https://esm.sh/@supabase/supabase-js@2';
-import { PushCopy, pushToTokens, tokensFor } from '../_shared/push.ts';
+import { PushCategory, PushCopy, pushToTokens, tokensFor } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -31,6 +31,12 @@ const TEXT: Record<Kind, PushCopy> = {
     ru: { title: 'Вызов на битву', body: 'Вас зовут в «Битву фанатов»' },
     en: { title: 'Battle invite', body: 'You have been challenged to a fan battle' },
   },
+};
+
+/** The switch in the app that silences each kind. */
+const CATEGORY: Record<Kind, PushCategory> = {
+  friendRequest: 'friends',
+  battleInvite: 'battles',
 };
 
 function json(body: unknown, status = 200): Response {
@@ -91,6 +97,6 @@ Deno.serve(async (req) => {
 
   if (!count) return json({ error: 'no such invitation' }, 403);
 
-  const delivered = await pushToTokens(admin, await tokensFor(admin, [toUserId]), TEXT[kind], { kind });
+  const delivered = await pushToTokens(admin, await tokensFor(admin, CATEGORY[kind], [toUserId]), TEXT[kind], { kind });
   return json({ ok: true, delivered });
 });

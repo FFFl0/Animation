@@ -3,7 +3,7 @@
 <!-- Этот файл генерируется из src/legal/privacyPolicy.ts.
      Правьте там и запускайте node scripts/generate-privacy.mjs. -->
 
-Обновлено: 2026-11-10
+Обновлено: 2026-11-11
 
 ## Русский
 
@@ -24,6 +24,10 @@ AnimeQuiz — викторина по аниме. Мы храним ровно �
 Общение: список друзей, личные и групповые сообщения, реакции на них, группы, в которых вы состоите.
 
 Блокировки и жалобы: кого вы заблокировали и какие жалобы отправили. В жалобе сохраняется копия сообщения, на которое вы пожаловались, — чтобы её можно было разобрать, даже если сообщение потом изменят или удалят. Тот, на кого пожаловались, не узнаёт, кто это сделал.
+
+Сообщения об ошибках в вопросах: какой вопрос, что в нём не так и ваш комментарий, если вы его оставили.
+
+Настройки уведомлений: какие виды уведомлений вы отключили на этом устройстве — чтобы сервер их не отправлял.
 
 Приложение на устройстве: тема оформления, язык, настройки звука и вибрации, недавно использованные эмодзи, включены ли напоминания. Это остаётся на телефоне и никуда не отправляется.
 
@@ -55,7 +59,7 @@ AnimeQuiz — викторина по аниме. Мы храним ровно �
 
 Supabase — хранение базы и файлов, вход в аккаунт.
 
-Expo — сборка приложения и доставка push-уведомлений.
+Expo — сборка приложения, доставка push-уведомлений и обновлений приложения. Проверяя, нет ли обновления, приложение передаёт версию, платформу и случайный идентификатор установки, не связанный с аккаунтом.
 
 Sentry — приём отчётов об ошибках.
 
@@ -107,6 +111,10 @@ Talking: your friends, direct and group messages, reactions to them, and the gro
 
 Blocks and reports: who you have blocked and which reports you have sent. A report keeps a copy of the message it is about, so it can be looked into even if the message is later edited or deleted. The person reported is not told who reported them.
 
+Reports of mistakes in questions: which question, what is wrong with it, and your note if you left one.
+
+Notification settings: which kinds of notification you have turned off on this device, so the server does not send them.
+
 On the device: theme, language, sound and vibration settings, recently used emoji, whether reminders are on. This stays on your phone and is never sent anywhere.
 
 ### What we do NOT store
@@ -137,7 +145,7 @@ Your messages, passwords and conversation contents are not part of a report.
 
 Supabase — database and file storage, signing in.
 
-Expo — building the app and delivering push notifications.
+Expo — building the app, delivering push notifications and app updates. When it checks for an update the app sends its version, platform and a random installation identifier that is not linked to your account.
 
 Sentry — receiving crash reports.
 

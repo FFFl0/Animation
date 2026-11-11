@@ -10,7 +10,7 @@ export type PolicySection = { title: string; body: string[] };
  *
  * When the app starts collecting something new, this is the file to change.
  */
-export const POLICY_UPDATED = '2026-11-10';
+export const POLICY_UPDATED = '2026-11-11';
 
 const RU: PolicySection[] = [
   {
@@ -28,6 +28,8 @@ const RU: PolicySection[] = [
       'Профиль: аватарка (ваша картинка или одна из готовых), рамка, любимый персонаж, игровая статистика, серия дней и достижения.',
       'Общение: список друзей, личные и групповые сообщения, реакции на них, группы, в которых вы состоите.',
       'Блокировки и жалобы: кого вы заблокировали и какие жалобы отправили. В жалобе сохраняется копия сообщения, на которое вы пожаловались, — чтобы её можно было разобрать, даже если сообщение потом изменят или удалят. Тот, на кого пожаловались, не узнаёт, кто это сделал.',
+      'Сообщения об ошибках в вопросах: какой вопрос, что в нём не так и ваш комментарий, если вы его оставили.',
+      'Настройки уведомлений: какие виды уведомлений вы отключили на этом устройстве — чтобы сервер их не отправлял.',
       'Приложение на устройстве: тема оформления, язык, настройки звука и вибрации, недавно использованные эмодзи, включены ли напоминания. Это остаётся на телефоне и никуда не отправляется.',
     ],
   },
@@ -63,7 +65,7 @@ const RU: PolicySection[] = [
     title: 'Кому мы передаём данные',
     body: [
       'Supabase — хранение базы и файлов, вход в аккаунт.',
-      'Expo — сборка приложения и доставка push-уведомлений.',
+      'Expo — сборка приложения, доставка push-уведомлений и обновлений приложения. Проверяя, нет ли обновления, приложение передаёт версию, платформу и случайный идентификатор установки, не связанный с аккаунтом.',
       'Sentry — приём отчётов об ошибках.',
       'Google — только если вы сами выбрали вход через Google.',
       'Это подрядчики, которые обрабатывают данные по нашему поручению. Больше мы данные никому не передаём.',
@@ -114,6 +116,8 @@ const EN: PolicySection[] = [
       'Profile: avatar (your own picture or one of the ready-made ones), frame, favourite character, game stats, day streak and achievements.',
       'Talking: your friends, direct and group messages, reactions to them, and the groups you belong to.',
       'Blocks and reports: who you have blocked and which reports you have sent. A report keeps a copy of the message it is about, so it can be looked into even if the message is later edited or deleted. The person reported is not told who reported them.',
+      'Reports of mistakes in questions: which question, what is wrong with it, and your note if you left one.',
+      'Notification settings: which kinds of notification you have turned off on this device, so the server does not send them.',
       'On the device: theme, language, sound and vibration settings, recently used emoji, whether reminders are on. This stays on your phone and is never sent anywhere.',
     ],
   },
@@ -149,7 +153,7 @@ const EN: PolicySection[] = [
     title: 'Who else sees the data',
     body: [
       'Supabase — database and file storage, signing in.',
-      'Expo — building the app and delivering push notifications.',
+      'Expo — building the app, delivering push notifications and app updates. When it checks for an update the app sends its version, platform and a random installation identifier that is not linked to your account.',
       'Sentry — receiving crash reports.',
       'Google — only if you chose to sign in with Google.',
       'These are contractors processing data on our behalf. We share it with nobody else.',

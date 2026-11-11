@@ -12,6 +12,7 @@ import ContentCatalogue from '../components/ContentCatalogue';
 import Icon from '../components/Icon';
 import SoundTouchable from '../sound/SoundTouchable';
 import { isSupabaseConfigured } from '../auth/supabaseClient';
+import { otaInfo } from '../updates/ota';
 import { useT } from '../i18n/strings';
 
 type Props = {
@@ -32,12 +33,27 @@ export default function AboutScreen({ onBack, onOpenPrivacy }: Props) {
   // The build number is assigned by EAS and is what actually distinguishes
   // two installs of the same version; it is absent in Expo Go and on web.
   const build = Application.nativeBuildVersion ?? t('about.buildUnavailable');
+  const ota = otaInfo();
 
   const rows = [
     { label: t('about.version'), value: version },
     { label: t('about.build'), value: build },
     { label: t('about.platform'), value: `${Platform.OS} ${Platform.Version}` },
     { label: t('about.sync'), value: isSupabaseConfigured ? t('about.syncOn') : t('about.syncOff') },
+    // Which bundle is running: the one the build shipped with, or one that
+    // arrived over the air since. Two phones on the same build can differ
+    // here, and a bug report needs to say which.
+    ...(ota
+      ? [
+          {
+            label: t('about.update'),
+            value:
+              ota.embedded || !ota.publishedAt
+                ? t('about.updateEmbedded')
+                : `${ota.publishedAt.toLocaleDateString()} · ${ota.shortId ?? ''}`,
+          },
+        ]
+      : []),
   ];
 
   return (

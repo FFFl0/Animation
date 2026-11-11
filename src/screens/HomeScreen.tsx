@@ -16,6 +16,7 @@ import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
 import StreakCard from '../components/StreakCard';
 import DailyQuestsCard from '../components/DailyQuestsCard';
+import UpdateBanner from '../updates/UpdateBanner';
 import FadeIn from '../components/FadeIn';
 import { BATTLE_BANNER, MODE_BACKGROUNDS, TOURNAMENT_BANNER } from '../data/modeImages';
 import Icon from '../components/Icon';
@@ -113,6 +114,8 @@ export default function HomeScreen({
             </View>
           </View>
         </SoundTouchable>
+
+        <UpdateBanner />
 
         <StreakCard days={profile.streak.count} />
 

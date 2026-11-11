@@ -1,4 +1,4 @@
-import { createContext, useContext, useEffect, useMemo, useState, ReactNode } from 'react';
+import { createContext, useCallback, useContext, useEffect, useMemo, useRef, useState, ReactNode } from 'react';
 import { useAuth } from '../auth/AuthContext';
 import { useLanguage } from '../i18n/LanguageContext';
 import { getT } from '../i18n/strings';
@@ -15,6 +15,15 @@ import {
 import { countUnread, subscribeChatList } from '../chat/chatsApi';
 import { presentLocalNotification } from './localNotify';
 import { registerPushToken } from './pushTokens';
+import {
+  ALL_ON,
+  PushCategory,
+  PushSettings,
+  allows,
+  loadPushSettings,
+  mutedCategories,
+  savePushSettings,
+} from './notificationSettings';
 
 type NotificationsContextValue = {
   incomingRequests: Friendship[];
@@ -23,6 +32,9 @@ type NotificationsContextValue = {
   badgeCount: number;
   /** Unread messages across every chat, for the Chats tab badge. */
   unreadMessages: number;
+  /** Which kinds of notification this device still wants. */
+  pushSettings: PushSettings;
+  setPushCategory: (category: PushCategory, on: boolean) => void;
   refresh: () => void;
   respondToInvite: (inviteId: string, accept: boolean) => Promise<{ roomCode: string } | null>;
 };
@@ -36,6 +48,37 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
   const [battleInvites, setBattleInvites] = useState<BattleInvite[]>([]);
   const [unreadMessages, setUnreadMessages] = useState(0);
   const meId = profile?.id ?? null;
+  const [pushSettings, setPushSettings] = useState<PushSettings>(ALL_ON);
+  /** False until the saved switches are read, so a sign-in that beats the
+   * disk does not tell the server that nothing is muted. */
+  const [settingsReady, setSettingsReady] = useState(false);
+  /** The same settings for the realtime callbacks below, which outlive the
+   * render that subscribed them. */
+  const settingsRef = useRef(pushSettings);
+  settingsRef.current = pushSettings;
+
+  useEffect(() => {
+    void loadPushSettings().then((saved) => {
+      setPushSettings(saved);
+      setSettingsReady(true);
+    });
+  }, []);
+
+  const setPushCategory = useCallback((category: PushCategory, on: boolean) => {
+    const next = { ...settingsRef.current, [category]: on };
+    settingsRef.current = next;
+    setPushSettings(next);
+    void savePushSettings(next);
+  }, []);
+
+  // Re-registered on every sign-in, language change and flip of a switch:
+  // the token can be reissued by the OS, and the server needs to know which
+  // language to write in and which notices this device has asked not to get.
+  const muted = mutedCategories(pushSettings).join(',');
+  useEffect(() => {
+    if (!meId || !isSupabaseConfigured || !settingsReady) return;
+    void registerPushToken(meId, language, mutedCategories(settingsRef.current));
+  }, [meId, language, settingsReady, muted]);
 
   const refresh = () => {
     if (!meId || !isSupabaseConfigured) return;
@@ -50,20 +93,19 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
 
     getIncomingFriendRequests(meId).then(setIncomingRequests);
     getPendingBattleInvites(meId).then(setBattleInvites);
-    // Re-registered on every sign-in and language change: the token can be
-    // reissued by the OS, and the server needs to know which language to
-    // write the notification in.
-    registerPushToken(meId, language);
 
     const t = getT(language);
     const unsubFriend = subscribeIncomingFriendRequests(meId, () => {
       getIncomingFriendRequests(meId).then(setIncomingRequests);
+      // The badge still counts it; a muted category only stops the banner.
+      if (!allows(settingsRef.current, 'friendRequest')) return;
       presentLocalNotification(t('notifications.friendRequestTitle'), t('notifications.friendRequestBody'), {
         kind: 'friendRequest',
       });
     });
     const unsubBattle = subscribeBattleInvites(meId, () => {
       getPendingBattleInvites(meId).then(setBattleInvites);
+      if (!allows(settingsRef.current, 'battleInvite')) return;
       presentLocalNotification(t('notifications.battleInviteTitle'), t('notifications.battleInviteBody'), {
         kind: 'battleInvite',
       });
@@ -109,10 +151,12 @@ export function NotificationsProvider({ children }: { children: ReactNode }) {
       battleInvites,
       badgeCount: incomingRequests.length + battleInvites.length,
       unreadMessages,
+      pushSettings,
+      setPushCategory,
       refresh,
       respondToInvite,
     }),
-    [incomingRequests, battleInvites, unreadMessages]
+    [incomingRequests, battleInvites, unreadMessages, pushSettings, setPushCategory]
   );
 
   return <NotificationsContext.Provider value={value}>{children}</NotificationsContext.Provider>;

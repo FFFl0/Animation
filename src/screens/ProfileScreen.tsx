@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState } from 'react';
+import { useMemo, useState } from 'react';
 import { ActivityIndicator, Image, ImageSourcePropType, ScrollView, StyleSheet, Text, TextInput, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -27,7 +27,7 @@ import BlockedUsersSheet from '../moderation/BlockedUsersSheet';
 import { useModeration } from '../moderation/ModerationContext';
 import RareAchievements from '../components/RareAchievements';
 import { unlockedIds } from '../data/achievements';
-import { getReminderEnabled, setReminderEnabled } from '../notifications/streakReminder';
+import NotificationSettings from '../notifications/NotificationSettings';
 import { USERNAME_MAX } from '../auth/validation';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT, translateAuthError } from '../i18n/strings';
@@ -63,8 +63,6 @@ export default function ProfileScreen({
   const [renameError, setRenameError] = useState<string | null>(null);
   const [walletOpen, setWalletOpen] = useState(false);
   const { balance, spent, medals } = useShop();
-  const [reminderOn, setReminderOn] = useState(false);
-  const [reminderError, setReminderError] = useState<string | null>(null);
 
   const THEME_TABS: { key: ThemeMode; label: string }[] = [
     { key: 'light', label: t('profile.themeLight') },
@@ -85,21 +83,6 @@ export default function ProfileScreen({
     { key: 'ru', label: t('profile.languageRu') },
     { key: 'en', label: t('profile.languageEn') },
   ];
-
-  useEffect(() => {
-    getReminderEnabled().then(setReminderOn);
-  }, []);
-
-  const handleToggleReminder = async () => {
-    setReminderError(null);
-    const next = !reminderOn;
-    const result = await setReminderEnabled(next, language);
-    if (result.ok) {
-      setReminderOn(next);
-    } else {
-      setReminderError(result.reason === 'permissionDenied' ? t('profile.reminderPermissionDenied') : t('profile.reminderFallbackError'));
-    }
-  };
 
   const handlePickPhoto = async () => {
     if (photoBusy || !profile) return;
@@ -381,15 +364,8 @@ export default function ProfileScreen({
         ))}
       </View>
 
-      <Text style={styles.sectionTitle}>{t('profile.remindersTitle')}</Text>
-      <View style={styles.themeTabs}>
-        <SoundTouchable style={[styles.themeTab, reminderOn && styles.themeTabActive]} onPress={handleToggleReminder}>
-          <Text style={[styles.themeTabText, reminderOn && styles.themeTabTextActive]}>
-            {reminderOn ? t('profile.streakReminderOn') : t('profile.streakReminderOff')}
-          </Text>
-        </SoundTouchable>
-      </View>
-      {reminderError && <Text style={styles.reminderError}>{reminderError}</Text>}
+      <Text style={styles.sectionTitle}>{t('profile.notificationsTitle')}</Text>
+      <NotificationSettings />
 
       <Text style={styles.sectionTitle}>{t('profile.aboutTitle')}</Text>
       <SoundTouchable style={styles.linkRow} onPress={onOpenAbout} accessibilityRole="button">
@@ -677,6 +653,5 @@ function makeStyles(theme: Theme) {
       backgroundColor: theme.danger,
     },
     dangerConfirmText: { fontSize: 14, fontFamily: fontFamily('700'), color: '#FFFFFF' },
-    reminderError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 8 },
   });
 }

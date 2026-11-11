@@ -628,6 +628,22 @@ create policy "Drop your own push token"
 
 create index if not exists push_tokens_user_idx on public.push_tokens (user_id);
 
+-- What this device has asked not to be told about. The app's notification
+-- switches are per device, so they live on the device's own row: the send
+-- functions read `muted` in the same query that finds the token, and a
+-- device that has muted a category is never handed to the push service.
+--
+-- The list of categories is the one in supabase/functions/_shared/push.ts
+-- and src/notifications/notificationSettings.ts; a test keeps all three
+-- the same.
+alter table public.push_tokens
+  add column if not exists muted text[] not null default '{}';
+
+alter table public.push_tokens drop constraint if exists push_tokens_muted_known;
+alter table public.push_tokens
+  add constraint push_tokens_muted_known
+  check (muted <@ array['friends', 'battles', 'tournament']::text[]);
+
 -- ============================================================
 -- Weekly tournament: 16 players, double elimination, matches best of three.
 --
@@ -2075,3 +2091,156 @@ end;
 $$;
 
 revoke execute on function public.shop_claim_daily(uuid, date, text) from anon, authenticated;
+
+-- ============================================================
+-- ОШИБКА В ВОПРОСЕ
+--
+-- Кнопка под ответом в квизе. Вопросы собираются на телефоне из каталога,
+-- который меняется от версии к версии, поэтому жалоба несёт не только
+-- ключ вопроса, но и сам вопрос, каким его видел игрок: текст, варианты и
+-- тот, что приложение сочло верным. По ключу жалобы складываются, по
+-- снимку видно, что именно было не так.
+--
+-- Политик нет: приложение сюда не читает и напрямую не пишет. Пишет
+-- функция report_question, читает разработчик — представлением
+-- question_report_queue из панели Supabase.
+-- ============================================================
+
+create table if not exists public.question_reports (
+  id uuid primary key default gen_random_uuid(),
+  reporter_id uuid not null references auth.users(id) on delete cascade,
+  -- Предмет и тип вопроса, например naruto-guessQuote. Одинаков у всех,
+  -- кому этот вопрос попался.
+  question_key text not null check (char_length(question_key) between 3 and 120),
+  language text not null check (language in ('ru', 'en')),
+  reason text not null check (reason in ('wrongAnswer', 'ambiguous', 'typo', 'media', 'other')),
+  comment text check (comment is null or char_length(comment) <= 500),
+  prompt text check (prompt is null or char_length(prompt) <= 600),
+  options jsonb,
+  correct_index smallint,
+  picked_index smallint,
+  app_version text check (app_version is null or char_length(app_version) <= 40),
+  status text not null default 'open' check (status in ('open', 'fixed', 'dismissed')),
+  created_at timestamptz not null default now()
+);
+
+alter table public.question_reports enable row level security;
+
+-- Один игрок — одна жалоба на вопрос на одном языке; повторная заменяет
+-- прежнюю, а не добавляется к счёту.
+create unique index if not exists question_reports_once
+  on public.question_reports (reporter_id, question_key, language);
+create index if not exists question_reports_open_idx
+  on public.question_reports (status, question_key);
+
+/*
+ * Сообщить об ошибке в вопросе.
+ *
+ * Всё, что приходит от клиента, — текст для человека, который будет это
+ * читать, и ни на что в игре не влияет. Поэтому проверяется только то,
+ * что это текст разумного размера: вариантов не больше шести и не
+ * длиннее двухсот знаков каждый.
+ */
+create or replace function public.report_question(
+  p_key text,
+  p_language text,
+  p_reason text,
+  p_comment text default null,
+  p_prompt text default null,
+  p_options jsonb default null,
+  p_correct integer default null,
+  p_picked integer default null,
+  p_version text default null
+)
+returns void
+language plpgsql
+security definer
+set search_path = public
+as $$
+declare
+  v_me uuid := auth.uid();
+begin
+  if v_me is null then
+    raise exception 'not signed in' using errcode = 'P0001';
+  end if;
+  if p_reason not in ('wrongAnswer', 'ambiguous', 'typo', 'media', 'other') then
+    raise exception 'unknown reason' using errcode = 'P0001';
+  end if;
+  if p_language not in ('ru', 'en') then
+    raise exception 'unknown language' using errcode = 'P0001';
+  end if;
+  if p_key is null or char_length(p_key) not between 3 and 120 then
+    raise exception 'bad question' using errcode = 'P0001';
+  end if;
+  if p_options is not null and (
+       jsonb_typeof(p_options) <> 'array'
+       or jsonb_array_length(p_options) > 6
+       or exists (
+         select 1 from jsonb_array_elements(p_options) o
+          where jsonb_typeof(o) <> 'string' or char_length(o #>> '{}') > 200
+       )
+     ) then
+    raise exception 'bad options' using errcode = 'P0001';
+  end if;
+
+  -- Сорок в сутки: столько ошибок за день честно не найти, а завалить
+  -- очередь одному человеку это не даст.
+  if (select count(*) from public.question_reports
+       where reporter_id = v_me and created_at > now() - interval '24 hours') >= 40 then
+    raise exception 'too many reports' using errcode = 'P0001';
+  end if;
+
+  insert into public.question_reports
+    (reporter_id, question_key, language, reason, comment, prompt, options, correct_index, picked_index, app_version)
+  values
+    (v_me, p_key, p_language, p_reason, nullif(left(btrim(coalesce(p_comment, '')), 500), ''),
+     left(p_prompt, 600), p_options,
+     case when p_correct between 0 and 5 then p_correct end,
+     case when p_picked between -1 and 5 then p_picked end,
+     left(p_version, 40))
+  on conflict (reporter_id, question_key, language) do update
+    set reason = excluded.reason,
+        comment = excluded.comment,
+        prompt = excluded.prompt,
+        options = excluded.options,
+        correct_index = excluded.correct_index,
+        picked_index = excluded.picked_index,
+        app_version = excluded.app_version;
+end;
+$$;
+
+revoke all on function public.report_question(text, text, text, text, text, jsonb, integer, integer, text) from public;
+grant execute on function public.report_question(text, text, text, text, text, jsonb, integer, integer, text) to authenticated;
+
+/*
+ * Очередь разбора — для панели Supabase, не для приложения. Одна строка
+ * на вопрос и язык: сколько человек пожаловалось, на что, и последний
+ * снимок вопроса. Наверху те, на кого жалоб больше.
+ *
+ * Разобрав вопрос, закройте его жалобы:
+ *   update public.question_reports set status = 'fixed'
+ *    where question_key = '…' and language = 'ru';
+ */
+drop view if exists public.question_report_queue;
+create view public.question_report_queue with (security_invoker = true) as
+select
+  r.question_key,
+  r.language,
+  count(*) as reports,
+  count(*) filter (where r.reason = 'wrongAnswer') as wrong_answer,
+  count(*) filter (where r.reason = 'ambiguous') as ambiguous,
+  count(*) filter (where r.reason = 'typo') as typo,
+  count(*) filter (where r.reason = 'media') as media,
+  count(*) filter (where r.reason = 'other') as other,
+  max(r.created_at) as last_reported,
+  (array_agg(r.prompt order by r.created_at desc))[1] as prompt,
+  (array_agg(r.options order by r.created_at desc))[1] as options,
+  (array_agg(r.correct_index order by r.created_at desc))[1] as correct_index,
+  (array_agg(r.app_version order by r.created_at desc))[1] as app_version,
+  array_remove(array_agg(r.comment order by r.created_at desc), null) as comments
+from public.question_reports r
+where r.status = 'open'
+group by r.question_key, r.language
+order by count(*) desc, max(r.created_at) desc;
+
+revoke all on public.question_report_queue from anon, authenticated;

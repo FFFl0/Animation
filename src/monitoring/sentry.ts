@@ -2,6 +2,7 @@ import { Platform } from 'react-native';
 import Constants from 'expo-constants';
 import * as Application from 'expo-application';
 import * as Sentry from '@sentry/react-native';
+import { otaInfo } from '../updates/ota';
 
 /**
  * Crash reporting, off unless a DSN is configured.
@@ -34,6 +35,10 @@ export function initCrashReporting(): void {
   });
 
   Sentry.setTag('platform', Platform.OS);
+  // The build number no longer says which code crashed once bundles arrive
+  // over the air; this does.
+  const ota = otaInfo();
+  Sentry.setTag('ota', ota && !ota.embedded && ota.shortId ? ota.shortId : 'embedded');
 }
 
 /**

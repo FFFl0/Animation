@@ -1,0 +1,134 @@
+name: EAS Update (OTA)
+
+# Publishes the JavaScript of the chosen commit to builds that are already
+# installed, without a new build. Run it from the branch whose code should
+# go out ("Use workflow from").
+#
+# It only works for changes that did not touch the native side. Whether
+# they did is not left to memory: the runtime version is a fingerprint of
+# everything native, and the job stops before publishing if no finished
+# build carries the same one.
+
+on:
+  workflow_dispatch:
+    inputs:
+      channel:
+        description: 'Which builds get it: preview (test APKs) or production (store)'
+        required: true
+        default: 'preview'
+        type: choice
+        options:
+          - preview
+          - production
+      platform:
+        description: 'Target platform'
+        required: true
+        default: 'android'
+        type: choice
+        options:
+          - android
+          - ios
+          - all
+      message:
+        description: 'What changed (shown on expo.dev; defaults to the last commit subject)'
+        required: false
+        type: string
+
+jobs:
+  publish:
+    name: publish to ${{ github.event.inputs.channel }}
+    runs-on: ubuntu-latest
+    timeout-minutes: 25
+    env:
+      CHANNEL: ${{ github.event.inputs.channel }}
+      PLATFORM: ${{ github.event.inputs.platform }}
+      MESSAGE: ${{ github.event.inputs.message }}
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: 22
+
+      - name: Install dependencies
+        run: npm ci
+
+      # A build sits behind store review or at least an install; an update
+      # is on players' phones the next time they open the app. Nothing that
+      # fails its own checks goes out that way.
+      - name: Typecheck and tests
+        run: |
+          npx tsc --noEmit
+          npx jest
+
+      - name: Setup EAS
+        uses: expo/expo-github-action@v8
+        with:
+          eas-version: latest
+          token: ${{ secrets.EXPO_TOKEN }}
+
+      - name: Link EAS project (idempotent)
+        run: npx eas-cli init --non-interactive --force
+
+      # The bundle is made on this runner, so it needs the same build-time
+      # variables the channel's builds were made with. See the script.
+      - name: Load the channel's build-time variables
+        run: node scripts/ota-env.mjs "$CHANNEL" >> "$GITHUB_ENV"
+
+      - name: Check that a build can receive this update
+        run: |
+          platforms="$PLATFORM"
+          [ "$PLATFORM" = "all" ] && platforms="android ios"
+          for platform in $platforms; do
+            runtime=$(npx expo-updates runtimeversion:resolve --platform "$platform" \
+              | node -p "JSON.parse(require('fs').readFileSync(0, 'utf8')).runtimeVersion")
+            if [ -z "$runtime" ] || [ "$runtime" = "null" ]; then
+              echo "::error::Could not work out the runtime version for $platform."
+              exit 1
+            fi
+            echo "$platform runtime version: $runtime"
+            npx eas-cli build:list --platform "$platform" --channel "$CHANNEL" \
+              --runtime-version "$runtime" --status finished --limit 1 \
+              --json --non-interactive > builds.json
+            found=$(node -p "JSON.parse(require('fs').readFileSync('builds.json', 'utf8')).length")
+            if [ "$found" = "0" ]; then
+              {
+                echo "## Not published"
+                echo
+                echo "No finished **$platform** build on the **$CHANNEL** channel has runtime version \`$runtime\`."
+                echo
+                echo "That means the native side changed since the last build (a native module was added or updated,"
+                echo "or app.json changed), or no build with over-the-air updates has been made on this channel yet."
+                echo "Run the **EAS Build** workflow with the \`$CHANNEL\` profile instead: an update published now"
+                echo "would reach nobody."
+              } >> "$GITHUB_STEP_SUMMARY"
+              echo "::error::No $platform build on '$CHANNEL' can receive this update. A new build is needed."
+              exit 1
+            fi
+          done
+
+      - name: Publish
+        run: |
+          [ -n "$MESSAGE" ] || MESSAGE=$(git log -1 --pretty=%s)
+          npx eas-cli update --channel "$CHANNEL" --platform "$PLATFORM" \
+            --message "$MESSAGE" --non-interactive --json > update-output.json
+
+      - name: Summary
+        if: always()
+        run: |
+          if [ -s update-output.json ]; then
+            node -e "
+              const fs = require('fs');
+              const parsed = JSON.parse(fs.readFileSync('update-output.json', 'utf8'));
+              const updates = Array.isArray(parsed) ? parsed : [parsed];
+              const app = JSON.parse(fs.readFileSync('app.json', 'utf8')).expo;
+              const write = (line) => fs.appendFileSync(process.env.GITHUB_STEP_SUMMARY, line + '\n');
+              write('## Published to ' + process.env.CHANNEL);
+              for (const u of updates) {
+                write('\n- **' + u.platform + '** · runtime \`' + u.runtimeVersion + '\` · ' + (u.message || ''));
+              }
+              const group = updates[0] && updates[0].group;
+              if (group) write('\n[Open on expo.dev](https://expo.dev/accounts/' + app.owner + '/projects/' + app.slug + '/updates/' + group + ')');
+              write('\nPhones pick it up on the next cold start, or when the app is brought back after half an hour away.');
+            "
+          fi

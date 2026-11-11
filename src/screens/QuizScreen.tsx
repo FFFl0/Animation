@@ -8,6 +8,9 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question } from '../quiz/generateQuiz';
+import QuestionReportSheet from '../quiz/QuestionReportSheet';
+import { canReportQuestions } from '../quiz/questionReportApi';
+import { questionKeyOf } from '../quiz/questionReports';
 import { RoundConfig } from '../quiz/types';
 import { AnswerTiming, answerSample, answerTiming, averageAnswerMs } from '../quiz/answerTiming';
 import AnimeAvatar from '../components/AnimeAvatar';
@@ -94,6 +97,10 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const picks = useRef<number[]>([]);
   /** Set while a timed-out question is showing its answer before moving on. */
   const advanceRef = useRef<ReturnType<typeof setTimeout> | null>(null);
+  /** The question a mistake is being reported in, while its sheet is open. */
+  const [reporting, setReporting] = useState<Question | null>(null);
+  /** Questions already reported this round, so the offer is not made twice. */
+  const [reported, setReported] = useState<string[]>([]);
 
   const question = questions[index];
   const isLast = index === questions.length - 1;
@@ -210,6 +217,13 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
    * and a half ago still acts on the state as it is when it fires. */
   const advanceNow = useRef(handleNext);
   advanceNow.current = handleNext;
+
+  const openReport = () => {
+    // A timed-out question moves on by itself in a moment; somebody who has
+    // started describing a mistake in it has asked for it to wait.
+    cancelAdvance();
+    setReporting(question);
+  };
 
   const useHint = () => {
     if (selected !== null || hidden.length || !spendConsumable('hint5050')) return;
@@ -394,10 +408,30 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
                   {isLast || (hasLives && lives <= 0) ? t('quiz.results') : t('quiz.next')}
                 </Text>
               </SoundTouchable>
+              {canReportQuestions &&
+                (reported.includes(questionKeyOf(question)) ? (
+                  <Text style={styles.reportDone}>{t('questionReport.linkSent')}</Text>
+                ) : (
+                  <SoundTouchable
+                    style={styles.reportLink}
+                    onPress={openReport}
+                    accessibilityRole="button"
+                    testID="question-report-open"
+                  >
+                    <Text style={styles.reportLinkText}>{t('questionReport.link')}</Text>
+                  </SoundTouchable>
+                ))}
             </FadeIn>
           )}
         </View>
       </View>
+
+      <QuestionReportSheet
+        question={reporting}
+        picked={selected ?? -1}
+        onClose={() => setReporting(null)}
+        onSent={() => reporting && setReported((keys) => [...keys, questionKeyOf(reporting)])}
+      />
     </SafeAreaView>
   );
 }
@@ -481,5 +515,18 @@ function makeStyles(theme: Theme) {
       alignItems: 'center',
     },
     nextButtonText: { color: theme.onPrimary, fontSize: 16, fontFamily: fontFamily('700') },
+    // Small and quiet: it is there for the one question in a hundred that is
+    // wrong, and must not compete with "Next" on the other ninety-nine.
+    reportLink: { alignSelf: 'center', paddingVertical: 10, paddingHorizontal: 12, marginTop: 4 },
+    reportLinkText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('600'), color: theme.textMuted },
+    reportDone: {
+      alignSelf: 'center',
+      paddingVertical: 10,
+      marginTop: 4,
+      fontSize: 12,
+      lineHeight: 16,
+      fontFamily: fontFamily('600'),
+      color: theme.textMuted,
+    },
   });
 }
