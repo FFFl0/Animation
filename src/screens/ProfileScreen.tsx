@@ -291,7 +291,7 @@ export default function ProfileScreen({
               onPress={() => updateAvatar({ favoriteCharacterId: c.id === profile.favoriteCharacterId ? null : c.id })}
             >
               <View style={[styles.favAvatarWrap, c.id === profile.favoriteCharacterId && styles.favAvatarSelected]}>
-                <AnimeAvatar avatar={c.avatar} characterId={c.id} size={56} />
+                <AnimeAvatar avatar={c.avatar} characterId={c.id} size={68} />
               </View>
               <Text style={styles.favName} numberOfLines={1}>{characterName(c, language).split(' ')[0]}</Text>
             </SoundTouchable>
@@ -563,8 +563,8 @@ function makeStyles(theme: Theme) {
     searchInput: { flex: 1, fontSize: 13, fontFamily: fontFamily('500'), color: theme.text, padding: 0 },
     searchEmpty: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, paddingVertical: 8 },
     favRow: { gap: 14, paddingRight: 12 },
-    favItem: { alignItems: 'center', width: 64 },
-    favAvatarWrap: { borderRadius: 30, borderWidth: 2, borderColor: 'transparent' },
+    favItem: { alignItems: 'center', width: 76 },
+    favAvatarWrap: { borderRadius: 36, borderWidth: 2, borderColor: 'transparent' },
     favAvatarSelected: { borderColor: theme.primary },
     cosmeticThumbWrap: {
       width: 56,

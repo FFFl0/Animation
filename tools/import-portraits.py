@@ -31,10 +31,10 @@ CATALOGUE = os.path.join(ROOT, 'src', 'data', 'characters.ts')
 # The same spelling differences import-characters.py knows about.
 ALIASES = {'л': 'l', 'зенитsuагацума': 'зеницуагацума', 'хисокаморроу': 'хисокамороу', 'асуна': 'асунаюки'}
 
-# 512 is enough for the largest place a portrait is drawn (140pt in the quiz,
-# at up to 3x); 84 keeps a portrait near 90 KB.
-SIZE = '512x512'
-QUALITY = '84'
+# 1024 keeps a portrait sharp at its largest (230pt in the quiz,
+# at up to 3x, and a little more); 80 keeps one near 280 KB.
+SIZE = '1024x1024'
+QUALITY = '80'
 
 
 def norm(name):

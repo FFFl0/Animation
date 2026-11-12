@@ -205,7 +205,7 @@ function RoundPreview({
           <View style={styles.faceRow}>
             {faces.map((character, i) => (
               <View key={character.id} style={[styles.face, i > 0 && styles.faceOverlap, { borderColor: theme.card }]}>
-                <AnimeAvatar avatar={character.avatar} characterId={character.id} size={44} />
+                <AnimeAvatar avatar={character.avatar} characterId={character.id} size={52} />
               </View>
             ))}
             {pool.length > faces.length && (
@@ -327,8 +327,9 @@ function makeStyles(theme: Theme) {
     infoText: { fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4 },
     infoSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 14, marginBottom: 8 },
     faceRow: { flexDirection: 'row', alignItems: 'center' },
-    face: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
-    faceOverlap: { marginLeft: -10 },
+    face: { width: 56, height: 56, borderRadius: 28, borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
+    // Seven 56px faces have to fit a 288px card on the narrowest phone.
+    faceOverlap: { marginLeft: -15 },
     faceMore: { backgroundColor: theme.primaryLight },
     faceMoreText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.primary },
     recordHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },

@@ -45,7 +45,7 @@ Name each picture by the **workbook's** id (`naruto-1.png`, `csm-6.png`), as
 they are named on the Drive. The workbook's ids are its own row numbers, not
 the app's, so each file is matched to a character by name through the
 workbook — `naruto-1.png` is Madara and becomes `assets/characters/naruto-4.jpg`.
-Every match is scaled to 512×512 JPEG, replaces the generated placeholder PNG
+Every match is scaled to 1024×1024 JPEG, replaces the generated placeholder PNG
 if there was one, and `src/data/avatarImages.ts` is rewritten. Files that
 match no character in the app are listed and left alone. Needs ImageMagick.
 

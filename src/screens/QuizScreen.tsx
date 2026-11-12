@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { Animated, Platform, StyleSheet, Text, View } from 'react-native';
+import { Animated, Platform, StyleSheet, Text, View, useWindowDimensions } from 'react-native';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import SoundTouchable from '../sound/SoundTouchable';
 import { Theme } from '../theme/palette';
@@ -8,6 +8,7 @@ import { radius } from '../theme/tokens';
 import { useTheme } from '../theme/ThemeContext';
 import { useSound } from '../sound/SoundContext';
 import { generateQuiz, Question } from '../quiz/generateQuiz';
+import { portraitSizeFor } from '../quiz/portraitSize';
 import QuestionReportSheet from '../quiz/QuestionReportSheet';
 import { canReportQuestions } from '../quiz/questionReportApi';
 import { questionKeyOf } from '../quiz/questionReports';
@@ -105,6 +106,8 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const [reported, setReported] = useState<string[]>([]);
 
   const question = questions[index];
+  const { width: screenWidth, height: screenHeight } = useWindowDimensions();
+  const portraitSize = portraitSizeFor(screenWidth, screenHeight);
   const isLast = index === questions.length - 1;
   // Options key off this too, so every part of the question re-enters together.
   const questionKey = `${index}-${question?.promptText ?? ''}`;
@@ -376,7 +379,7 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
                 <AnimeAvatar
                   avatar={question.character.avatar}
                   characterId={question.character.id}
-                  size={140}
+                  size={portraitSize}
                   variant={question.promptKind === 'avatar' ? 'full' : question.promptKind}
                 />
               </View>
