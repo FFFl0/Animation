@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { StyleSheet, Text, View } from 'react-native';
 import SoundTouchable from '../sound/SoundTouchable';
 import Icon from './Icon';
@@ -12,6 +12,7 @@ import { useLanguage } from '../i18n/LanguageContext';
 import { categoryTitle, getCategory } from '../data/categories';
 import { Quest } from '../quests/quests';
 import { useQuests } from '../quests/QuestsContext';
+import { localClock, nextQuestReset, timeUntil } from '../quests/questClock';
 
 /**
  * Today's three quests, how far each has got, and the reward for all of
@@ -30,6 +31,12 @@ export default function DailyQuestsCard() {
   const { ready, quests, progress, reward, canClaim, claimed, claim } = useQuests();
   const [busy, setBusy] = useState(false);
   const [failed, setFailed] = useState(false);
+  // Ticks the countdown along; a minute is as fine as it is shown.
+  const [now, setNow] = useState(() => new Date());
+  useEffect(() => {
+    const timer = setInterval(() => setNow(new Date()), 30_000);
+    return () => clearInterval(timer);
+  }, []);
 
   // Nothing until today's record is read: three empty bars that then jump
   // to "done" would be a lie told for a quarter of a second.
@@ -58,6 +65,9 @@ export default function DailyQuestsCard() {
     if (ok) buzz('success');
     else setFailed(true);
   };
+
+  const reset = nextQuestReset(now);
+  const left = timeUntil(reset, now);
 
   return (
     <View style={styles.card}>
@@ -94,6 +104,13 @@ export default function DailyQuestsCard() {
       })}
 
       <View style={styles.footer}>
+        <View style={styles.resetRow} testID="quests-reset">
+          <Icon name="calendar" size={13} color={theme.textMuted} />
+          <Text style={styles.resetText}>
+            {t('quests.resetsAt', localClock(reset))}
+            <Text style={styles.resetLeft}>{` · ${t('quests.resetsIn', left.hours, left.minutes)}`}</Text>
+          </Text>
+        </View>
         {claimed ? (
           <Text style={styles.claimed}>{t('quests.claimed')}</Text>
         ) : (
@@ -146,6 +163,9 @@ function makeStyles(theme: Theme) {
     rowText: { flex: 1, fontSize: 13, lineHeight: 18, fontFamily: fontFamily('700'), color: theme.text },
     rowTextDone: { color: theme.textMuted },
     count: { fontSize: 12, lineHeight: 18, fontFamily: fontFamily('800'), color: theme.primary },
+    resetRow: { flexDirection: 'row', alignItems: 'center', gap: 6, marginBottom: 8 },
+    resetText: { flex: 1, fontSize: 12, lineHeight: 17, fontFamily: fontFamily('700'), color: theme.text },
+    resetLeft: { fontFamily: fontFamily('500'), color: theme.textMuted },
     track: { height: 4, borderRadius: 2, backgroundColor: theme.border, marginTop: 6, overflow: 'hidden' },
     fill: { height: 4, borderRadius: 2, backgroundColor: theme.primary },
     footer: { marginTop: 10, paddingTop: 12, borderTopWidth: 1, borderTopColor: theme.border },

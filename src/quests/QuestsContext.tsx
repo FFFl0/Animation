@@ -5,6 +5,8 @@ import { ConsumableId } from '../shop/consumables';
 import { todayDateStr } from '../quiz/today';
 import { Quest, QuestProgress, RoundFacts, allDone, applyRound, questsForDay, rewardForDay } from './quests';
 import { QuestDay, loadQuestDay, saveQuestDay } from './questStorage';
+import { nextQuestReset } from './questClock';
+import { AppState } from 'react-native';
 
 type QuestsValue = {
   ready: boolean;
@@ -52,6 +54,28 @@ export function QuestsProvider({ children }: { children: ReactNode }) {
     const held = latest.current;
     return held && held.day === today ? held : { day: today, progress: {}, claimed: false };
   }, []);
+
+  // Midnight UTC while the app is open, or while it sat in the background:
+  // without this the card would keep showing yesterday's quests until the
+  // next round happened to replace them.
+  useEffect(() => {
+    if (!userId) return;
+    const roll = () => {
+      const fresh = current();
+      if (latest.current && fresh !== latest.current) {
+        latest.current = fresh;
+        setState(fresh);
+      }
+    };
+    const timer = setTimeout(roll, nextQuestReset().getTime() - Date.now() + 1000);
+    const subscription = AppState.addEventListener('change', (next) => {
+      if (next === 'active') roll();
+    });
+    return () => {
+      clearTimeout(timer);
+      subscription.remove();
+    };
+  }, [userId, current, state?.day]);
 
   const commit = useCallback(
     (next: QuestDay) => {
