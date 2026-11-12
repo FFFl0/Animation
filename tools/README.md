@@ -32,3 +32,20 @@ with them.
 `xlsx.py` beside it is a small reader for the parts of the format this needs;
 a workbook is a zip of XML and the standard library has both, so there is no
 third-party dependency to install.
+
+## import-portraits.py
+
+Adds drawn portraits for characters already in the app.
+
+```
+python3 tools/import-portraits.py path/to/folder path/to/AnimeQuiz_Characters.xlsx
+```
+
+Name each picture by the **workbook's** id (`naruto-1.png`, `csm-6.png`), as
+they are named on the Drive. The workbook's ids are its own row numbers, not
+the app's, so each file is matched to a character by name through the
+workbook — `naruto-1.png` is Madara and becomes `assets/characters/naruto-4.jpg`.
+Every match is scaled to 512×512 JPEG, replaces the generated placeholder PNG
+if there was one, and `src/data/avatarImages.ts` is rewritten. Files that
+match no character in the app are listed and left alone. Needs ImageMagick.
+
