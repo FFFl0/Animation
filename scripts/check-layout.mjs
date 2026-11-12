@@ -218,7 +218,16 @@ const STEPS = [
   }],
   ['home', async (h) => h.tap('Пропустить')],
   ['home-lower', async (h) => h.scrollDown()],
+  ['battle', async (h) => {
+    await h.scrollTop();
+    await h.page.getByText('Битва фанатов', { exact: true }).first().click({ timeout: 4000 }).catch(() => {});
+    await h.settle();
+  }],
+  ['battle-lower', async (h) => h.scrollDown()],
   ['category-hard', async (h) => {
+    // back to home from the battle page
+    await h.page.getByText('‹ Битва фанатов').first().click({ timeout: 4000 }).catch(() => {});
+    await h.settle();
     await h.scrollTop();
     await h.tap('Сложные', 'first');
   }],

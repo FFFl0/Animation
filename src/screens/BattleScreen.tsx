@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { ActivityIndicator, Share, StyleSheet, Text, TextInput, View } from 'react-native';
+import { ActivityIndicator, Image, ScrollView, Share, StyleSheet, Text, TextInput, View } from 'react-native';
 import * as Clipboard from 'expo-clipboard';
 import { SafeAreaView } from 'react-native-safe-area-context';
 import { Theme } from '../theme/palette';
@@ -10,7 +10,7 @@ import { useAuth } from '../auth/AuthContext';
 import { isSupabaseConfigured } from '../auth/supabaseClient';
 import SoundTouchable from '../sound/SoundTouchable';
 import PillButton from '../components/PillButton';
-import Icon from '../components/Icon';
+import Icon, { IconName } from '../components/Icon';
 import QuizScreen from './QuizScreen';
 import { RoundConfig } from '../quiz/types';
 import { dateSeed } from '../quiz/generateQuiz';
@@ -24,6 +24,20 @@ import {
 import { battleInviteUrl, looksLikeInviteLink, roomCodeFromInput } from '../battle/battleLink';
 import { useT } from '../i18n/strings';
 import { sendBattleInvite } from '../notifications/notificationsApi';
+import ImageScrim from '../components/ImageScrim';
+import FadeIn from '../components/FadeIn';
+import QuestionKindChips from '../components/QuestionKindChips';
+import { BATTLE_BANNER } from '../data/modeImages';
+import { questionKindsOf } from '../data/roundPreview';
+import { isLayoutCheck } from '../monitoring/layoutCheck';
+import {
+  BattleRecord,
+  EMPTY_RECORD,
+  battlesPlayed,
+  loadBattleRecord,
+  outcomeOf,
+  saveBattleOutcome,
+} from '../battle/battleRecord';
 
 type Props = {
   onBack: () => void;
@@ -62,6 +76,21 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
   const [countdown, setCountdown] = useState(0);
   const [localResult, setLocalResult] = useState<{ score: number; total: number } | null>(null);
   const [copied, setCopied] = useState<'link' | 'code' | null>(null);
+  const [record, setRecord] = useState<BattleRecord>(EMPTY_RECORD);
+  /** Set once this battle's outcome is written down, so a re-render cannot count it twice. */
+  const recorded = useRef(false);
+
+  useEffect(() => {
+    if (profile) void loadBattleRecord(profile.id).then(setRecord);
+  }, [profile?.id]); // eslint-disable-line react-hooks/exhaustive-deps
+
+  // A battle counts once both scores are in. One where the rival left
+  // before finishing is not counted either way: it was not played out.
+  useEffect(() => {
+    if (!profile || !localResult || !opponentFinish || recorded.current) return;
+    recorded.current = true;
+    void saveBattleOutcome(profile.id, outcomeOf(localResult.score, opponentFinish.score)).then(setRecord);
+  }, [localResult, opponentFinish]); // eslint-disable-line react-hooks/exhaustive-deps
 
   const roomRef = useRef<BattleRoom | null>(null);
   const countdownTimer = useRef<ReturnType<typeof setInterval> | null>(null);
@@ -153,6 +182,7 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
     setOpponentFinish(null);
     setBattleConfig(null);
     setLocalResult(null);
+    recorded.current = false;
   };
 
   const handleCreate = () => connect(generateRoomCode(), true);
@@ -222,7 +252,8 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
 
   if (!profile) return null;
 
-  if (!isSupabaseConfigured) {
+  // The layout check has no server, but still wants to see the menu laid out.
+  if (!isSupabaseConfigured && !isLayoutCheck) {
     return (
       <SafeAreaView style={styles.safe}>
         <Header title={t('battle.title')} onBack={onBack} theme={theme} backLabel={t('battle.back')} />
@@ -263,25 +294,90 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
     );
   }
 
+  if (phase === 'menu') {
+    const played = battlesPlayed(record);
+    return (
+      <SafeAreaView style={styles.safe}>
+        <Header title={t('battle.title')} onBack={onBack} theme={theme} backLabel={t('battle.back')} />
+        <ScrollView contentContainerStyle={styles.menu}>
+          <Text style={styles.menuTitle}>{t('battle.title')}</Text>
+          <Text style={styles.menuSubtitle}>{t('battle.menuSubtitle')}</Text>
+
+          <FadeIn duration={260}>
+            <View style={styles.hero}>
+              <Image source={BATTLE_BANNER} style={styles.heroImage} resizeMode="cover" />
+              <ImageScrim />
+              <View style={styles.heroChips}>
+                <HeroChip icon="swords" label={t('battle.ruleDuel')} styles={styles} />
+                <HeroChip icon="target" label={t('battle.ruleQuestions', BATTLE_QUESTION_COUNT)} styles={styles} />
+                <HeroChip icon="eye" label={t('battle.ruleLive')} styles={styles} />
+                <HeroChip icon="lock" label={t('battle.ruleNoItems')} styles={styles} />
+              </View>
+            </View>
+          </FadeIn>
+
+          {error && <Text style={styles.error}>{error}</Text>}
+          <PillButton title={t('battle.createBattle')} variant="ink" onPress={handleCreate} style={{ marginTop: 14 }} />
+          <PillButton
+            title={t('battle.joinByLinkOrCode')}
+            variant="outline"
+            onPress={() => setPhase('joinInput')}
+            style={{ marginTop: 10 }}
+          />
+
+          <FadeIn duration={300} delay={80}>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>{t('battle.howTitle')}</Text>
+              {(['step1', 'step2', 'step3'] as const).map((step, i) => (
+                <View key={step} style={styles.step}>
+                  <View style={styles.stepNumber}>
+                    <Text style={styles.stepNumberText}>{i + 1}</Text>
+                  </View>
+                  <Text style={styles.stepText}>{t(`battle.${step}`)}</Text>
+                </View>
+              ))}
+            </View>
+          </FadeIn>
+
+          <FadeIn duration={300} delay={140}>
+            <View style={styles.infoCard}>
+              <Text style={styles.infoTitle}>{t('battle.kindsTitle')}</Text>
+              <Text style={styles.infoText}>{t('battle.kindsHint')}</Text>
+              <View style={{ marginTop: 10 }}>
+                <QuestionKindChips kinds={questionKindsOf('mixed')} color={theme.primary} background={theme.primaryLight} />
+              </View>
+            </View>
+          </FadeIn>
+
+          <FadeIn duration={300} delay={200}>
+            <View style={styles.infoCard} testID="battle-record">
+              <View style={styles.recordHead}>
+                <Icon name="trophy" size={17} color={theme.primary} />
+                <Text style={styles.infoTitle}>{t('battle.recordTitle')}</Text>
+              </View>
+              {played > 0 ? (
+                <>
+                  <View style={styles.recordRow}>
+                    <RecordCell value={record.wins} label={t('battle.wins')} color={theme.success} styles={styles} />
+                    <RecordCell value={record.losses} label={t('battle.losses')} color={theme.danger} styles={styles} />
+                    <RecordCell value={record.draws} label={t('battle.draws')} color={theme.textMuted} styles={styles} />
+                  </View>
+                  <Text style={styles.recordNote}>{t('battle.recordNote')}</Text>
+                </>
+              ) : (
+                <Text style={styles.infoText}>{t('battle.recordEmpty')}</Text>
+              )}
+            </View>
+          </FadeIn>
+        </ScrollView>
+      </SafeAreaView>
+    );
+  }
+
   return (
     <SafeAreaView style={styles.safe}>
-      <Header title={t('battle.title')} onBack={phase === 'menu' ? onBack : resetToMenu} theme={theme} backLabel={t('battle.back')} />
+      <Header title={t('battle.title')} onBack={resetToMenu} theme={theme} backLabel={t('battle.back')} />
       <View style={styles.container}>
-        {phase === 'menu' && (
-          <>
-            <Icon name="swords" size={40} color={theme.primary} />
-            <Text style={styles.title}>{t('battle.title')}</Text>
-            <Text style={styles.subtitle}>{t('battle.menuSubtitle')}</Text>
-            {error && <Text style={styles.error}>{error}</Text>}
-            <PillButton title={t('battle.createBattle')} variant="ink" onPress={handleCreate} style={{ marginTop: 8 }} />
-            <PillButton
-              title={t('battle.joinByLinkOrCode')}
-              variant="outline"
-              onPress={() => setPhase('joinInput')}
-              style={{ marginTop: 12 }}
-            />
-          </>
-        )}
 
         {phase === 'joinInput' && (
           <>
@@ -412,6 +508,34 @@ export default function BattleScreen({ onBack, challengeFriend, autoJoinRoomCode
   );
 }
 
+function HeroChip({ icon, label, styles }: { icon: IconName; label: string; styles: ReturnType<typeof makeStyles> }) {
+  return (
+    <View style={styles.heroChip}>
+      <Icon name={icon} size={12} color="#FFFFFF" />
+      <Text style={styles.heroChipText}>{label}</Text>
+    </View>
+  );
+}
+
+function RecordCell({
+  value,
+  label,
+  color,
+  styles,
+}: {
+  value: number;
+  label: string;
+  color: string;
+  styles: ReturnType<typeof makeStyles>;
+}) {
+  return (
+    <View style={styles.recordCell}>
+      <Text style={[styles.recordValue, { color }]}>{value}</Text>
+      <Text style={styles.recordLabel}>{label}</Text>
+    </View>
+  );
+}
+
 function Header({ title, onBack, theme, backLabel }: { title: string; onBack: () => void; theme: Theme; backLabel: string }) {
   return (
     <SoundTouchable
@@ -429,6 +553,55 @@ function makeStyles(theme: Theme) {
   return StyleSheet.create({
     safe: { flex: 1, backgroundColor: theme.background },
     container: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 4 },
+    menu: { paddingHorizontal: 20, paddingTop: 8, paddingBottom: 40 },
+    menuTitle: { fontSize: 26, lineHeight: 32, fontFamily: fontFamily('800'), color: theme.text },
+    menuSubtitle: { fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 6, marginBottom: 18 },
+    hero: { height: 180, borderRadius: radius.lg, overflow: 'hidden', borderWidth: 1.5, borderColor: theme.primary },
+    heroImage: { position: 'absolute', top: 0, left: 0, width: '100%', height: '100%' },
+    heroChips: { position: 'absolute', left: 12, right: 12, bottom: 12, flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
+    heroChip: {
+      flexDirection: 'row',
+      alignItems: 'center',
+      gap: 5,
+      paddingHorizontal: 9,
+      paddingVertical: 5,
+      borderRadius: radius.pill,
+      backgroundColor: 'rgba(0,0,0,0.45)',
+    },
+    heroChipText: { fontSize: 11, lineHeight: 14, fontFamily: fontFamily('800'), color: '#FFFFFF' },
+    infoCard: {
+      backgroundColor: theme.card,
+      borderRadius: radius.lg,
+      borderWidth: 1.5,
+      borderColor: theme.border,
+      padding: 16,
+      marginTop: 14,
+    },
+    infoTitle: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily('800'), color: theme.text },
+    infoText: { fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4 },
+    step: { flexDirection: 'row', alignItems: 'flex-start', gap: 10, marginTop: 10 },
+    stepNumber: {
+      width: 22,
+      height: 22,
+      borderRadius: 11,
+      backgroundColor: theme.primaryLight,
+      alignItems: 'center',
+      justifyContent: 'center',
+    },
+    stepNumberText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.primary },
+    stepText: { flex: 1, fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.text },
+    recordHead: { flexDirection: 'row', alignItems: 'center', gap: 8 },
+    recordRow: { flexDirection: 'row', gap: 8, marginTop: 12 },
+    recordCell: {
+      flex: 1,
+      alignItems: 'center',
+      paddingVertical: 10,
+      borderRadius: radius.md,
+      backgroundColor: theme.background,
+    },
+    recordValue: { fontSize: 22, lineHeight: 28, fontFamily: fontFamily('800') },
+    recordLabel: { fontSize: 11, lineHeight: 15, fontFamily: fontFamily('700'), color: theme.textMuted, marginTop: 2 },
+    recordNote: { fontSize: 11, lineHeight: 15, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 8 },
     centerFill: { flex: 1, alignItems: 'center', justifyContent: 'center', paddingHorizontal: 28, gap: 8 },
     title: { fontSize: 22, fontFamily: fontFamily('800'), color: theme.text, marginTop: 10, textAlign: 'center' },
     subtitle: { fontSize: 13, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4, marginBottom: 8, textAlign: 'center', lineHeight: 19 },

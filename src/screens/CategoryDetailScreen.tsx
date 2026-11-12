@@ -19,7 +19,8 @@ import AnimeAvatar from '../components/AnimeAvatar';
 import ImageScrim from '../components/ImageScrim';
 import FadeIn from '../components/FadeIn';
 import { CATEGORY_BACKGROUNDS } from '../data/categoryImages';
-import { Category, QuestionType } from '../data/categories';
+import { Category } from '../data/categories';
+import QuestionKindChips from '../components/QuestionKindChips';
 import { Profile } from '../auth/types';
 import {
   UNTIERED_ROUND_LENGTH,
@@ -139,19 +140,6 @@ export default function CategoryDetailScreen({ categoryId, onBack, onStartTier }
   );
 }
 
-/** What each kind of question is drawn with in the list of kinds. */
-const KIND_ICON: Record<QuestionType, IconName> = {
-  guessSeries: 'book',
-  guessCharacterFull: 'character',
-  guessCharacterSilhouette: 'user',
-  guessCharacterEyes: 'eye',
-  guessQuote: 'quote',
-  guessAbility: 'swords',
-  guessFaction: 'globe',
-  openingTrivia: 'music',
-  guessSeriesByVideo: 'film',
-};
-
 const FACES = 6;
 
 /**
@@ -211,14 +199,7 @@ function RoundPreview({
           <Text style={styles.infoText}>{t(poolText, pool.length, seriesCountOf(category.id))}</Text>
 
           <Text style={styles.infoSubtitle}>{t('categoryDetail.kinds')}</Text>
-          <View style={styles.kindRow}>
-            {kinds.map((kind) => (
-              <View key={kind} style={[styles.kindChip, { backgroundColor: category.colorBg }]}>
-                <Icon name={KIND_ICON[kind]} size={13} color={category.color} />
-                <Text style={[styles.kindText, { color: category.color }]}>{t(`categoryDetail.kind.${kind}`)}</Text>
-              </View>
-            ))}
-          </View>
+          <QuestionKindChips kinds={kinds} color={category.color} background={category.colorBg} />
 
           <Text style={styles.infoSubtitle}>{t('categoryDetail.faces')}</Text>
           <View style={styles.faceRow}>
@@ -345,9 +326,6 @@ function makeStyles(theme: Theme) {
     infoTitle: { fontSize: 15, lineHeight: 20, fontFamily: fontFamily('800'), color: theme.text },
     infoText: { fontSize: 13, lineHeight: 19, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 4 },
     infoSubtitle: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('800'), color: theme.text, marginTop: 14, marginBottom: 8 },
-    kindRow: { flexDirection: 'row', flexWrap: 'wrap', gap: 6 },
-    kindChip: { flexDirection: 'row', alignItems: 'center', gap: 5, paddingHorizontal: 9, paddingVertical: 5, borderRadius: radius.pill },
-    kindText: { fontSize: 12, lineHeight: 16, fontFamily: fontFamily('700') },
     faceRow: { flexDirection: 'row', alignItems: 'center' },
     face: { width: 48, height: 48, borderRadius: 24, borderWidth: 2, overflow: 'hidden', alignItems: 'center', justifyContent: 'center' },
     faceOverlap: { marginLeft: -10 },
