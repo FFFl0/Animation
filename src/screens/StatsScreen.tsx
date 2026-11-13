@@ -465,8 +465,12 @@ function makeStyles(theme: Theme) {
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 6,
     },
+    // Full width by stretching, not by an aspect ratio: on a phone the ratio
+    // left the card short of the right edge, with the words spilling past it.
     quoteCard: {
-      aspectRatio: 2.85,
+      alignSelf: 'stretch',
+      minHeight: 112,
+      paddingVertical: 22,
       marginHorizontal: 20,
       marginTop: 18,
       borderRadius: radius.lg,
