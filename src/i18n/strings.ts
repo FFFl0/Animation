@@ -297,7 +297,7 @@ const ru: StringDict = {
     notificationsTitle: 'Уведомления',
     notify: {
       streak: 'Напоминание о серии',
-      streakHint: 'Каждый день в 20:00',
+      streakHint: 'В 12:00 и ещё раз в 20:00, если сегодня не играл',
       friends: 'Заявки в друзья',
       friendsHint: 'Когда кто-то хочет добавить тебя',
       battles: 'Вызовы на битву',
@@ -1230,7 +1230,7 @@ const en: StringDict = {
     notificationsTitle: 'Notifications',
     notify: {
       streak: 'Streak reminder',
-      streakHint: 'Every day at 20:00',
+      streakHint: 'At 12:00, and again at 20:00 if you have not played today',
       friends: 'Friend requests',
       friendsHint: 'When somebody wants to add you',
       battles: 'Battle invites',

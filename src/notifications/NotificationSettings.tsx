@@ -10,6 +10,7 @@ import { useT } from '../i18n/strings';
 import { isSupabaseConfigured } from '../auth/supabaseClient';
 import { isLayoutCheck } from '../monitoring/layoutCheck';
 import { useNotifications } from './NotificationsContext';
+import { useAuth } from '../auth/AuthContext';
 import { PUSH_CATEGORIES } from './notificationSettings';
 import { PushPermission, getPushPermission } from './pushTokens';
 import { getReminderEnabled, setReminderEnabled } from './streakReminder';
@@ -32,6 +33,7 @@ export default function NotificationSettings() {
   const t = useT();
   const { language } = useLanguage();
   const { pushSettings, setPushCategory } = useNotifications();
+  const { profile } = useAuth();
   const [reminderOn, setReminderOn] = useState(false);
   const [reminderError, setReminderError] = useState<string | null>(null);
   const [permission, setPermission] = useState<PushPermission>('unsupported');
@@ -53,7 +55,7 @@ export default function NotificationSettings() {
   const toggleReminder = async () => {
     setReminderError(null);
     const next = !reminderOn;
-    const result = await setReminderEnabled(next, language);
+    const result = await setReminderEnabled(next, language, profile?.streak ?? null);
     if (result.ok) setReminderOn(next);
     else {
       setReminderError(

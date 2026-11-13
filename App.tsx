@@ -38,6 +38,7 @@ import BattleScreen from './src/screens/BattleScreen';
 import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
 import { NotificationTarget } from './src/notifications/notificationRoute';
 import { useNotificationTaps } from './src/notifications/useNotificationTaps';
+import { useStreakReminders } from './src/notifications/useStreakReminders';
 import TournamentScreen from './src/screens/TournamentScreen';
 import { ModerationProvider } from './src/moderation/ModerationContext';
 import { QuestsProvider, useQuests } from './src/quests/QuestsContext';
@@ -240,6 +241,9 @@ function AppShell() {
   // Marks the account as present while the app is open, so friends see
   // "online" in chat instead of a timestamp from last week.
   useLastSeenHeartbeat(profile?.id ?? null);
+
+  // Noon and evening reminders, dropped for a day once it is played.
+  useStreakReminders(profile?.streak, language);
 
   // Up here with the other hooks, not down beside the render that uses it:
   // the loading and signed-out screens below return early, and a hook after
