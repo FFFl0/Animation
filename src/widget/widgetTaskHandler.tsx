@@ -2,6 +2,7 @@ import AsyncStorage from '@react-native-async-storage/async-storage';
 import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import { todayDateStr } from '../quiz/today';
 import { StreakWidget } from './StreakWidget';
+import { currentVariant } from './streakScene';
 import { SNAPSHOT_KEY, WIDGET_NAME, WidgetSnapshot, parseSnapshot, widgetStateOf } from './streakWidgetState';
 
 export async function readSnapshot(): Promise<WidgetSnapshot | null> {
@@ -12,14 +13,16 @@ export async function readSnapshot(): Promise<WidgetSnapshot | null> {
   }
 }
 
-/** The widget in both themes; Android picks the one the phone is in. */
+/**
+ * The widget as it should look now. The picture is the same in light and
+ * dark: it is artwork with its own sky, like a photo widget.
+ */
 export function renderStreakWidget(snapshot: WidgetSnapshot | null, width: number, height: number) {
   const state = widgetStateOf(snapshot, todayDateStr());
   const language = snapshot?.language ?? 'ru';
-  return {
-    light: <StreakWidget state={state} language={language} width={width} height={height} dark={false} />,
-    dark: <StreakWidget state={state} language={language} width={width} height={height} dark />,
-  };
+  return (
+    <StreakWidget state={state} language={language} width={width} height={height} variant={currentVariant()} />
+  );
 }
 
 /**

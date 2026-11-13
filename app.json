@@ -39,13 +39,13 @@
             {
               "name": "Streak",
               "label": "Серия",
-              "description": "Сколько дней подряд ты играешь",
+              "description": "Сколько дней подряд ты играешь — чем длиннее серия, тем круче картинка",
               "minWidth": "110dp",
-              "minHeight": "110dp",
+              "minHeight": "40dp",
               "targetCellWidth": 2,
-              "targetCellHeight": 2,
-              "maxResizeWidth": "320dp",
-              "maxResizeHeight": "320dp",
+              "targetCellHeight": 1,
+              "maxResizeWidth": "400dp",
+              "maxResizeHeight": "240dp",
               "previewImage": "./assets/widget-preview/streak.png",
               "resizeMode": "horizontal|vertical",
               "updatePeriodMillis": 1800000
