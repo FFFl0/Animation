@@ -1,5 +1,6 @@
 import { StreakTierId, tierForStreak } from '../data/streakTiers';
 import { WidgetKind } from './streakWidgetState';
+import type { FlameAccessory } from '../holidays/holidays';
 
 /**
  * The picture behind the streak widget, as one SVG.
@@ -137,6 +138,29 @@ const FLAME =
   'M50 4 C60 22 80 34 80 60 C80 81 66 95 50 95 C34 95 20 81 20 60 C20 45 29 36 35 28 C37 41 42 47 47 49 C43 33 45 18 50 4 Z';
 const CORE = 'M50 40 C58 52 68 60 68 74 C68 86 60 93 50 93 C40 93 32 86 32 74 C32 62 43 55 50 40 Z';
 
+/** Holiday accessories, drawn in the flame's 100×100 box. */
+const ACCESSORY: Record<FlameAccessory, string> = {
+  santa: [
+    '<path d="M24 38 C27 20 38 4 52 -3 C63 -8 76 -2 84 12 L77 16 C71 8 65 8 61 12 C67 21 72 29 76 38 Z" fill="#E53935"/>',
+    '<path d="M24 38 C27 20 38 4 52 -3 C46 8 42 22 42 38 Z" fill="#FF6F6B" fill-opacity="0.45"/>',
+    '<rect x="19" y="32" width="62" height="12" rx="6" fill="#FFFFFF"/>',
+    '<circle cx="82" cy="15" r="7" fill="#FFFFFF"/>',
+  ].join(''),
+  witch: [
+    '<ellipse cx="50" cy="37" rx="36" ry="7" fill="#3B2A4F"/>',
+    '<path d="M31 37 L44 6 C47 -2 54 -6 62 -2 C57 0 54 4 56 10 L69 37 Z" fill="#4C3566"/>',
+    '<path d="M33 31 L67 31 L69 37 L31 37 Z" fill="#F97316"/>',
+    '<rect x="46" y="30" width="8" height="8" rx="1.5" fill="#FDE68A"/>',
+  ].join(''),
+  heart: [
+    '<path d="M84 78 C84 78 70 70 70 61 C70 56 74 53 78 54 C81 55 83 57 84 59 C85 57 87 55 90 54 C94 53 98 56 98 61 C98 70 84 78 84 78 Z" fill="#FF3D71" stroke="#FFFFFF" stroke-width="2"/>',
+    '<ellipse cx="76" cy="59" rx="2.4" ry="1.6" fill="#FFFFFF" fill-opacity="0.8"/>',
+  ].join(''),
+  flower: [0, 72, 144, 216, 288]
+    .map((a) => `<ellipse cx="22" cy="28" rx="5.5" ry="9" fill="#FFC1D9" stroke="#FFFFFF" stroke-width="1" transform="rotate(${a} 22 37)"/>`)
+    .join('') + '<circle cx="22" cy="37" r="4" fill="#F472B6"/><circle cx="22" cy="37" r="1.6" fill="#FDE68A"/>',
+};
+
 function sparkle(x: number, y: number, r: number, color: string, opacity: number): string {
   const k = r * 0.28;
   return `<path d="M${n(x)} ${n(y - r)} L${n(x + k)} ${n(y - k)} L${n(x + r)} ${n(y)} L${n(x + k)} ${n(y + k)} L${n(x)} ${n(y + r)} L${n(x - k)} ${n(y + k)} L${n(x - r)} ${n(y)} L${n(x - k)} ${n(y - k)} Z" fill="${color}" fill-opacity="${opacity}"/>`;
@@ -158,6 +182,8 @@ export type SceneInput = {
   layer?: SceneLayer;
   /** Corner rounding; the widget's own when left out. */
   cornerRadius?: number;
+  /** What the flame wears for a holiday (holidays/holidays), if anything. */
+  accessory?: FlameAccessory | null;
 };
 
 export type SceneLayer = 'all' | 'back' | 'rays' | 'flame';
@@ -202,7 +228,7 @@ export function sceneGeometry(count: number, kind: WidgetKind, width: number, he
   };
 }
 
-export function streakScene({ count, kind, width, height, variant, layer = 'all', cornerRadius }: SceneInput): string {
+export function streakScene({ count, kind, width, height, variant, layer = 'all', cornerRadius, accessory = null }: SceneInput): string {
   const W = Math.max(60, width);
   const H = Math.max(40, height);
   const look = lookFor(count, kind);
@@ -330,10 +356,15 @@ export function streakScene({ count, kind, width, height, variant, layer = 'all'
         '<ellipse cx="50" cy="82" rx="3" ry="2.2" fill="#3A1A12"/>'
       );
     }
+    // A holiday hat goes on top of the flame, in its own box so it breathes
+    // and jumps with it; a heart or a flower is tucked in beside it.
+    if (accessory) out.push(ACCESSORY[accessory]);
     out.push('</g>');
 
-    // Crown on top from a month on; a gem set in it at a hundred.
-    if (look.crown && !frozen) {
+    // Crown on top from a month on; a gem set in it at a hundred. A holiday
+    // hat takes its place for the holiday.
+    const hat = accessory === 'santa' || accessory === 'witch';
+    if (look.crown && !frozen && !hat) {
       const cw = size * 0.36;
       const ch = cw * 0.62;
       const kx = cx - cw / 2;

@@ -29,6 +29,8 @@ import RareAchievements from '../components/RareAchievements';
 import { unlockedIds } from '../data/achievements';
 import NotificationSettings from '../notifications/NotificationSettings';
 import StreakWidgetCard from '../widget/StreakWidgetCard';
+import { useHoliday } from '../holidays/HolidayContext';
+import { nextHoliday } from '../holidays/holidays';
 import { widgetSupported } from '../widget/platform';
 import { isLayoutCheck } from '../monitoring/layoutCheck';
 import { USERNAME_MAX } from '../auth/validation';
@@ -76,6 +78,9 @@ export default function ProfileScreen({
   // Three side-by-side pills: the filled state carries on/off, the same way
   // the theme and language rows above do, so the labels stay short enough
   // to fit on a phone.
+  const holidayDecor = useHoliday();
+  const upcoming = nextHoliday(holidayDecor.today);
+
   const SOUND_TOGGLES = [
     { label: t('profile.musicLabel'), on: musicEnabled, toggle: toggleMusic },
     { label: t('profile.sfxLabel'), on: sfxEnabled, toggle: toggleSfx },
@@ -352,6 +357,26 @@ export default function ProfileScreen({
         ))}
       </View>
 
+      <Text style={styles.sectionTitle}>{t('profile.holidayTitle')}</Text>
+      <View style={styles.themeTabs}>
+        <SoundTouchable
+          style={[styles.themeTab, holidayDecor.enabled && styles.themeTabActive]}
+          onPress={() => holidayDecor.setEnabled(!holidayDecor.enabled)}
+          accessibilityRole="switch"
+          accessibilityState={{ checked: holidayDecor.enabled }}
+          testID="holiday-toggle"
+        >
+          <Text style={[styles.themeTabText, holidayDecor.enabled && styles.themeTabTextActive]}>
+            {t('profile.holidayToggle')}
+          </Text>
+        </SoundTouchable>
+      </View>
+      <Text style={styles.holidayHint}>
+        {holidayDecor.current
+          ? t('profile.holidayNow', t(`home.holidayName.${holidayDecor.current.id}`))
+          : t('profile.holidayNext', t(`home.holidayName.${upcoming.holiday.id}`), upcoming.inDays)}
+      </Text>
+
       <Text style={styles.sectionTitle}>{t('profile.soundTitle')}</Text>
       <View style={styles.themeTabs}>
         {SOUND_TOGGLES.map((toggle) => (
@@ -558,6 +583,7 @@ function makeStyles(theme: Theme) {
     medalHint: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 8, textAlign: 'center' },
     photoError: { fontSize: 12, fontFamily: fontFamily('500'), color: theme.danger, marginTop: 6, textAlign: 'center' },
     sectionTitle: { fontSize: 15, fontFamily: fontFamily('800'), color: theme.text, marginTop: 24, marginBottom: 10 },
+    holidayHint: { fontSize: 12, lineHeight: 17, fontFamily: fontFamily('500'), color: theme.textMuted, marginTop: 8 },
     searchWrap: {
       flexDirection: 'row',
       alignItems: 'center',

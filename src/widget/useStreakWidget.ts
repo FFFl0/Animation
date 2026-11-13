@@ -1,6 +1,7 @@
 import { useEffect } from 'react';
 import { Language } from '../i18n/LanguageContext';
 import { updateStreakWidget, widgetSupported } from './platform';
+import { useHoliday } from '../holidays/HolidayContext';
 
 /**
  * Keeps the home-screen widget in step with the streak: after every round,
@@ -14,11 +15,13 @@ export function useStreakWidget(
 ): void {
   const count = streak?.count ?? 0;
   const lastPlayedDate = streak?.lastPlayedDate ?? null;
+  // The hat goes on and comes off with the holiday and the switch.
+  const accessory = useHoliday().holiday?.accessory ?? null;
   useEffect(() => {
     if (!widgetSupported || !streak) return;
-    updateStreakWidget({ count, lastPlayedDate, freezes, language }).catch(() => {
+    updateStreakWidget({ count, lastPlayedDate, freezes, language }, accessory).catch(() => {
       // The widget keeps its last picture; the next redraw tries again.
     });
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [count, lastPlayedDate, freezes, language, !!streak]);
+  }, [count, lastPlayedDate, freezes, language, accessory, !!streak]);
 }

@@ -1,6 +1,7 @@
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { registerWidgetTaskHandler, requestPinWidget, requestWidgetUpdate } from 'react-native-android-widget';
 import { SNAPSHOT_KEY, WIDGET_NAME, WidgetSnapshot } from './streakWidgetState';
+import type { FlameAccessory } from '../holidays/holidays';
 import { renderStreakWidget, widgetTaskHandler } from './widgetTaskHandler';
 
 export const widgetSupported = true;
@@ -14,11 +15,11 @@ export function registerStreakWidget(): void {
  * Leaves the streak where the widget can find it, and redraws every copy
  * of the widget on the home screen now rather than at the next half hour.
  */
-export async function updateStreakWidget(snapshot: WidgetSnapshot): Promise<void> {
+export async function updateStreakWidget(snapshot: WidgetSnapshot, accessory: FlameAccessory | null = null): Promise<void> {
   await AsyncStorage.setItem(SNAPSHOT_KEY, JSON.stringify(snapshot));
   await requestWidgetUpdate({
     widgetName: WIDGET_NAME,
-    renderWidget: (info) => renderStreakWidget(snapshot, info.width, info.height),
+    renderWidget: (info) => renderStreakWidget(snapshot, info.width, info.height, accessory),
   });
 }
 

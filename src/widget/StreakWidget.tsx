@@ -2,6 +2,7 @@ import { FlexWidget, OverlapWidget, SvgWidget, TextWidget } from 'react-native-a
 import type { ColorProp, HexColor } from 'react-native-android-widget';
 import { WIDGET_TEXT, WidgetSnapshot, WidgetState } from './streakWidgetState';
 import { lookFor, pillColors, sceneText, streakScene } from './streakScene';
+import type { FlameAccessory } from '../holidays/holidays';
 
 /**
  * The streak widget, as Android draws it on the home screen: the tier's
@@ -22,12 +23,14 @@ export function StreakWidget({
   width,
   height,
   variant,
+  accessory = null,
 }: {
   state: WidgetState;
   language: WidgetSnapshot['language'];
   width: number;
   height: number;
   variant: number;
+  accessory?: FlameAccessory | null;
 }) {
   const W = Math.max(60, Math.round(width || 190));
   const H = Math.max(40, Math.round(height || 88));
@@ -51,7 +54,7 @@ export function StreakWidget({
       style={{ width: 'match_parent', height: 'match_parent', borderRadius: Math.min(28, H / 2), overflow: 'hidden' }}
     >
       <SvgWidget
-        svg={streakScene({ count: state.count, kind: state.kind, width: W, height: H, variant })}
+        svg={streakScene({ count: state.count, kind: state.kind, width: W, height: H, variant, accessory })}
         style={{ width: W, height: H }}
       />
       <FlexWidget

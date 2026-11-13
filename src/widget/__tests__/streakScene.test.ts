@@ -184,3 +184,34 @@ describe('the picture in layers, for the animated card', () => {
     expect(sceneIntensity(150, 'done')).toBe(1);
   });
 });
+
+describe('the flame dressed for a holiday', () => {
+  const dressed = (count: number, accessory: 'santa' | 'witch' | 'heart' | 'flower' | null) =>
+    streakScene({ count, kind: 'done', width: 240, height: 112, variant: 3, accessory });
+
+  it('wears a Santa hat at New Year and a witch hat at Halloween, in place of its crown', () => {
+    expect(dressed(4, 'santa')).toContain('#E53935');
+    expect(dressed(45, 'santa')).not.toContain('#FFD54A');
+    expect(dressed(45, 'witch')).toContain('#4C3566');
+    expect(dressed(45, 'witch')).not.toContain('#FFD54A');
+  });
+
+  it('keeps its crown beside a heart or a flower', () => {
+    expect(dressed(45, 'heart')).toContain('#FF3D71');
+    expect(dressed(45, 'heart')).toContain('#FFD54A');
+    expect(dressed(45, 'flower')).toContain('#FFC1D9');
+    expect(dressed(45, 'flower')).toContain('#FFD54A');
+  });
+
+  it('wears nothing outside a holiday, and the sprout never dresses up', () => {
+    expect(dressed(45, null)).not.toContain('#E53935');
+    expect(streakScene({ count: 0, kind: 'start', width: 240, height: 112, variant: 3, accessory: 'santa' })).not.toContain('#E53935');
+  });
+
+  it('puts the accessory in the flame layer, so it moves with the flame', () => {
+    const layer = (l: 'back' | 'flame') =>
+      streakScene({ count: 9, kind: 'done', width: 340, height: 166, variant: 3, layer: l, accessory: 'santa' });
+    expect(layer('flame')).toContain('#E53935');
+    expect(layer('back')).not.toContain('#E53935');
+  });
+});

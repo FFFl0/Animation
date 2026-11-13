@@ -1,5 +1,5 @@
 import { useEffect, useMemo, useRef, useState } from 'react';
-import { AccessibilityInfo, Animated, Easing, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
+import { Animated, Easing, LayoutChangeEvent, Pressable, StyleSheet, Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { fontFamily } from '../theme/fonts';
 import { radius } from '../theme/tokens';
@@ -14,6 +14,8 @@ import { streakWeek } from '../data/streakWeek';
 import { WIDGET_TEXT, widgetStateOf } from '../widget/streakWidgetState';
 import { lookFor, pillColors, raysSvg, sceneGeometry, sceneIntensity, streakScene } from '../widget/streakScene';
 import { useCountUp } from './useCountUp';
+import { useReduceMotion } from './useReduceMotion';
+import { useHoliday } from '../holidays/HolidayContext';
 
 type Props = {
   streak: { count: number; lastPlayedDate: string | null };
@@ -32,23 +34,6 @@ const SCENE_INSET = 6;
 const SCENE_RADIUS = radius.lg - SCENE_INSET;
 const MAX_TWINKLES = 6;
 const BURST = 10;
-
-/** Whether the phone asks for less motion; then the card holds still. */
-function useReduceMotion(): boolean {
-  const [reduce, setReduce] = useState(false);
-  useEffect(() => {
-    let alive = true;
-    AccessibilityInfo.isReduceMotionEnabled?.()
-      .then((value) => alive && setReduce(value))
-      .catch(() => {});
-    const sub = AccessibilityInfo.addEventListener?.('reduceMotionChanged', setReduce);
-    return () => {
-      alive = false;
-      sub?.remove();
-    };
-  }, []);
-  return reduce;
-}
 
 /** A value running 0→1 forever, every `ms`. */
 function useLoop(ms: number, run: boolean, delay = 0): Animated.Value {
@@ -102,6 +87,7 @@ export default function StreakHero({ streak, freezes }: Props) {
   const { language } = useLanguage();
   const { buzz } = useSound();
   const reduce = useReduceMotion();
+  const accessory = useHoliday().holiday?.accessory ?? null;
   const [W, setW] = useState(0);
   const H = Math.round(W * ASPECT);
 
@@ -123,8 +109,8 @@ export default function StreakHero({ streak, freezes }: Props) {
     [count, kind, W, H]
   );
   const flameXml = useMemo(
-    () => (W > 0 ? streakScene({ count, kind, width: W, height: H, variant: 3, layer: 'flame', cornerRadius: 0 }) : ''),
-    [count, kind, W, H]
+    () => (W > 0 ? streakScene({ count, kind, width: W, height: H, variant: 3, layer: 'flame', cornerRadius: 0, accessory }) : ''),
+    [count, kind, W, H, accessory]
   );
   const reach = Math.max(W, H) * 1.15;
   const rays = useMemo(() => (W > 0 ? raysSvg(count, kind, reach) : null), [count, kind, reach, W]);

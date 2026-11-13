@@ -3,6 +3,7 @@ import { Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { fontFamily } from '../theme/fonts';
 import { WIDGET_TEXT, WidgetSnapshot, WidgetState } from './streakWidgetState';
+import { useHoliday } from '../holidays/HolidayContext';
 import { LINE, lookFor, pillColors, sceneText, streakScene } from './streakScene';
 
 /**
@@ -47,7 +48,8 @@ export default function StreakWidgetPreview({
   const footer = text.footer === 'long' ? words.footer[state.kind] : words.footerShort[state.kind];
   const pill = pillColors(state.count, state.kind);
   const wide = text.shape === 'wide';
-  const xml = streakScene({ count: state.count, kind: state.kind, width, height, variant });
+  const accessory = useHoliday().holiday?.accessory ?? null;
+  const xml = streakScene({ count: state.count, kind: state.kind, width, height, variant, accessory });
   // Line boxes as tall as Android draws them, so the preview fits exactly
   // when the widget does.
   const line = (size: number) => Math.round(size * LINE);

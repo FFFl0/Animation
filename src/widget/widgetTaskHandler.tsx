@@ -3,6 +3,13 @@ import type { WidgetTaskHandlerProps } from 'react-native-android-widget';
 import { todayDateStr } from '../quiz/today';
 import { StreakWidget } from './StreakWidget';
 import { currentVariant } from './streakScene';
+import { FlameAccessory, holidayOn } from '../holidays/holidays';
+import { holidayDecorEnabled } from '../holidays/holidayDecor';
+
+/** Today's holiday accessory, unless decorations are switched off. */
+async function holidayAccessory(): Promise<FlameAccessory | null> {
+  return (await holidayDecorEnabled()) ? holidayOn(new Date())?.accessory ?? null : null;
+}
 import { SNAPSHOT_KEY, WIDGET_NAME, WidgetSnapshot, parseSnapshot, widgetStateOf } from './streakWidgetState';
 
 export async function readSnapshot(): Promise<WidgetSnapshot | null> {
@@ -17,11 +24,23 @@ export async function readSnapshot(): Promise<WidgetSnapshot | null> {
  * The widget as it should look now. The picture is the same in light and
  * dark: it is artwork with its own sky, like a photo widget.
  */
-export function renderStreakWidget(snapshot: WidgetSnapshot | null, width: number, height: number) {
+export function renderStreakWidget(
+  snapshot: WidgetSnapshot | null,
+  width: number,
+  height: number,
+  accessory: FlameAccessory | null = null
+) {
   const state = widgetStateOf(snapshot, todayDateStr());
   const language = snapshot?.language ?? 'ru';
   return (
-    <StreakWidget state={state} language={language} width={width} height={height} variant={currentVariant()} />
+    <StreakWidget
+      state={state}
+      language={language}
+      width={width}
+      height={height}
+      variant={currentVariant()}
+      accessory={accessory}
+    />
   );
 }
 
@@ -38,7 +57,9 @@ export async function widgetTaskHandler(props: WidgetTaskHandlerProps): Promise<
     case 'WIDGET_ADDED':
     case 'WIDGET_UPDATE':
     case 'WIDGET_RESIZED':
-      props.renderWidget(renderStreakWidget(await readSnapshot(), props.widgetInfo.width, props.widgetInfo.height));
+      props.renderWidget(
+        renderStreakWidget(await readSnapshot(), props.widgetInfo.width, props.widgetInfo.height, await holidayAccessory())
+      );
       break;
     default:
       break;

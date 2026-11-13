@@ -15,6 +15,7 @@ import { AuthProvider, useAuth } from './src/auth/AuthContext';
 import { NotificationsProvider } from './src/notifications/NotificationsContext';
 import { PresenceProvider } from './src/presence/PresenceContext';
 import { ThemeProvider, useTheme } from './src/theme/ThemeContext';
+import { HolidayProvider } from './src/holidays/HolidayContext';
 import { LanguageProvider, useLanguage } from './src/i18n/LanguageContext';
 import { SoundProvider, useSound } from './src/sound/SoundContext';
 import BottomTabBar, { TabKey } from './src/components/BottomTabBar';
@@ -939,6 +940,7 @@ export default function App() {
     // available, and falls back to something hard-coded.
     <ErrorBoundary area="root" fallback={(_error, retry) => <BareCrashScreen onRetry={retry} />}>
       <SafeAreaProvider>
+        <HolidayProvider>
         <ThemeProvider>
           <LanguageProvider>
             <SoundProvider>
@@ -971,6 +973,7 @@ export default function App() {
             </SoundProvider>
           </LanguageProvider>
         </ThemeProvider>
+        </HolidayProvider>
       </SafeAreaProvider>
     </ErrorBoundary>
   );

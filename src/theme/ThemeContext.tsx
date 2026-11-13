@@ -2,6 +2,8 @@ import { createContext, useContext, useEffect, useMemo, useState, ReactNode } fr
 import { Appearance, ColorSchemeName } from 'react-native';
 import AsyncStorage from '@react-native-async-storage/async-storage';
 import { Theme, lightTheme, darkTheme } from './palette';
+import { useHoliday } from '../holidays/HolidayContext';
+import { withHoliday } from '../holidays/holidays';
 
 export type ThemeMode = 'light' | 'dark' | 'system';
 
@@ -44,7 +46,12 @@ export function ThemeProvider({ children }: { children: ReactNode }) {
   };
 
   const resolvedScheme = resolveScheme(mode, systemScheme);
-  const theme = resolvedScheme === 'dark' ? darkTheme : lightTheme;
+  const { holiday } = useHoliday();
+  // A holiday brings its own accent; everything else stays the theme's.
+  const theme = useMemo(
+    () => withHoliday(resolvedScheme === 'dark' ? darkTheme : lightTheme, holiday, resolvedScheme),
+    [resolvedScheme, holiday]
+  );
 
   const value = useMemo(() => ({ mode, setMode, resolvedScheme, theme }), [mode, resolvedScheme, theme]);
 

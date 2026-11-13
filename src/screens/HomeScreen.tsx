@@ -26,6 +26,9 @@ import { todayDateStr } from '../quiz/today';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { useRememberedScroll } from '../components/useRememberedScroll';
+import HolidayParticles from '../holidays/HolidayParticles';
+import { useHoliday } from '../holidays/HolidayContext';
+import { greetingKey } from '../holidays/holidays';
 
 type Props = {
   /** Where the page was left, and a way to report where it is now. Held by
@@ -76,6 +79,7 @@ export default function HomeScreen({
   const { profile } = useAuth();
   const { countOf } = useShop();
   const { theme } = useTheme();
+  const { holiday, today } = useHoliday();
   const styles = useMemo(() => makeStyles(theme), [theme]);
   const { language } = useLanguage();
   const t = useT();
@@ -93,7 +97,9 @@ export default function HomeScreen({
         <View style={styles.header}>
           <View>
             <Text style={styles.greeting}>{t('home.greeting', profile.username)}</Text>
-            <Text style={styles.subGreeting}>{t('home.subGreeting')}</Text>
+            <Text style={[styles.subGreeting, holiday && { color: theme.primary }]} testID={holiday ? 'holiday-greeting' : undefined}>
+              {holiday ? t(`home.holidayGreeting.${greetingKey(holiday, today)}`) : t('home.subGreeting')}
+            </Text>
           </View>
           <SoundTouchable
             style={styles.gearButton}
@@ -187,6 +193,7 @@ export default function HomeScreen({
           })}
         </ScrollView>
       </ScrollView>
+      <HolidayParticles />
     </SafeAreaView>
   );
 }
