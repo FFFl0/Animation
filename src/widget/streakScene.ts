@@ -437,6 +437,12 @@ export type SceneText = {
   pill: number;
   pillPadX: number;
   pillPadY: number;
+  /**
+   * How much of the pill's vertical padding moves from top to bottom. Android
+   * leaves more room above Manrope's letters than below them, so evenly padded
+   * words sit low; this lifts them back to the middle.
+   */
+  pillLift: number;
   gap: number;
   /** Which wording of the status fits. */
   footer: 'long' | 'short';
@@ -447,10 +453,16 @@ export type SceneWords = { number: string; label: string; footer: string; footer
 /** Android's line box for Manrope, as a share of the font size. */
 export const LINE = 1.55;
 
-/** A safe guess at a string's width in em, for Manrope ExtraBold. */
+/**
+ * A safe guess at a string's width in em, for Manrope ExtraBold. Generous on
+ * purpose: on a phone the same words came out wider than the font's own
+ * widths in a browser (pixel rounding per letter, and the ✓ ❄ symbols drawn
+ * from the system font), and a status cut to "Серия продле…" is worse than
+ * one a size smaller.
+ */
 export function emWidth(text: string): number {
   let em = 0;
-  for (const ch of text) em += /[✓❄✨🔥]/u.test(ch) ? 1 : /\s/.test(ch) ? 0.28 : 0.52;
+  for (const ch of text) em += /[✓❄✨🔥]/u.test(ch) ? 1.15 : /\s/.test(ch) ? 0.3 : 0.58;
   return em;
 }
 
@@ -526,6 +538,7 @@ export function sceneText(width: number, height: number, words: SceneWords): Sce
     pill: r(sizes.pill),
     pillPadX: r(sizes.pill * 0.75),
     pillPadY: r(sizes.pill * 0.25),
+    pillLift: r(sizes.pill * 0.12),
     gap: r(sizes.pill * 0.4),
     footer,
   };

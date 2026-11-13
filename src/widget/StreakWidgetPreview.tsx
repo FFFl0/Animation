@@ -105,7 +105,8 @@ export default function StreakWidgetPreview({
             backgroundColor: pill.background,
             borderRadius: 999,
             paddingHorizontal: text.pillPadX,
-            paddingVertical: text.pillPadY,
+            paddingTop: text.pillPadY - text.pillLift,
+            paddingBottom: text.pillPadY + text.pillLift,
           }}
         >
           <Text

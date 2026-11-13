@@ -115,7 +115,7 @@ describe('the widget layout', () => {
       for (const kind of KINDS) {
         const words = WIDGET_TEXT.ru;
         const t = sceneText(W, H, { number: '4', label: words.label(4), footer: words.footer[kind], footerShort: words.footerShort[kind] });
-        expect(t.pill).toBeGreaterThanOrEqual(10);
+        expect(t.pill).toBeGreaterThanOrEqual(9.5);
         expect(t.label).toBeGreaterThan(0);
       }
     }
@@ -132,7 +132,7 @@ describe('the widget layout', () => {
     ];
     for (const [text, em] of measured) {
       expect(emWidth(text)).toBeGreaterThanOrEqual(em);
-      expect(emWidth(text)).toBeLessThan(em * 1.25);
+      expect(emWidth(text)).toBeLessThan(em * 1.4);
     }
   });
 });

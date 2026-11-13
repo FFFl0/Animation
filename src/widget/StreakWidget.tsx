@@ -120,7 +120,8 @@ export function StreakWidget({
             backgroundColor: pill.background as ColorProp,
             borderRadius: 999,
             paddingHorizontal: text.pillPadX,
-            paddingVertical: text.pillPadY,
+            paddingTop: text.pillPadY - text.pillLift,
+            paddingBottom: text.pillPadY + text.pillLift,
           }}
         >
           <TextWidget
