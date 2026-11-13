@@ -23,6 +23,13 @@ type Props = {
 /** Card height to width, as the old streak card and the widget art. */
 const ASPECT = 1 / 2.05;
 const MAX_EMBERS = 12;
+/**
+ * The picture sits inset in the card as a tile of its own, rounded on all
+ * four corners; its radius is the card's less the inset, so the two curves
+ * run parallel.
+ */
+const SCENE_INSET = 6;
+const SCENE_RADIUS = radius.lg - SCENE_INSET;
 const MAX_TWINKLES = 6;
 const BURST = 10;
 
@@ -112,7 +119,7 @@ export default function StreakHero({ streak, freezes }: Props) {
 
   const geo = W > 0 ? sceneGeometry(count, kind, W, H) : null;
   const back = useMemo(
-    () => (W > 0 ? streakScene({ count, kind, width: W, height: H, variant: 3, layer: 'back', cornerRadius: 0 }) : ''),
+    () => (W > 0 ? streakScene({ count, kind, width: W, height: H, variant: 3, layer: 'back', cornerRadius: SCENE_RADIUS }) : ''),
     [count, kind, W, H]
   );
   const flameXml = useMemo(
@@ -435,7 +442,12 @@ function makeStyles(theme: Theme) {
       borderWidth: 1.5,
       borderColor: theme.border,
     },
-    scene: { width: '100%', overflow: 'hidden' },
+    scene: {
+      margin: SCENE_INSET,
+      marginBottom: 0,
+      borderRadius: SCENE_RADIUS,
+      overflow: 'hidden',
+    },
     twinkle: { position: 'absolute', color: '#FFFFFF' },
     moon: { position: 'absolute', left: 0, top: 0, backgroundColor: '#FDE68A' },
     ember: { position: 'absolute', borderRadius: 3 },
