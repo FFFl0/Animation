@@ -138,7 +138,18 @@ export type SceneInput = {
   height: number;
   /** Which arrangement of the loose sparkles; any whole number. */
   variant: number;
+  /**
+   * One layer of the picture rather than all of it, so the app can move the
+   * parts separately (StreakHero): `back` is the sky, stars, glow and
+   * orbit; `rays` the rays alone; `flame` the flame, face, crown and frost.
+   * The widget always draws `all`, which also has the embers and the moon.
+   */
+  layer?: SceneLayer;
+  /** Corner rounding; the widget's own when left out. */
+  cornerRadius?: number;
 };
+
+export type SceneLayer = 'all' | 'back' | 'rays' | 'flame';
 
 export type SceneLayout = {
   /** Wide (2×1 and wider) puts the flame on the right; tall puts it on top. */
@@ -156,12 +167,37 @@ export function sceneLayout(width: number, height: number): SceneLayout {
   return { shape: 'wide', emblem: { x: width - size - height * 0.08, y: (height - size) / 2, size } };
 }
 
-export function streakScene({ count, kind, width, height, variant }: SceneInput): string {
+/**
+ * Where the moving parts of a picture are, in its own points: what the app
+ * turns the rays about, scales the flame from, and runs the moon round.
+ */
+export function sceneGeometry(count: number, kind: WidgetKind, width: number, height: number) {
   const W = Math.max(60, width);
   const H = Math.max(40, height);
   const look = lookFor(count, kind);
   const { emblem } = sceneLayout(W, H);
-  const radius = Math.min(28, H / 2);
+  const lit = kind === 'done';
+  const frozen = kind === 'frozen';
+  const scale = (lit || frozen ? 1 : 0.86) * (look.crown && !frozen ? 0.88 : 1);
+  const size = emblem.size * scale;
+  return {
+    emblem,
+    /** Centre of the glow and the rays. */
+    cx: emblem.x + emblem.size / 2,
+    cy: emblem.y + emblem.size * 0.58,
+    /** The flame's box: it stands on the bottom of the emblem. */
+    flame: { x: emblem.x + emblem.size / 2 - size / 2, y: emblem.y + emblem.size - size, size },
+    orbit: look.orbit ? { rx: emblem.size * 0.62, ry: emblem.size * 0.2, tilt: -18, moon: emblem.size * 0.045 } : null,
+  };
+}
+
+export function streakScene({ count, kind, width, height, variant, layer = 'all', cornerRadius }: SceneInput): string {
+  const W = Math.max(60, width);
+  const H = Math.max(40, height);
+  const look = lookFor(count, kind);
+  const { emblem } = sceneLayout(W, H);
+  const radius = cornerRadius ?? Math.min(28, H / 2);
+  const has = (part: SceneLayer) => layer === 'all' || layer === part;
   const rand = random(variant + count * 7 + 1);
   const lit = kind === 'done';
   const frozen = kind === 'frozen';
@@ -181,15 +217,15 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
     `<linearGradient id="${id}fCore" x1="0" y1="0" x2="0" y2="1"><stop offset="0" stop-color="${flame[2]}"/><stop offset="1" stop-color="${flame[1]}"/></linearGradient>`,
     `<clipPath id="${id}card"><rect x="0" y="0" width="${n(W)}" height="${n(H)}" rx="${n(radius)}" ry="${n(radius)}"/></clipPath>`,
     '</defs>',
-    `<g clip-path="url(#${id}card)">`,
-    `<rect x="0" y="0" width="${n(W)}" height="${n(H)}" fill="url(#${id}sky)"/>`
+    `<g clip-path="url(#${id}card)">`
   );
+  if (has('back')) out.push(`<rect x="0" y="0" width="${n(W)}" height="${n(H)}" fill="url(#${id}sky)"/>`);
 
   // Night tiers: a field of stars over the whole card.
   const { shape } = sceneLayout(W, H);
   // On a wide card the text sits on the left, so the stars keep to the right.
   const starFrom = shape === 'wide' ? emblem.x - emblem.size * 0.35 : 0;
-  for (let i = 0; i < look.stars; i++) {
+  for (let i = 0; i < (has('back') ? look.stars : 0); i++) {
     const x = starFrom + rand() * (W - starFrom);
     const y = rand() * H;
     const big = rand() > 0.8;
@@ -197,7 +233,7 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
   }
 
   // Rays fanning out from behind the flame, longer the higher the tier.
-  if (look.rays && !frozen) {
+  if (has('rays') && look.rays && !frozen) {
     const reach = Math.max(W, H) * 1.1;
     const turn = variant % 2 ? Math.PI / look.rays / 2 : 0;
     for (let i = 0; i < look.rays; i++) {
@@ -213,10 +249,10 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
 
   // The glow behind the flame.
   const glowR = emblem.size * (0.55 + 0.1 * Math.min(1, look.rays / 12));
-  out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(glowR)}" fill="url(#${id}glow)"/>`);
+  if (has('back')) out.push(`<circle cx="${n(cx)}" cy="${n(cy)}" r="${n(glowR)}" fill="url(#${id}glow)"/>`);
 
   // An orbit round the top tier, with a little moon on it.
-  if (look.orbit) {
+  if (has('back') && look.orbit) {
     const rx = emblem.size * 0.62;
     const ry = emblem.size * 0.2;
     const a = ((variant % 6) / 6) * Math.PI * 2;
@@ -225,10 +261,13 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
     );
     const mx = cx + Math.cos(a) * rx;
     const my = cy + Math.sin(a) * ry;
-    out.push(`<circle cx="${n(mx)}" cy="${n(my)}" r="${n(emblem.size * 0.045)}" fill="#FDE68A" transform="rotate(-18 ${n(cx)} ${n(cy)})"/>`);
+    // The app runs its own moon round the ring.
+    if (layer === 'all') out.push(`<circle cx="${n(mx)}" cy="${n(my)}" r="${n(emblem.size * 0.045)}" fill="#FDE68A" transform="rotate(-18 ${n(cx)} ${n(cy)})"/>`);
   }
 
-  if (look.tier === 'seed') {
+  if (!has('flame')) {
+    // The flame is drawn in its own layer.
+  } else if (look.tier === 'seed') {
     // Nothing burning yet: a sprout in a little mound.
     const s = emblem.size / 100;
     const ox = emblem.x;
@@ -248,7 +287,7 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
     const size = emblem.size * scale;
     const fx = cx - size / 2;
     const fy = emblem.y + emblem.size - size;
-    const t = `translate(${n(fx)} ${n(fy)}) scale(${n(size / 100)})`;
+    const t = `translate(${n(fx)} ${n(fy)}) scale(${Math.round((size / 100) * 1000) / 1000})`;
     const dim = lit || frozen ? 1 : 0.78;
     out.push(
       `<g transform="${t}" opacity="${dim}">`,
@@ -310,7 +349,7 @@ export function streakScene({ count, kind, width, height, variant }: SceneInput)
   }
 
   // Embers rising off the flame — only while it is lit.
-  if (lit) {
+  if (layer === 'all' && lit) {
     for (let i = 0; i < look.embers; i++) {
       const x = cx + (rand() - 0.5) * emblem.size * 1.1;
       const y = emblem.y + rand() * emblem.size * 0.55;
@@ -376,4 +415,31 @@ export function pillColors(count: number, kind: WidgetKind): { background: strin
 /** Which arrangement of sparkles to draw now: a new one every half hour. */
 export function currentVariant(now = Date.now()): number {
   return Math.floor(now / 1_800_000);
+}
+
+/**
+ * The rays on their own, as a square of side 2·`reach` with the rays
+ * meeting in its middle — so the app can spin it about its centre without
+ * the corners of a card-shaped layer swinging into view.
+ */
+export function raysSvg(count: number, kind: WidgetKind, reach: number): string | null {
+  const look = lookFor(count, kind);
+  if (!look.rays || kind === 'frozen') return null;
+  const c = reach;
+  const parts = [`<svg xmlns="http://www.w3.org/2000/svg" width="${n(2 * reach)}" height="${n(2 * reach)}" viewBox="0 0 ${n(2 * reach)} ${n(2 * reach)}">`];
+  const spread = Math.PI / look.rays / 2.6;
+  for (let i = 0; i < look.rays; i++) {
+    const a = (i / look.rays) * Math.PI * 2;
+    parts.push(
+      `<path d="M${n(c)} ${n(c)} L${n(c + Math.cos(a - spread) * reach)} ${n(c + Math.sin(a - spread) * reach)} L${n(c + Math.cos(a + spread) * reach)} ${n(c + Math.sin(a + spread) * reach)} Z" fill="#FFFFFF" fill-opacity="${kind === 'done' ? 0.14 : 0.06}"/>`
+    );
+  }
+  parts.push('</svg>');
+  return parts.join('');
+}
+
+/** What each tier adds to the picture, in the order the streak reaches them. */
+export function sceneIntensity(count: number, kind: WidgetKind): number {
+  const order: StreakTierId[] = ['seed', 'spark', 'rolling', 'week', 'fortnight', 'month', 'iron', 'legend', 'beyond'];
+  return order.indexOf(lookFor(count, kind).tier) / (order.length - 1);
 }

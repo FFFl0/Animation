@@ -1,5 +1,5 @@
 import { STREAK_TIERS } from '../../data/streakTiers';
-import { currentVariant, lookFor, sceneLayout, sceneText, streakScene } from '../streakScene';
+import { currentVariant, lookFor, raysSvg, sceneGeometry, sceneIntensity, sceneLayout, sceneText, streakScene } from '../streakScene';
 
 const scene = (count: number, kind: 'done' | 'pending' | 'frozen' | 'start' = 'done', variant = 3) =>
   streakScene({ count, kind, width: 190, height: 88, variant });
@@ -75,5 +75,53 @@ describe('the widget layout', () => {
     const { emblem } = sceneLayout(190, 88);
     expect(190 - text.padRight).toBeLessThanOrEqual(emblem.x + 0.5);
     expect(text.number).toBeGreaterThanOrEqual(18);
+  });
+});
+
+describe('the picture in layers, for the animated card', () => {
+  const layer = (l: 'back' | 'rays' | 'flame', count = 45, kind: 'done' | 'pending' | 'frozen' | 'start' = 'done') =>
+    streakScene({ count, kind, width: 340, height: 166, variant: 3, layer: l, cornerRadius: 0 });
+
+  it('puts the sky in the back layer only', () => {
+    expect(layer('back')).toMatch(/fill="url\(#[^)]*sky\)"/);
+    expect(layer('flame')).not.toMatch(/fill="url\(#[^)]*sky\)"/);
+    expect(layer('rays')).not.toMatch(/fill="url\(#[^)]*sky\)"/);
+  });
+
+  it('puts the flame, its face and crown in the flame layer only', () => {
+    expect(layer('flame')).toContain('#FFD54A');
+    expect(layer('flame')).toContain('rx="3.6" ry="5"');
+    expect(layer('back')).not.toContain('rx="3.6" ry="5"');
+    expect(layer('back')).not.toContain('#FFD54A');
+  });
+
+  it('leaves the embers and the moon to the app', () => {
+    for (const l of ['back', 'rays', 'flame'] as const) {
+      expect(layer(l, 150)).not.toContain('fill="#FDE68A"');
+    }
+    expect(streakScene({ count: 150, kind: 'done', width: 340, height: 166, variant: 3 })).toContain('fill="#FDE68A"');
+  });
+
+  it('stands the flame where the geometry says, so the app scales it from its base', () => {
+    const geo = sceneGeometry(45, 'done', 340, 166);
+    const m = layer('flame').match(/translate\(([\d.]+) ([\d.]+)\) scale\(([\d.]+)\)/);
+    expect(m).not.toBeNull();
+    expect(Number(m![1])).toBeCloseTo(geo.flame.x, 0);
+    expect(Number(m![2])).toBeCloseTo(geo.flame.y, 0);
+    expect(Number(m![3]) * 100).toBeCloseTo(geo.flame.size, 0);
+  });
+
+  it('spins rays only where the picture has them', () => {
+    expect(raysSvg(3, 'done', 200)).toBeNull();
+    expect(raysSvg(45, 'frozen', 200)).toBeNull();
+    expect(count(raysSvg(45, 'done', 200)!, /<path/g)).toBe(10);
+    expect(sceneGeometry(150, 'done', 340, 166).orbit).not.toBeNull();
+    expect(sceneGeometry(60, 'done', 340, 166).orbit).toBeNull();
+  });
+
+  it('turns up as the tiers climb', () => {
+    expect(sceneIntensity(0, 'start')).toBe(0);
+    expect(sceneIntensity(1, 'done')).toBeLessThan(sceneIntensity(30, 'done'));
+    expect(sceneIntensity(150, 'done')).toBe(1);
   });
 });

@@ -14,7 +14,7 @@ import { OPENINGS } from '../data/openings';
 import { GAME_MODES, ModeId, modeTitle, modeSubtitle } from '../data/modes';
 import CategoryTile from '../components/CategoryTile';
 import ImageScrim from '../components/ImageScrim';
-import StreakCard from '../components/StreakCard';
+import StreakHero from '../components/StreakHero';
 import DailyQuestsCard from '../components/DailyQuestsCard';
 import UpdateBanner from '../updates/UpdateBanner';
 import StreakFreezeRow from '../components/StreakFreezeRow';
@@ -123,7 +123,7 @@ export default function HomeScreen({
 
         <UpdateBanner />
 
-        <StreakCard days={profile.streak.count} />
+        <StreakHero streak={profile.streak} freezes={countOf('streakFreeze')} />
         <StreakFreezeRow
           streak={profile.streak}
           freezes={countOf('streakFreeze')}
