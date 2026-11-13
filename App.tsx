@@ -39,6 +39,7 @@ import { useBattleInviteLink } from './src/battle/useBattleInviteLink';
 import { NotificationTarget } from './src/notifications/notificationRoute';
 import { useNotificationTaps } from './src/notifications/useNotificationTaps';
 import { useStreakReminders } from './src/notifications/useStreakReminders';
+import { useStreakWidget } from './src/widget/useStreakWidget';
 import TournamentScreen from './src/screens/TournamentScreen';
 import { ModerationProvider } from './src/moderation/ModerationContext';
 import { QuestsProvider, useQuests } from './src/quests/QuestsContext';
@@ -244,6 +245,8 @@ function AppShell() {
 
   // Noon and evening reminders, dropped for a day once it is played.
   useStreakReminders(profile?.streak, language);
+  // The home-screen widget (Android), redrawn whenever the streak moves.
+  useStreakWidget(profile?.streak, countOf('streakFreeze'), language);
 
   // Up here with the other hooks, not down beside the render that uses it:
   // the loading and signed-out screens below return early, and a hook after

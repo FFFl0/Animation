@@ -28,6 +28,30 @@
         {
           "microphonePermission": "Разрешите доступ к микрофону, чтобы записывать голосовые сообщения."
         }
+      ],
+      [
+        "react-native-android-widget",
+        {
+          "fonts": [
+            "./node_modules/@expo-google-fonts/manrope/800ExtraBold/Manrope_800ExtraBold.ttf"
+          ],
+          "widgets": [
+            {
+              "name": "Streak",
+              "label": "Серия",
+              "description": "Сколько дней подряд ты играешь",
+              "minWidth": "110dp",
+              "minHeight": "110dp",
+              "targetCellWidth": 2,
+              "targetCellHeight": 2,
+              "maxResizeWidth": "320dp",
+              "maxResizeHeight": "320dp",
+              "previewImage": "./assets/widget-preview/streak.png",
+              "resizeMode": "horizontal|vertical",
+              "updatePeriodMillis": 1800000
+            }
+          ]
+        }
       ]
     ],
     "ios": {

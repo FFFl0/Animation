@@ -28,6 +28,9 @@ import { useModeration } from '../moderation/ModerationContext';
 import RareAchievements from '../components/RareAchievements';
 import { unlockedIds } from '../data/achievements';
 import NotificationSettings from '../notifications/NotificationSettings';
+import StreakWidgetCard from '../widget/StreakWidgetCard';
+import { widgetSupported } from '../widget/platform';
+import { isLayoutCheck } from '../monitoring/layoutCheck';
 import { USERNAME_MAX } from '../auth/validation';
 import { Language, useLanguage } from '../i18n/LanguageContext';
 import { useT, translateAuthError } from '../i18n/strings';
@@ -366,6 +369,13 @@ export default function ProfileScreen({
 
       <Text style={styles.sectionTitle}>{t('profile.notificationsTitle')}</Text>
       <NotificationSettings />
+
+      {(widgetSupported || isLayoutCheck) && (
+        <>
+          <Text style={styles.sectionTitle}>{t('profile.widgetTitle')}</Text>
+          <StreakWidgetCard />
+        </>
+      )}
 
       <Text style={styles.sectionTitle}>{t('profile.aboutTitle')}</Text>
       <SoundTouchable style={styles.linkRow} onPress={onOpenAbout} accessibilityRole="button">
