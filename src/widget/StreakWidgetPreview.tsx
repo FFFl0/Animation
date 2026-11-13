@@ -3,7 +3,7 @@ import { Text, View } from 'react-native';
 import { SvgXml } from 'react-native-svg';
 import { fontFamily } from '../theme/fonts';
 import { WIDGET_TEXT, WidgetSnapshot, WidgetState } from './streakWidgetState';
-import { lookFor, pillColors, sceneText, streakScene } from './streakScene';
+import { LINE, lookFor, pillColors, sceneText, streakScene } from './streakScene';
 
 /**
  * The streak widget drawn inside the app, from the same picture and the
@@ -36,16 +36,27 @@ export default function StreakWidgetPreview({
 
   const words = WIDGET_TEXT[language];
   const look = lookFor(state.count, state.kind);
-  const text = sceneText(width, height);
+  const number = String(state.count);
+  const label = words.label(state.count);
+  const text = sceneText(width, height, {
+    number,
+    label,
+    footer: words.footer[state.kind],
+    footerShort: words.footerShort[state.kind],
+  });
+  const footer = text.footer === 'long' ? words.footer[state.kind] : words.footerShort[state.kind];
   const pill = pillColors(state.count, state.kind);
   const wide = text.shape === 'wide';
   const xml = streakScene({ count: state.count, kind: state.kind, width, height, variant });
+  // Line boxes as tall as Android draws them, so the preview fits exactly
+  // when the widget does.
+  const line = (size: number) => Math.round(size * LINE);
 
   return (
     <View
       style={{ width, height }}
       accessibilityRole="image"
-      accessibilityLabel={`${state.count} ${words.label(state.count)}. ${words.footer[state.kind]}`}
+      accessibilityLabel={`${state.count} ${label}. ${words.footer[state.kind]}`}
     >
       <SvgXml xml={xml} width={width} height={height} />
       <View
@@ -60,14 +71,32 @@ export default function StreakWidgetPreview({
           paddingLeft: text.padLeft,
           paddingRight: text.padRight,
           paddingTop: text.padTop,
+          paddingBottom: text.padBottom,
         }}
       >
-        <Text style={{ fontSize: text.number, lineHeight: Math.round(text.number * 1.15), fontFamily: fontFamily('800'), color: look.ink }}>
-          {state.count}
-        </Text>
-        <Text style={{ fontSize: text.label, fontFamily: fontFamily('800'), color: look.inkSoft }}>
-          {words.label(state.count)}
-        </Text>
+        <View style={{ flexDirection: text.labelBeside ? 'row' : 'column', alignItems: text.labelBeside ? 'center' : wide ? 'flex-start' : 'center' }}>
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={{ fontSize: text.number, lineHeight: line(text.number), fontFamily: fontFamily('800'), color: look.ink }}
+          >
+            {number}
+          </Text>
+          {text.label > 0 ? (
+            <View style={text.labelBeside ? { marginLeft: Math.round(text.number * 0.18) } : null}>
+              {text.labelLines.map((part, i) => (
+                <Text
+                  key={i}
+                  allowFontScaling={false}
+                  numberOfLines={1}
+                  style={{ fontSize: text.label, lineHeight: line(text.label), fontFamily: fontFamily('800'), color: look.inkSoft }}
+                >
+                  {part}
+                </Text>
+              ))}
+            </View>
+          ) : null}
+        </View>
         <View
           style={{
             marginTop: text.gap,
@@ -77,8 +106,12 @@ export default function StreakWidgetPreview({
             paddingVertical: text.pillPadY,
           }}
         >
-          <Text numberOfLines={1} style={{ fontSize: text.pill, fontFamily: fontFamily('800'), color: pill.text }}>
-            {words.footer[state.kind]}
+          <Text
+            allowFontScaling={false}
+            numberOfLines={1}
+            style={{ fontSize: text.pill, lineHeight: line(text.pill), fontFamily: fontFamily('800'), color: pill.text }}
+          >
+            {footer}
           </Text>
         </View>
       </View>

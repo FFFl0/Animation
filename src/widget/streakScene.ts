@@ -33,6 +33,8 @@ type Look = {
   /** Text colour that reads on this sky. */
   ink: string;
   inkSoft: string;
+  /** The tier's own deep colour, for words on the white status pill. */
+  pillInk: string;
 };
 
 const LOOKS: Record<StreakTierId, Look> = {
@@ -42,6 +44,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#9AA8B5', '#B9C4CE', '#DDE3E9'],
     embers: 0, rays: 0, stars: 0, crown: false, gem: false, orbit: false,
     ink: '#334155', inkSoft: '#64748B',
+    pillInk: '#334155',
   },
   spark: {
     sky: ['#FFE4EA', '#FFC9D4'],
@@ -49,6 +52,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#F4556B', '#FF8A80', '#FFD6A5'],
     embers: 2, rays: 0, stars: 0, crown: false, gem: false, orbit: false,
     ink: '#7A1730', inkSoft: '#B4415B',
+    pillInk: '#BE123C',
   },
   rolling: {
     sky: ['#FFD1E6', '#F9A8D4'],
@@ -56,6 +60,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#EC4899', '#FB7185', '#FFE0A3'],
     embers: 4, rays: 0, stars: 0, crown: false, gem: false, orbit: false,
     ink: '#6B0F3A', inkSoft: '#A3285F',
+    pillInk: '#9D174D',
   },
   week: {
     sky: ['#FF9A62', '#F0508A'],
@@ -63,6 +68,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#FF6A2B', '#FFA43A', '#FFF1B8'],
     embers: 6, rays: 8, stars: 0, crown: false, gem: false, orbit: false,
     ink: '#FFFFFF', inkSoft: '#FFE9DE',
+    pillInk: '#C2410C',
   },
   fortnight: {
     sky: ['#FFC53D', '#FF7A2F'],
@@ -70,6 +76,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#FF5A1F', '#FFB020', '#FFFBE0'],
     embers: 8, rays: 12, stars: 0, crown: false, gem: false, orbit: false,
     ink: '#FFFFFF', inkSoft: '#FFF4D6',
+    pillInk: '#B45309',
   },
   month: {
     sky: ['#4C1D95', '#9D4EDD'],
@@ -77,6 +84,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#FF5E3A', '#FFB347', '#FFF6C9'],
     embers: 8, rays: 10, stars: 10, crown: true, gem: false, orbit: false,
     ink: '#FFFFFF', inkSoft: '#E9D8FF',
+    pillInk: '#5B21B6',
   },
   iron: {
     sky: ['#3B0A45', '#C2185B'],
@@ -84,6 +92,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#FF2E88', '#FF9F43', '#FFF3D6'],
     embers: 10, rays: 14, stars: 14, crown: true, gem: false, orbit: false,
     ink: '#FFFFFF', inkSoft: '#FFD6EC',
+    pillInk: '#9D174D',
   },
   legend: {
     sky: ['#0B1D51', '#2563EB'],
@@ -91,6 +100,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#38BDF8', '#A5F3FC', '#FFFFFF'],
     embers: 12, rays: 16, stars: 18, crown: true, gem: true, orbit: false,
     ink: '#FFFFFF', inkSoft: '#D6E8FF',
+    pillInk: '#1D4ED8',
   },
   beyond: {
     sky: ['#140A3A', '#5B21B6'],
@@ -98,6 +108,7 @@ const LOOKS: Record<StreakTierId, Look> = {
     flame: ['#A855F7', '#F472B6', '#FFF1FB'],
     embers: 14, rays: 20, stars: 24, crown: true, gem: true, orbit: true,
     ink: '#FFFFFF', inkSoft: '#E4DBFF',
+    pillInk: '#5B21B6',
   },
 };
 
@@ -365,6 +376,14 @@ export function streakScene({ count, kind, width, height, variant, layer = 'all'
 /**
  * Where the words go and how big they are, for the widget and the in-app
  * preview alike, so the two never drift apart.
+ *
+ * Sized to fit rather than to a fixed share of the height: every line is
+ * measured (roughly, from Manrope ExtraBold's widths) against the room left
+ * of the flame, and the whole block is scaled down until its height fits
+ * too. Android pads each line of text by the font's full height (about
+ * 1.55 of its size), so that is what is counted. When even that is not
+ * enough — a very flat widget — the "days in a row" line goes first, and the
+ * status takes its short form before it is squeezed.
  */
 export type SceneText = {
   shape: 'wide' | 'tall';
@@ -372,43 +391,132 @@ export type SceneText = {
   padLeft: number;
   padRight: number;
   padTop: number;
+  padBottom: number;
   number: number;
+  /** 0 when there is no room for the line at all. */
   label: number;
+  /**
+   * On a flat widget the "days in a row" words stand beside the number, one
+   * word a line, instead of under it — the only way three things fit in a
+   * 2×1 cell at a readable size.
+   */
+  labelBeside: boolean;
+  /** The label as it is set: one line under the number, or its words beside it. */
+  labelLines: string[];
   pill: number;
   pillPadX: number;
   pillPadY: number;
   gap: number;
+  /** Which wording of the status fits. */
+  footer: 'long' | 'short';
 };
 
-export function sceneText(width: number, height: number): SceneText {
-  const { shape, emblem } = sceneLayout(width, height);
-  const unit = shape === 'wide' ? height : height * 0.42;
+export type SceneWords = { number: string; label: string; footer: string; footerShort: string };
+
+/** Android's line box for Manrope, as a share of the font size. */
+export const LINE = 1.55;
+
+/** A safe guess at a string's width in em, for Manrope ExtraBold. */
+export function emWidth(text: string): number {
+  let em = 0;
+  for (const ch of text) em += /[✓❄✨🔥]/u.test(ch) ? 1 : /\s/.test(ch) ? 0.28 : 0.52;
+  return em;
+}
+
+const clamp = (x: number, lo: number, hi: number) => Math.max(lo, Math.min(hi, x));
+
+/** Below this height a wide widget sets the label beside the number. */
+const BESIDE_BELOW = 140;
+
+export function sceneText(width: number, height: number, words: SceneWords): SceneText {
+  const W = Math.max(60, width);
+  const H = Math.max(40, height);
+  const { shape, emblem } = sceneLayout(W, H);
+  const padX = Math.round(clamp(Math.min(W, H) * 0.11, 10, 18));
+  const padV = Math.round(clamp(H * 0.08, 5, 14));
+  const wide = shape === 'wide';
+  // The flame's box has empty sides; the words may run a little into them.
+  const room = wide ? emblem.x + emblem.size * 0.1 - padX : W - padX * 2;
+  const top = wide ? padV : Math.round(emblem.y + emblem.size);
+  const tall = H - top - padV;
+  const unit = wide ? H : tall * 2.4;
+  const beside = wide && H < BESIDE_BELOW;
+  const space = words.label.indexOf(' ');
+  const besideLines = space > 0 ? [words.label.slice(0, space), words.label.slice(space + 1)] : [words.label];
+  const longestWord = Math.max(...besideLines.map(emWidth));
+
+  const fit = (withLabel: boolean, footer: string) => {
+    let pill = Math.min(unit * (beside ? 0.17 : 0.12), 15, room / (emWidth(footer) + 1.5));
+    let number: number;
+    let label: number;
+    let height: () => number;
+    if (beside) {
+      // Two short lines beside the number take no more height than it does.
+      const share = withLabel ? 0.36 : 0;
+      number = Math.min(unit * 0.38, 56, room / (emWidth(words.number) + (withLabel ? 0.18 + longestWord * share : 0)));
+      label = number * share;
+      height = () => number * LINE + pill * 0.4 + pill * LINE + pill * 0.5;
+    } else {
+      number = Math.min(unit * 0.34, 56, room / emWidth(words.number));
+      label = withLabel ? Math.min(unit * 0.13, 17, room / emWidth(words.label)) : 0;
+      height = () => number * LINE + label * LINE + pill * 0.4 + pill * LINE + pill * 0.5;
+    }
+    const k = Math.min(1, tall / height());
+    number *= k;
+    label *= k;
+    pill *= k;
+    return { number, label, pill };
+  };
+
+  // The long status unless the short one is plainly bigger and the long
+  // one small; the label only while the status stays readable.
+  let footer: 'long' | 'short' = 'long';
+  let sizes = fit(true, words.footer);
+  const short = fit(true, words.footerShort);
+  if (sizes.pill < 11 && short.pill > sizes.pill + 0.5) {
+    footer = 'short';
+    sizes = short;
+  }
+  if (sizes.pill < 9) {
+    const noLabel = fit(false, footer === 'long' ? words.footer : words.footerShort);
+    if (noLabel.pill > sizes.pill) sizes = noLabel;
+  }
+  const r = (x: number) => Math.round(x * 10) / 10;
   return {
     shape,
-    padLeft: shape === 'wide' ? Math.round(unit * 0.2) : 0,
-    padRight: shape === 'wide' ? Math.round(width - emblem.x) : 0,
-    padTop: shape === 'wide' ? 0 : Math.round(emblem.y + emblem.size),
-    number: Math.max(18, Math.round(unit * 0.36)),
-    label: Math.max(9, Math.round(unit * 0.12)),
-    pill: Math.max(9, Math.round(unit * 0.105)),
-    pillPadX: Math.round(unit * 0.08),
-    pillPadY: Math.max(2, Math.round(unit * 0.03)),
-    gap: Math.round(unit * 0.06),
+    padLeft: padX,
+    padRight: wide ? Math.round(W - emblem.x - emblem.size * 0.1) : padX,
+    padTop: top,
+    padBottom: padV,
+    number: r(sizes.number),
+    label: r(sizes.label),
+    labelBeside: beside,
+    labelLines: beside ? besideLines : [words.label],
+    pill: r(sizes.pill),
+    pillPadX: r(sizes.pill * 0.75),
+    pillPadY: r(sizes.pill * 0.25),
+    gap: r(sizes.pill * 0.4),
+    footer,
   };
 }
 
-/** The status pill's colours, by state, on this tier's sky. */
+/**
+ * The status pill: white on every sky, so it reads on the palest and the
+ * darkest alike, with the words in the colour of what it says — the tier's
+ * own when the day is done, urgent pink while it waits, ice blue under a
+ * freeze.
+ */
 export function pillColors(count: number, kind: WidgetKind): { background: string; text: string } {
   const look = lookFor(count, kind);
   switch (kind) {
     case 'done':
-      return { background: 'rgba(255, 255, 255, 0.3)', text: look.ink };
+      return { background: '#FFFFFF', text: look.pillInk };
     case 'frozen':
-      return { background: '#DBEAFE', text: '#1D4ED8' };
+      return { background: '#FFFFFF', text: '#1D4ED8' };
     case 'start':
-      return { background: '#FADDE1', text: '#D94A7B' };
+      return { background: '#FFFFFF', text: '#D94A7B' };
     default:
-      return { background: '#F06292', text: '#FFFFFF' };
+      return { background: '#FFFFFF', text: '#E11D48' };
   }
 }
 

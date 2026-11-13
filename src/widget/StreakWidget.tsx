@@ -33,13 +33,21 @@ export function StreakWidget({
   const H = Math.max(40, Math.round(height || 88));
   const words = WIDGET_TEXT[language];
   const look = lookFor(state.count, state.kind);
-  const text = sceneText(W, H);
+  const number = String(state.count);
+  const label = words.label(state.count);
+  const text = sceneText(W, H, {
+    number,
+    label,
+    footer: words.footer[state.kind],
+    footerShort: words.footerShort[state.kind],
+  });
+  const footer = text.footer === 'long' ? words.footer[state.kind] : words.footerShort[state.kind];
   const pill = pillColors(state.count, state.kind);
   const wide = text.shape === 'wide';
   return (
     <OverlapWidget
       clickAction="OPEN_APP"
-      accessibilityLabel={`${state.count} ${words.label(state.count)}. ${words.footer[state.kind]}`}
+      accessibilityLabel={`${state.count} ${label}. ${words.footer[state.kind]}`}
       style={{ width: 'match_parent', height: 'match_parent', borderRadius: Math.min(28, H / 2), overflow: 'hidden' }}
     >
       <SvgWidget
@@ -56,16 +64,53 @@ export function StreakWidget({
           paddingLeft: text.padLeft,
           paddingRight: text.padRight,
           paddingTop: text.padTop,
+          paddingBottom: text.padBottom,
         }}
       >
-        <TextWidget
-          text={String(state.count)}
-          style={{ fontSize: text.number, fontFamily: FONT, color: look.ink as HexColor }}
-        />
-        <TextWidget
-          text={words.label(state.count)}
-          style={{ fontSize: text.label, fontFamily: FONT, color: look.inkSoft as HexColor }}
-        />
+        {/* Sizes are worked out in widget points, so the phone's font size
+            setting must not scale them again. */}
+        {text.labelBeside ? (
+          <FlexWidget style={{ flexDirection: 'row', alignItems: 'center' }}>
+            <TextWidget
+              text={number}
+              allowFontScaling={false}
+              maxLines={1}
+              style={{ fontSize: text.number, fontFamily: FONT, color: look.ink as HexColor }}
+            />
+            {text.label > 0 ? (
+              <FlexWidget style={{ flexDirection: 'column', marginLeft: Math.round(text.number * 0.18) }}>
+                {text.labelLines.map((line, i) => (
+                  <TextWidget
+                    key={i}
+                    text={line}
+                    allowFontScaling={false}
+                    maxLines={1}
+                    style={{ fontSize: text.label, fontFamily: FONT, color: look.inkSoft as HexColor }}
+                  />
+                ))}
+              </FlexWidget>
+            ) : null}
+          </FlexWidget>
+        ) : null}
+        {/* No fragments: the widget library walks the tree itself and does
+            not know them. Null children it skips. */}
+        {!text.labelBeside ? (
+          <TextWidget
+            text={number}
+            allowFontScaling={false}
+            maxLines={1}
+            style={{ fontSize: text.number, fontFamily: FONT, color: look.ink as HexColor }}
+          />
+        ) : null}
+        {!text.labelBeside && text.label > 0 ? (
+          <TextWidget
+            text={label}
+            allowFontScaling={false}
+            maxLines={1}
+            truncate="END"
+            style={{ fontSize: text.label, fontFamily: FONT, color: look.inkSoft as HexColor }}
+          />
+        ) : null}
         <FlexWidget
           style={{
             marginTop: text.gap,
@@ -76,7 +121,8 @@ export function StreakWidget({
           }}
         >
           <TextWidget
-            text={words.footer[state.kind]}
+            text={footer}
+            allowFontScaling={false}
             maxLines={1}
             truncate="END"
             style={{ fontSize: text.pill, fontFamily: FONT, color: pill.text as HexColor }}

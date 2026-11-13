@@ -1,5 +1,6 @@
 import { STREAK_TIERS } from '../../data/streakTiers';
-import { currentVariant, lookFor, raysSvg, sceneGeometry, sceneIntensity, sceneLayout, sceneText, streakScene } from '../streakScene';
+import { LINE, currentVariant, emWidth, lookFor, raysSvg, sceneGeometry, sceneIntensity, sceneLayout, sceneText, streakScene } from '../streakScene';
+import { WIDGET_TEXT } from '../streakWidgetState';
 
 const scene = (count: number, kind: 'done' | 'pending' | 'frozen' | 'start' = 'done', variant = 3) =>
   streakScene({ count, kind, width: 190, height: 88, variant });
@@ -70,11 +71,69 @@ describe('the widget layout', () => {
     expect(sceneLayout(170, 170).shape).toBe('tall');
   });
 
-  it('keeps the words clear of the flame', () => {
-    const text = sceneText(190, 88);
-    const { emblem } = sceneLayout(190, 88);
-    expect(190 - text.padRight).toBeLessThanOrEqual(emblem.x + 0.5);
-    expect(text.number).toBeGreaterThanOrEqual(18);
+  // The sizes from the phone in the bug report: a 2×1 widget and the same
+  // widget stretched, in dp.
+  const SIZES: [number, number][] = [
+    [168, 81],
+    [263, 185],
+    [110, 40],
+    [190, 88],
+    [250, 110],
+    [320, 120],
+    [400, 240],
+    [180, 170],
+  ];
+  const KINDS = ['done', 'pending', 'frozen', 'start'] as const;
+  const LANGS = ['ru', 'en'] as const;
+
+  it('fits every line, in height and in width, at every size, state and language', () => {
+    for (const [W, H] of SIZES) {
+      for (const kind of KINDS) {
+        for (const lang of LANGS) {
+          for (const n of [1, 4, 45, 365]) {
+            const words = WIDGET_TEXT[lang];
+            const input = { number: String(n), label: words.label(n), footer: words.footer[kind], footerShort: words.footerShort[kind] };
+            const t = sceneText(W, H, input);
+            const footer = t.footer === 'long' ? input.footer : input.footerShort;
+            const labelHeight = t.labelBeside ? 0 : t.label * LINE;
+            const block = t.number * LINE + labelHeight + t.gap + t.pill * LINE + 2 * t.pillPadY;
+            if (t.labelBeside) expect(t.labelLines.length * t.label * LINE).toBeLessThanOrEqual(t.number * LINE + 0.5);
+            expect(block).toBeLessThanOrEqual(H - t.padTop - t.padBottom + 0.5);
+            const room = W - t.padLeft - t.padRight;
+            expect(emWidth(footer) * t.pill + 2 * t.pillPadX).toBeLessThanOrEqual(room + 0.5);
+            const besideWidth = t.labelBeside && t.label > 0 ? t.number * 0.18 + Math.max(...t.labelLines.map(emWidth)) * t.label : 0;
+            expect(emWidth(input.number) * t.number + besideWidth).toBeLessThanOrEqual(room + 0.5);
+            if (t.label > 0 && !t.labelBeside) expect(emWidth(input.label) * t.label).toBeLessThanOrEqual(room + 0.5);
+          }
+        }
+      }
+    }
+  });
+
+  it('keeps the status readable on the reported 2×1 and stretched widgets', () => {
+    for (const [W, H] of [SIZES[0], SIZES[1]]) {
+      for (const kind of KINDS) {
+        const words = WIDGET_TEXT.ru;
+        const t = sceneText(W, H, { number: '4', label: words.label(4), footer: words.footer[kind], footerShort: words.footerShort[kind] });
+        expect(t.pill).toBeGreaterThanOrEqual(10);
+        expect(t.label).toBeGreaterThan(0);
+      }
+    }
+  });
+
+  it('measures the words close to what Manrope really draws', () => {
+    // Widths taken from the font in a browser, in em; the guess may only err wide.
+    const measured: [string, number][] = [
+      ['Серия продлена ✓', 7.94],
+      ['Заморозка спасёт ❄', 8.47],
+      ['дней подряд', 5.26],
+      ['Extend your streak!', 7.89],
+      ['999', 1.5],
+    ];
+    for (const [text, em] of measured) {
+      expect(emWidth(text)).toBeGreaterThanOrEqual(em);
+      expect(emWidth(text)).toBeLessThan(em * 1.25);
+    }
   });
 });
 

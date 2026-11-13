@@ -57,7 +57,13 @@ function daysInARowRu(n: number): string {
 
 export const WIDGET_TEXT: Record<
   Language,
-  { label: (count: number) => string; footer: Record<WidgetKind, string>; picker: { label: string; description: string } }
+  {
+    label: (count: number) => string;
+    footer: Record<WidgetKind, string>;
+    /** For a widget too small for the full wording. */
+    footerShort: Record<WidgetKind, string>;
+    picker: { label: string; description: string };
+  }
 > = {
   ru: {
     label: daysInARowRu,
@@ -67,6 +73,7 @@ export const WIDGET_TEXT: Record<
       frozen: 'Заморозка спасёт ❄',
       start: 'Начни серию',
     },
+    footerShort: { done: 'Продлена ✓', pending: 'Продли!', frozen: 'Заморозка ❄', start: 'Начни!' },
     picker: { label: 'Серия', description: 'Сколько дней подряд ты играешь' },
   },
   en: {
@@ -77,6 +84,7 @@ export const WIDGET_TEXT: Record<
       frozen: 'A freeze will save it ❄',
       start: 'Start a streak',
     },
+    footerShort: { done: 'Extended ✓', pending: 'Play today!', frozen: 'Frozen ❄', start: 'Start!' },
     picker: { label: 'Streak', description: 'How many days in a row you play' },
   },
 };
