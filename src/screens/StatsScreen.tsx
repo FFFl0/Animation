@@ -212,7 +212,7 @@ export default function StatsScreen({ scrollY, onChangeScrollY, onOpenAchievemen
         ))}
 
         <View style={styles.quoteCard}>
-          <Image source={STATS_QUOTE} style={styles.heroImage} resizeMode="cover" />
+          <Image source={STATS_QUOTE} style={styles.quoteImage} resizeMode="cover" />
           <ImageScrim />
           <Text style={styles.quoteText}>{t('stats.quote')}</Text>
         </View>
@@ -465,21 +465,25 @@ function makeStyles(theme: Theme) {
       textShadowOffset: { width: 0, height: 0 },
       textShadowRadius: 6,
     },
-    // Full width by stretching, not by an aspect ratio: on a phone the ratio
-    // left the card short of the right edge, with the words spilling past it.
+    // Full width by stretching, not by an aspect ratio. No padding on the
+    // card itself: Android sizes a 100% child against the card less its
+    // padding, which left the picture short of the right and bottom edges.
+    // The room round the words is the text's own padding instead.
     quoteCard: {
       alignSelf: 'stretch',
       minHeight: 112,
-      paddingVertical: 22,
       marginHorizontal: 20,
       marginTop: 18,
       borderRadius: radius.lg,
       overflow: 'hidden',
-      alignItems: 'center',
+      alignItems: 'stretch',
       justifyContent: 'center',
-      paddingHorizontal: 24,
     },
+    // Pinned to all four edges, with no percentages to resolve.
+    quoteImage: { position: 'absolute', top: 0, left: 0, right: 0, bottom: 0 },
     quoteText: {
+      paddingHorizontal: 24,
+      paddingVertical: 22,
       fontSize: 14,
       lineHeight: 20,
       fontFamily: fontFamily('600'),
