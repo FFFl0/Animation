@@ -60,6 +60,27 @@ def write_table(order):
     return sum(1 for cid in order if cid in files)
 
 
+def convert_args(source, target):
+    """
+    The picture as a square JPEG.
+
+    Round artwork often comes as a PNG whose corners are see-through, with
+    the medallion not quite touching the edges. The app shows every
+    portrait cut to a circle, so the transparent margin is trimmed off
+    first (the medallion then fills the circle), the rest is centred on a
+    square, and anything still see-through is filled with white — a JPEG
+    has no transparency, and left alone those corners would turn black.
+    """
+    side = SIZE.split('x')[0]
+    return [
+        'convert', source,
+        '-fuzz', '3%', '-trim', '+repage',
+        '-resize', SIZE, '-gravity', 'center', '-background', 'white', '-extent', f'{side}x{side}',
+        '-alpha', 'remove', '-alpha', 'off',
+        '-strip', '-sampling-factor', '4:2:0', '-quality', QUALITY, target,
+    ]
+
+
 def main():
     if len(sys.argv) != 3:
         sys.exit(__doc__)
@@ -87,11 +108,7 @@ def main():
             skipped.append(f'{file}: ' + (f'"{name}" is not a character in the app' if name else 'not an id in the workbook'))
             continue
         cid = targets[0]
-        subprocess.run(
-            ['convert', os.path.join(folder, file), '-resize', SIZE, '-strip', '-sampling-factor', '4:2:0',
-             '-quality', QUALITY, os.path.join(ASSETS, cid + '.jpg')],
-            check=True,
-        )
+        subprocess.run(convert_args(os.path.join(folder, file), os.path.join(ASSETS, cid + '.jpg')), check=True)
         placeholder = os.path.join(ASSETS, cid + '.png')
         if os.path.exists(placeholder):
             os.remove(placeholder)
