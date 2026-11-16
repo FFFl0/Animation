@@ -1,0 +1,852 @@
+{
+ "rezero-1": {
+  "name": "Рем",
+  "anime": "Re:Zero",
+  "app": "rz-2"
+ },
+ "rezero-2": {
+  "name": "Субару Нацуки",
+  "anime": "Re:Zero",
+  "app": "rz-1"
+ },
+ "rezero-3": {
+  "name": "Рам",
+  "anime": "Re:Zero",
+  "app": "rezero-3"
+ },
+ "rezero-4": {
+  "name": "Эмилия",
+  "anime": "Re:Zero",
+  "app": "rz-3"
+ },
+ "saekano-1": {
+  "name": "Томоя Аки",
+  "anime": "Saekano",
+  "app": "saekano-1"
+ },
+ "saekano-2": {
+  "name": "Мэгуми Като",
+  "anime": "Saekano",
+  "app": "saekano-2"
+ },
+ "aot-1": {
+  "name": "Эрен Йегер",
+  "anime": "Атака титанов",
+  "app": "aot-1"
+ },
+ "aot-2": {
+  "name": "Микаса Аккерман",
+  "anime": "Атака титанов",
+  "app": "aot-2"
+ },
+ "aot-3": {
+  "name": "Леви Аккерман",
+  "anime": "Атака титанов",
+  "app": "aot-3"
+ },
+ "aot-4": {
+  "name": "Ханджи Зоэ",
+  "anime": "Атака титанов",
+  "app": "aot-4"
+ },
+ "aot-5": {
+  "name": "Армин Арлерт",
+  "anime": "Атака титанов",
+  "app": "aot-5"
+ },
+ "aot-6": {
+  "name": "Эрвин Смит",
+  "anime": "Атака титанов",
+  "app": "aot-6"
+ },
+ "bleach-1": {
+  "name": "Ичиго Куросаки",
+  "anime": "Блич",
+  "app": "bleach-1"
+ },
+ "bleach-2": {
+  "name": "Кенпачи Дзараки",
+  "anime": "Блич",
+  "app": "bleach-4"
+ },
+ "bleach-3": {
+  "name": "Ренджи Абарай",
+  "anime": "Блич",
+  "app": "bleach-5"
+ },
+ "bleach-4": {
+  "name": "Рукия Кучики",
+  "anime": "Блич",
+  "app": "bleach-2"
+ },
+ "bleach-5": {
+  "name": "Бьякуя Кучики",
+  "anime": "Блич",
+  "app": "bleach-6"
+ },
+ "bleach-6": {
+  "name": "Соскэ Айдзэн",
+  "anime": "Блич",
+  "app": "bleach-7"
+ },
+ "bleach-7": {
+  "name": "Тоширо Хицугая",
+  "anime": "Блич",
+  "app": "bleach-3"
+ },
+ "bleach-8": {
+  "name": "Урахара Киске",
+  "anime": "Блич",
+  "app": "bleach-8"
+ },
+ "marriedcouple-1": {
+  "name": "Акари Ватанабе",
+  "anime": "Больше чем пара, меньше чем любовники",
+  "app": null
+ },
+ "violet-1": {
+  "name": "Вайолет Эвергарден",
+  "anime": "Вайолет Эвергарден",
+  "app": "violet-1"
+ },
+ "violet-2": {
+  "name": "Гилберт Бугенвилья",
+  "anime": "Вайолет Эвергарден",
+  "app": "violet-2"
+ },
+ "onepiece-1": {
+  "name": "Монки Д. Луффи",
+  "anime": "Ван-Пис",
+  "app": "op-1"
+ },
+ "onepiece-2": {
+  "name": "Портгас Д. Эйс",
+  "anime": "Ван-Пис",
+  "app": "onepiece-2"
+ },
+ "onepiece-3": {
+  "name": "Санджи",
+  "anime": "Ван-Пис",
+  "app": "onepiece-3"
+ },
+ "onepiece-4": {
+  "name": "Ророноа Зоро",
+  "anime": "Ван-Пис",
+  "app": "op-2"
+ },
+ "onepiece-5": {
+  "name": "Тони Тони Чоппер",
+  "anime": "Ван-Пис",
+  "app": "onepiece-5"
+ },
+ "onepiece-6": {
+  "name": "Шанкс",
+  "anime": "Ван-Пис",
+  "app": "onepiece-6"
+ },
+ "onepiece-7": {
+  "name": "Маршалл Д. Тич",
+  "anime": "Ван-Пис",
+  "app": "onepiece-7"
+ },
+ "onepiece-8": {
+  "name": "Нами",
+  "anime": "Ван-Пис",
+  "app": "op-3"
+ },
+ "onepiece-9": {
+  "name": "Нико Робин",
+  "anime": "Ван-Пис",
+  "app": "onepiece-9"
+ },
+ "onepiece-10": {
+  "name": "Донкихот Дофламинго",
+  "anime": "Ван-Пис",
+  "app": "onepiece-10"
+ },
+ "onepiece-11": {
+  "name": "Трафальгар Ло",
+  "anime": "Ван-Пис",
+  "app": "onepiece-11"
+ },
+ "opm-1": {
+  "name": "Сайтама",
+  "anime": "Ванпанчмен",
+  "app": "opm-1"
+ },
+ "opm-2": {
+  "name": "Генос",
+  "anime": "Ванпанчмен",
+  "app": "opm-2"
+ },
+ "opm-3": {
+  "name": "Тацумаки",
+  "anime": "Ванпанчмен",
+  "app": "opm-3"
+ },
+ "opm-4": {
+  "name": "Гаро",
+  "anime": "Ванпанчмен",
+  "app": "opm-4"
+ },
+ "spicewolf-1": {
+  "name": "Лоуренс Крафт",
+  "anime": "Волчица и пряности",
+  "app": "spicewolf-1"
+ },
+ "spicewolf-2": {
+  "name": "Холо",
+  "anime": "Волчица и пряности",
+  "app": "spicewolf-2"
+ },
+ "kaguya-1": {
+  "name": "Кагуя Синомия",
+  "anime": "Госпожа Кагуя: В любви как на войне",
+  "app": "kaguya-1"
+ },
+ "kaguya-2": {
+  "name": "Миюки Сироганэ",
+  "anime": "Госпожа Кагуя: В любви как на войне",
+  "app": "kaguya-2"
+ },
+ "kaguya-3": {
+  "name": "Чика Фудзивара",
+  "anime": "Госпожа Кагуя: В любви как на войне",
+  "app": "kaguya-3"
+ },
+ "drstone-1": {
+  "name": "Сэнку Исигами",
+  "anime": "Доктор Стоун",
+  "app": "drstone-1"
+ },
+ "drstone-2": {
+  "name": "Цукаса Сисио",
+  "anime": "Доктор Стоун",
+  "app": "drstone-2"
+ },
+ "evangelion-1": {
+  "name": "Синдзи Икари",
+  "anime": "Евангелион",
+  "app": "eva-1"
+ },
+ "evangelion-2": {
+  "name": "Аска Лэнгли Сорю",
+  "anime": "Евангелион",
+  "app": "eva-3"
+ },
+ "evangelion-3": {
+  "name": "Рей Аянами",
+  "anime": "Евангелион",
+  "app": "eva-2"
+ },
+ "demonlord-1": {
+  "name": "Мэри Саотоме",
+  "anime": "Как не надо призывать демона",
+  "app": null
+ },
+ "demonslayer-1": {
+  "name": "Мицури Канродзи",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-1"
+ },
+ "demonslayer-2": {
+  "name": "Музан Кибуцудзи",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-2"
+ },
+ "demonslayer-3": {
+  "name": "Танджиро Камадо",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "ds-1"
+ },
+ "demonslayer-4": {
+  "name": "Гию Томиока",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-4"
+ },
+ "demonslayer-5": {
+  "name": "Муичиро Токито",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-5"
+ },
+ "demonslayer-6": {
+  "name": "Незуко Камадо",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "ds-2"
+ },
+ "demonslayer-7": {
+  "name": "Аказа",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-7"
+ },
+ "demonslayer-8": {
+  "name": "Зеницу Агацума",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "ds-3"
+ },
+ "demonslayer-9": {
+  "name": "Тандзюро Камадо",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-9"
+ },
+ "demonslayer-10": {
+  "name": "Шинобу Кочо",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-10"
+ },
+ "demonslayer-11": {
+  "name": "Кёджуро Ренгоку",
+  "anime": "Клинок, рассекающий демонов",
+  "app": "demonslayer-11"
+ },
+ "bebop-1": {
+  "name": "Эдвард Вонг",
+  "anime": "Ковбой Бибоп",
+  "app": "bebop-1"
+ },
+ "bebop-2": {
+  "name": "Фэй Валентайн",
+  "anime": "Ковбой Бибоп",
+  "app": "bebop-2"
+ },
+ "bebop-3": {
+  "name": "Джету Блэк",
+  "anime": "Ковбой Бибоп",
+  "app": "bebop-3"
+ },
+ "codegeass-1": {
+  "name": "Судзаку Куруруги",
+  "anime": "Код Гиас",
+  "app": "codegeass-1"
+ },
+ "codegeass-2": {
+  "name": "Ц.Ц.",
+  "anime": "Код Гиас",
+  "app": "cg-2"
+ },
+ "codegeass-3": {
+  "name": "Лелуш Ламперуж",
+  "anime": "Код Гиас",
+  "app": "cg-1"
+ },
+ "jjk-1": {
+  "name": "Махито",
+  "anime": "Магическая битва",
+  "app": "jjk-4"
+ },
+ "jjk-2": {
+  "name": "Юджи Итадори",
+  "anime": "Магическая битва",
+  "app": "jjk-1"
+ },
+ "jjk-3": {
+  "name": "Маки Зенин",
+  "anime": "Магическая битва",
+  "app": "jjk-5"
+ },
+ "jjk-4": {
+  "name": "Сатору Годзё",
+  "anime": "Магическая битва",
+  "app": "jjk-2"
+ },
+ "jjk-5": {
+  "name": "Тодзи Фусигуро",
+  "anime": "Магическая битва",
+  "app": "jjk-6"
+ },
+ "jjk-6": {
+  "name": "Кэнто Нанами",
+  "anime": "Магическая битва",
+  "app": "jjk-7"
+ },
+ "jjk-7": {
+  "name": "Нобара Кугисаки",
+  "anime": "Магическая битва",
+  "app": "jjk-8"
+ },
+ "jjk-8": {
+  "name": "Сугуру Гэто",
+  "anime": "Магическая битва",
+  "app": "jjk-9"
+ },
+ "jjk-9": {
+  "name": "Мэй Мэй",
+  "anime": "Магическая битва",
+  "app": "jjk-10"
+ },
+ "jjk-10": {
+  "name": "Мегуми Фушигуро",
+  "anime": "Магическая битва",
+  "app": "jjk-3"
+ },
+ "jjk-11": {
+  "name": "Рёмен Сукуна",
+  "anime": "Магическая битва",
+  "app": "jjk-11"
+ },
+ "sao-1": {
+  "name": "Кирито",
+  "anime": "Мастера меча онлайн",
+  "app": "sao-1"
+ },
+ "sao-2": {
+  "name": "Сино Асада",
+  "anime": "Мастера меча онлайн",
+  "app": "sao-3"
+ },
+ "sao-3": {
+  "name": "Асуна Юки",
+  "anime": "Мастера меча онлайн",
+  "app": "sao-2"
+ },
+ "mobpsycho-1": {
+  "name": "Тэруки Ханадзава",
+  "anime": "Моб Психо 100",
+  "app": "mobpsycho-1"
+ },
+ "mobpsycho-2": {
+  "name": "Моб",
+  "anime": "Моб Психо 100",
+  "app": "mobpsycho-2"
+ },
+ "mobpsycho-3": {
+  "name": "Рэйгэн Аратака",
+  "anime": "Моб Психо 100",
+  "app": "mobpsycho-3"
+ },
+ "apothecary-1": {
+  "name": "Маомао",
+  "anime": "Монолог фармацевта",
+  "app": "apothecary-1"
+ },
+ "apothecary-2": {
+  "name": "Джинши",
+  "anime": "Монолог фармацевта",
+  "app": "apothecary-2"
+ },
+ "monster-1": {
+  "name": "Йохан Либерт",
+  "anime": "Монстр",
+  "app": "monster-1"
+ },
+ "monster-2": {
+  "name": "Кэндзо Тэнма",
+  "anime": "Монстр",
+  "app": "monster-2"
+ },
+ "mha-1": {
+  "name": "Изуку Мидория",
+  "anime": "Моя геройская академия",
+  "app": "mha-1"
+ },
+ "mha-2": {
+  "name": "Шото Тодороки",
+  "anime": "Моя геройская академия",
+  "app": "mha-4"
+ },
+ "mha-3": {
+  "name": "Аидзава Сёта",
+  "anime": "Моя геройская академия",
+  "app": "mha-5"
+ },
+ "mha-4": {
+  "name": "Кацуки Бакуго",
+  "anime": "Моя геройская академия",
+  "app": "mha-2"
+ },
+ "mha-5": {
+  "name": "Олл Майт",
+  "anime": "Моя геройская академия",
+  "app": "mha-6"
+ },
+ "mha-6": {
+  "name": "Очако Урарака",
+  "anime": "Моя геройская академия",
+  "app": "mha-3"
+ },
+ "mha-7": {
+  "name": "Тога Химико",
+  "anime": "Моя геройская академия",
+  "app": "mha-7"
+ },
+ "mha-8": {
+  "name": "Шигараки Томура",
+  "anime": "Моя геройская академия",
+  "app": "mha-8"
+ },
+ "oregairu-1": {
+  "name": "Юкино Юкиносита",
+  "anime": "Моя подростковая романтическая комедия",
+  "app": "oregairu-1"
+ },
+ "oregairu-2": {
+  "name": "Харуно Юкиносита",
+  "anime": "Моя подростковая романтическая комедия",
+  "app": "oregairu-2"
+ },
+ "oregairu-3": {
+  "name": "Хачиман Хикигая",
+  "anime": "Моя подростковая романтическая комедия",
+  "app": "oregairu-3"
+ },
+ "nana-1": {
+  "name": "Нана Комацу",
+  "anime": "Нана",
+  "app": "nana-1"
+ },
+ "nana-2": {
+  "name": "Нана Осаки",
+  "anime": "Нана",
+  "app": "nana-2"
+ },
+ "naruto-1": {
+  "name": "Мадара Учиха",
+  "anime": "Наруто",
+  "app": "naruto-4"
+ },
+ "naruto-2": {
+  "name": "Наруто Удзумаки",
+  "anime": "Наруто",
+  "app": "naruto-1"
+ },
+ "naruto-3": {
+  "name": "Нагато",
+  "anime": "Наруто",
+  "app": "naruto-5"
+ },
+ "naruto-4": {
+  "name": "Саске Учиха",
+  "anime": "Наруто",
+  "app": "naruto-2"
+ },
+ "naruto-5": {
+  "name": "Джирайя",
+  "anime": "Наруто",
+  "app": "naruto-6"
+ },
+ "naruto-6": {
+  "name": "Какаши Хатаке",
+  "anime": "Наруто",
+  "app": "naruto-3"
+ },
+ "naruto-7": {
+  "name": "Хината Хьюга",
+  "anime": "Наруто",
+  "app": "naruto-7"
+ },
+ "naruto-8": {
+  "name": "Цунаде",
+  "anime": "Наруто",
+  "app": "naruto-8"
+ },
+ "naruto-9": {
+  "name": "Шикамару Нара",
+  "anime": "Наруто",
+  "app": "naruto-9"
+ },
+ "naruto-10": {
+  "name": "Гаара",
+  "anime": "Наруто",
+  "app": "naruto-10"
+ },
+ "naruto-11": {
+  "name": "Орочимару",
+  "anime": "Наруто",
+  "app": "naruto-11"
+ },
+ "naruto-12": {
+  "name": "Итачи Учиха",
+  "anime": "Наруто",
+  "app": "naruto-12"
+ },
+ "nagatoro-1": {
+  "name": "Кайдзё Такаги",
+  "anime": "Не издевайся, Нагаторо",
+  "app": null
+ },
+ "nagatoro-2": {
+  "name": "Хаясэ Нагаторо",
+  "anime": "Не издевайся, Нагаторо",
+  "app": "nagatoro-2"
+ },
+ "hxh-1": {
+  "name": "Гон Фрикс",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-1"
+ },
+ "hxh-2": {
+  "name": "Леорио Парадинайт",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-4"
+ },
+ "hxh-3": {
+  "name": "Киллуа Золдик",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-2"
+ },
+ "hxh-4": {
+  "name": "Курапика",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-5"
+ },
+ "hxh-5": {
+  "name": "Хисока Мороу",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-3"
+ },
+ "hxh-6": {
+  "name": "Иллуми Золдик",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-6"
+ },
+ "hxh-7": {
+  "name": "Меруэм",
+  "anime": "Охотник x Охотник",
+  "app": "hxh-7"
+ },
+ "frieren-1": {
+  "name": "Штарк",
+  "anime": "Провожающая в последний путь Фрирен",
+  "app": "frieren-1"
+ },
+ "frieren-2": {
+  "name": "Фрирен",
+  "anime": "Провожающая в последний путь Фрирен",
+  "app": "fr-1"
+ },
+ "frieren-3": {
+  "name": "Ферн",
+  "anime": "Провожающая в последний путь Фрирен",
+  "app": "fr-2"
+ },
+ "vinland-1": {
+  "name": "Аскеладд",
+  "anime": "Сага о Винланде",
+  "app": "vinland-1"
+ },
+ "vinland-2": {
+  "name": "Канут",
+  "anime": "Сага о Винланде",
+  "app": "vinland-2"
+ },
+ "vinland-3": {
+  "name": "Торфинн",
+  "anime": "Сага о Винланде",
+  "app": "vinland-3"
+ },
+ "spyfamily-1": {
+  "name": "Лойд Форджер",
+  "anime": "Семья шпиона",
+  "app": "sf-1"
+ },
+ "spyfamily-2": {
+  "name": "Аня Форджер",
+  "anime": "Семья шпиона",
+  "app": "sf-2"
+ },
+ "spyfamily-3": {
+  "name": "Йор Форджер",
+  "anime": "Семья шпиона",
+  "app": "sf-3"
+ },
+ "blueexorcist-1": {
+  "name": "Рин Окумура",
+  "anime": "Синий экзорцист",
+  "app": "blueexorcist-1"
+ },
+ "blueexorcist-2": {
+  "name": "Юри Катана",
+  "anime": "Синий экзорцист",
+  "app": null
+ },
+ "fma-1": {
+  "name": "Эдвард Элрик",
+  "anime": "Стальной алхимик",
+  "app": "fma-1"
+ },
+ "fma-2": {
+  "name": "Альфонс Элрик",
+  "anime": "Стальной алхимик",
+  "app": "fma-2"
+ },
+ "fma-3": {
+  "name": "Винри Рокбелл",
+  "anime": "Стальной алхимик",
+  "app": "fma-4"
+ },
+ "fma-4": {
+  "name": "Оливье Мира Армстронг",
+  "anime": "Стальной алхимик",
+  "app": "fma-5"
+ },
+ "fma-5": {
+  "name": "Алекс Луи Армстронг",
+  "anime": "Стальной алхимик",
+  "app": "fma-6"
+ },
+ "fma-6": {
+  "name": "Энви",
+  "anime": "Стальной алхимик",
+  "app": "fma-7"
+ },
+ "fma-7": {
+  "name": "Люст",
+  "anime": "Стальной алхимик",
+  "app": "fma-8"
+ },
+ "fma-8": {
+  "name": "Маэс Хьюз",
+  "anime": "Стальной алхимик",
+  "app": "fma-9"
+ },
+ "fma-9": {
+  "name": "Рой Мустанг",
+  "anime": "Стальной алхимик",
+  "app": "fma-3"
+ },
+ "deathnote-1": {
+  "name": "Лайт Ягами",
+  "anime": "Тетрадь смерти",
+  "app": "dn-1"
+ },
+ "deathnote-2": {
+  "name": "L",
+  "anime": "Тетрадь смерти",
+  "app": "dn-2"
+ },
+ "deathnote-3": {
+  "name": "Миса Аманэ",
+  "anime": "Тетрадь смерти",
+  "app": "deathnote-3"
+ },
+ "deathnote-4": {
+  "name": "Рюк",
+  "anime": "Тетрадь смерти",
+  "app": "dn-3"
+ },
+ "deathnote-5": {
+  "name": "Ниар",
+  "anime": "Тетрадь смерти",
+  "app": "deathnote-5"
+ },
+ "deathnote-6": {
+  "name": "Мелло",
+  "anime": "Тетрадь смерти",
+  "app": "deathnote-6"
+ },
+ "tokyoghoul-1": {
+  "name": "Кэн Канеки",
+  "anime": "Токийский гуль",
+  "app": "tg-1"
+ },
+ "tokyoghoul-2": {
+  "name": "Тоука Киришима",
+  "anime": "Токийский гуль",
+  "app": "tg-2"
+ },
+ "trigun-1": {
+  "name": "Вэш Ураган",
+  "anime": "Триган",
+  "app": "trigun-1"
+ },
+ "hellsing-1": {
+  "name": "Виктория Серас",
+  "anime": "Хеллсинг",
+  "app": "hellsing-1"
+ },
+ "hellsing-2": {
+  "name": "Алукард",
+  "anime": "Хеллсинг",
+  "app": "hellsing-2"
+ },
+ "horimiya-1": {
+  "name": "Хоримия Кёко",
+  "anime": "Хоримия",
+  "app": "horimiya-1"
+ },
+ "horimiya-2": {
+  "name": "Миямура Идзуми",
+  "anime": "Хоримия",
+  "app": "horimiya-2"
+ },
+ "csm-1": {
+  "name": "Ангел-Дьявол",
+  "anime": "Человек-бензопила",
+  "app": "csm-3"
+ },
+ "csm-2": {
+  "name": "Дэндзи",
+  "anime": "Человек-бензопила",
+  "app": "csm-1"
+ },
+ "csm-3": {
+  "name": "Макима",
+  "anime": "Человек-бензопила",
+  "app": "csm-4"
+ },
+ "csm-4": {
+  "name": "Аки Хаякава",
+  "anime": "Человек-бензопила",
+  "app": "csm-5"
+ },
+ "csm-5": {
+  "name": "Кобэни Хигасияма",
+  "anime": "Человек-бензопила",
+  "app": "csm-6"
+ },
+ "csm-6": {
+  "name": "Пауэр",
+  "anime": "Человек-бензопила",
+  "app": "csm-2"
+ },
+ "csm-7": {
+  "name": "Кишибэ",
+  "anime": "Человек-бензопила",
+  "app": "csm-7"
+ },
+ "blacklagoon-1": {
+  "name": "Реви",
+  "anime": "Чёрная лагуна",
+  "app": "blacklagoon-1"
+ },
+ "blacklagoon-2": {
+  "name": "Рок",
+  "anime": "Чёрная лагуна",
+  "app": "blacklagoon-2"
+ },
+ "blackclover-1": {
+  "name": "Аста",
+  "anime": "Чёрный клевер",
+  "app": "blackclover-1"
+ },
+ "blackclover-2": {
+  "name": "Юно",
+  "anime": "Чёрный клевер",
+  "app": "blackclover-2"
+ },
+ "blackclover-3": {
+  "name": "Ноэль Сильва",
+  "anime": "Чёрный клевер",
+  "app": "blackclover-3"
+ },
+ "blackclover-4": {
+  "name": "Ями Сукэхиро",
+  "anime": "Чёрный клевер",
+  "app": "blackclover-4"
+ },
+ "konosuba-1": {
+  "name": "Казума Сато",
+  "anime": "Этот замечательный мир!",
+  "app": "ks-1"
+ },
+ "konosuba-2": {
+  "name": "Аква",
+  "anime": "Этот замечательный мир!",
+  "app": "ks-2"
+ },
+ "konosuba-3": {
+  "name": "Мегумин",
+  "anime": "Этот замечательный мир!",
+  "app": "ks-3"
+ }
+}

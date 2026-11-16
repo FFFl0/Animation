@@ -1,63 +1,51 @@
-"""Adds drawn character portraits to the app.
+"""Turns uploaded character pictures into the app's portraits.
 
-    python3 tools/import-portraits.py path/to/folder path/to/AnimeQuiz_Characters.xlsx
+    python3 tools/import-portraits.py [another/folder]
 
-The folder holds one picture per character, named by the workbook's id —
-`naruto-1.png`, `csm-6.png` and so on. Those ids are the workbook's own row
-numbers, not the app's (the workbook's `naruto-1` is Madara; the app's is
-Naruto), so each file is matched to a character by name through the
-workbook, the same way import-characters.py matches rows.
+Portraits live in assets/characters, named by the id in the characters
+table (AnimeQuiz_Characters.xlsx): `naruto-1.jpg` is the table's naruto-1,
+Madara. To add or replace one, put `<table id>.png` in that folder — from
+GitHub's "Add files via upload" is fine — and run this. It can also take
+pictures from another folder, named the same way.
 
-Each match is scaled to 512x512 and saved as `assets/characters/<app id>.jpg`,
-replacing a generated placeholder PNG if there was one, and the lookup table
-in src/data/avatarImages.ts is rewritten to cover whatever is in the folder
-now. A file that matches no character in the app is listed and left alone.
+Each picture is made into a 1024x1024 JPEG of the same name: a transparent
+margin is trimmed off (round artwork then fills the circle the app cuts
+portraits to), what is still see-through becomes white, and it is squeezed
+to about 200 KB. The uploaded PNG is then deleted — at 2-3 MB a picture,
+150 of them would make the app 360 MB. Then the lookup table the app reads,
+src/data/avatarImages.ts, is rewritten.
+
+Which character a table id is comes from tools/portrait-ids.json, made
+from the table (the app's own ids are different for 73 characters; the
+table's naruto-1 is Madara, the app's is Naruto). A picture whose name is
+not a table id, or is a character the app does not have, is reported and
+left alone, and so is an upload that arrived empty.
 
 Needs ImageMagick's `convert`.
 """
+import json
 import os
 import re
 import subprocess
 import sys
 
-sys.path.insert(0, os.path.dirname(os.path.abspath(__file__)))
-from xlsx import read  # noqa: E402
-
 ROOT = os.path.dirname(os.path.dirname(os.path.abspath(__file__)))
 ASSETS = os.path.join(ROOT, 'assets', 'characters')
 TABLE = os.path.join(ROOT, 'src', 'data', 'avatarImages.ts')
 CATALOGUE = os.path.join(ROOT, 'src', 'data', 'characters.ts')
-
-# The same spelling differences import-characters.py knows about.
-ALIASES = {'л': 'l', 'зенитsuагацума': 'зеницуагацума', 'хисокаморроу': 'хисокамороу', 'асуна': 'асунаюки'}
+IDS = os.path.join(ROOT, 'tools', 'portrait-ids.json')
 
 # 1024 keeps a portrait sharp at its largest (230pt in the quiz,
-# at up to 3x, and a little more); 80 keeps one near 280 KB.
+# at up to 3x, and a little more); 80 keeps one near 200-280 KB.
 SIZE = '1024x1024'
 QUALITY = '80'
-
-
-def norm(name):
-    key = re.sub(r'[^а-яёa-z]', '', name.lower().replace('ё', 'е'))
-    return ALIASES.get(key, key)
+PICTURES = ('.png', '.jpg', '.jpeg', '.webp')
 
 
 def app_characters():
     """(id, name) in catalogue order."""
     source = open(CATALOGUE, encoding='utf-8').read()
     return re.findall(r"^\s*c\('([^']+)', '([^']+)'", source, re.M)
-
-
-def write_table(order):
-    files = {f[:-4]: f[-4:] for f in os.listdir(ASSETS) if f.endswith(('.png', '.jpg'))}
-    text = open(TABLE, encoding='utf-8').read()
-    head = text[: text.index('export const AVATAR_IMAGES')]
-    body = '\n'.join(
-        f"  '{cid}': require('../../assets/characters/{cid}{files[cid]}')," for cid in order if cid in files
-    )
-    with open(TABLE, 'w', encoding='utf-8') as out:
-        out.write(head + 'export const AVATAR_IMAGES: Record<string, ImageSourcePropType> = {\n' + body + '\n};\n')
-    return sum(1 for cid in order if cid in files)
 
 
 def convert_args(source, target):
@@ -81,40 +69,51 @@ def convert_args(source, target):
     ]
 
 
+def write_table(ids):
+    """The app's lookup: app character id -> its portrait, named by table id."""
+    table_id_of = {v['app']: tid for tid, v in ids.items() if v['app']}
+    text = open(TABLE, encoding='utf-8').read()
+    head = text[: text.index('export const AVATAR_IMAGES')]
+    lines, missing = [], []
+    for cid, name in app_characters():
+        tid = table_id_of.get(cid)
+        if tid and os.path.exists(os.path.join(ASSETS, tid + '.jpg')):
+            lines.append(f"  '{cid}': require('../../assets/characters/{tid}.jpg'),")
+        else:
+            missing.append(f'{tid or "(no table row)"} {name}')
+    with open(TABLE, 'w', encoding='utf-8') as out:
+        out.write(head + 'export const AVATAR_IMAGES: Record<string, ImageSourcePropType> = {\n' + '\n'.join(lines) + '\n};\n')
+    return len(lines), missing
+
+
 def main():
-    if len(sys.argv) != 3:
-        sys.exit(__doc__)
-    folder, workbook = sys.argv[1], sys.argv[2]
-
-    sheet = {}
-    for row in read(workbook)['Персонажи'][1:]:
-        row = (row + [''] * 3)[:3]
-        if row[1].strip():
-            sheet[row[1].strip()] = row[2].strip()
-
-    characters = app_characters()
-    by_name = {}
-    for cid, name in characters:
-        by_name.setdefault(norm(name), []).append(cid)
+    ids = json.load(open(IDS, encoding='utf-8'))
+    sources = [ASSETS] + sys.argv[1:]
 
     added, skipped = [], []
-    for file in sorted(os.listdir(folder)):
-        stem, ext = os.path.splitext(file)
-        if ext.lower() not in ('.png', '.jpg', '.jpeg', '.webp'):
-            continue
-        name = sheet.get(stem)
-        targets = by_name.get(norm(name), []) if name else []
-        if len(targets) != 1:
-            skipped.append(f'{file}: ' + (f'"{name}" is not a character in the app' if name else 'not an id in the workbook'))
-            continue
-        cid = targets[0]
-        subprocess.run(convert_args(os.path.join(folder, file), os.path.join(ASSETS, cid + '.jpg')), check=True)
-        placeholder = os.path.join(ASSETS, cid + '.png')
-        if os.path.exists(placeholder):
-            os.remove(placeholder)
-        added.append(f'{file} -> {cid} ({name})')
+    for folder in sources:
+        for file in sorted(os.listdir(folder)):
+            stem, ext = os.path.splitext(file)
+            path = os.path.join(folder, file)
+            # In the portraits folder only an upload is new; the .jpg files are the portraits themselves.
+            if ext.lower() not in PICTURES or (folder == ASSETS and ext.lower() == '.jpg'):
+                continue
+            entry = ids.get(stem)
+            if os.path.getsize(path) < 1024:
+                skipped.append(f'{file}: arrived empty ({os.path.getsize(path)} bytes), upload it again')
+                continue
+            if not entry:
+                skipped.append(f'{file}: "{stem}" is not an id in the characters table')
+                continue
+            if not entry['app']:
+                skipped.append(f'{file}: {entry["name"]} ({entry["anime"]}) is not a character in the app')
+                continue
+            subprocess.run(convert_args(path, os.path.join(ASSETS, stem + '.jpg')), check=True)
+            if folder == ASSETS:
+                os.remove(path)
+            added.append(f'{file} -> {stem}.jpg ({entry["name"]})')
 
-    total = write_table([cid for cid, _ in characters])
+    total, missing = write_table(ids)
     print(f'{len(added)} portrait(s) added:')
     for line in added:
         print('  ' + line)
@@ -122,7 +121,11 @@ def main():
         print(f'{len(skipped)} file(s) left out:')
         for line in skipped:
             print('  ' + line)
-    print(f'{total} of {len(characters)} characters now have a picture.')
+    print(f'{total} of {len(app_characters())} characters have a portrait.')
+    if missing:
+        print('Still without one:')
+        for line in missing:
+            print('  ' + line)
 
 
 if __name__ == '__main__':

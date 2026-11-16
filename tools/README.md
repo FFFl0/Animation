@@ -17,8 +17,7 @@ Two rules are worth knowing before changing it:
 
 **Characters already in the app keep their existing ids.** A character id is
 not a private detail. It is stored in every player's profile as their
-favourite, and it keys both the pre-rendered avatar PNGs in
-`assets/characters/` and the recorded lines in `assets/quotes/`. The workbook
+favourite, and it keys the recorded lines in `assets/quotes/`. The workbook
 numbers its rows independently — its `naruto-1` is Madara where the app's is
 Naruto — so adopting its ids wholesale would change whose face a player picked
 and which voice line plays. Rows are matched to existing characters by name
@@ -35,17 +34,25 @@ third-party dependency to install.
 
 ## import-portraits.py
 
-Adds drawn portraits for characters already in the app.
+Turns uploaded character pictures into the app's portraits.
 
 ```
-python3 tools/import-portraits.py path/to/folder path/to/AnimeQuiz_Characters.xlsx
+python3 tools/import-portraits.py [another/folder]
 ```
 
-Name each picture by the **workbook's** id (`naruto-1.png`, `csm-6.png`), as
-they are named on the Drive. The workbook's ids are its own row numbers, not
-the app's, so each file is matched to a character by name through the
-workbook — `naruto-1.png` is Madara and becomes `assets/characters/naruto-4.jpg`.
-Every match is scaled to 1024×1024 JPEG, replaces the generated placeholder PNG
-if there was one, and `src/data/avatarImages.ts` is rewritten. Files that
-match no character in the app are listed and left alone. Needs ImageMagick.
+The portraits in `assets/characters/` are named by the **characters table's**
+id — `naruto-1.jpg` is the table's naruto-1, Madara — so the folder reads the
+same as the table. (The app's own ids differ for 73 characters; which table id
+is which app character is in `portrait-ids.json`, made from the table by name,
+and `src/data/avatarImages.ts` maps between them.)
+
+To add or replace a portrait, put `<table id>.png` into `assets/characters/`
+(GitHub's "Add files via upload" works) and run this. Every `.png` there, and
+every picture in a folder given on the command line, becomes a 1024×1024 JPEG
+of the same name: transparent margins trimmed so round artwork fills the
+circle the app shows, see-through parts made white, about 200 KB. The uploaded
+PNG is deleted (2–3 MB each would make the app hundreds of megabytes), and
+`avatarImages.ts` is rewritten. Uploads that arrived empty, names that are not
+table ids, and characters the app does not have are listed and left alone; so
+are characters still without a portrait. Needs ImageMagick.
 
