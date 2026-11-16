@@ -100,7 +100,9 @@ describe('the server never takes the app’s word for a score', () => {
   it('limits how many times a game can be dealt', () => {
     const start = FUNCTION.slice(FUNCTION.indexOf("if (payload.action === 'start')"), FUNCTION.indexOf("if (payload.action === 'submit')"));
     expect(start).toContain('used >= MAX_ATTEMPTS');
-    expect(start.indexOf('used >= MAX_ATTEMPTS')).toBeLessThan(start.indexOf('drawSeed()'));
+    // The limit is checked before a quiz is dealt (pickSeed draws it).
+    expect(start.indexOf('pickSeed(')).toBeGreaterThan(-1);
+    expect(start.indexOf('used >= MAX_ATTEMPTS')).toBeLessThan(start.indexOf('pickSeed('));
   });
 
   it('keeps the dealt seeds where only the function can reach them', () => {

@@ -38,6 +38,7 @@ import { TOURNAMENT_KEY_VERSION } from '../keyVersion';
 const POOL = 2000;
 
 const SERVER_FILE = join(__dirname, '../../../supabase/functions/_shared/tournamentKey.ts');
+const SUBJECT_FILE = join(__dirname, '../../../supabase/functions/_shared/tournamentSubjects.ts');
 const CLIENT_FILE = join(__dirname, '../keyVersion.ts');
 
 function buildKey(lang: 'ru' | 'en'): string {
@@ -48,6 +49,37 @@ function buildKey(lang: 'ru' | 'en'): string {
     }
   }
   return key;
+}
+
+/**
+ * Who each question of each quiz is about, for the server to deal a player
+ * quizzes about characters they have not met yet this tournament. Subjects
+ * are numbered in sorted order and written two base-36 digits a question —
+ * the server only ever compares them, it never needs the names.
+ */
+function buildSubjects(): { key: string; count: number } {
+  const all: string[][] = [];
+  for (let seed = 1; seed <= POOL; seed++) {
+    all.push(generateQuiz({ ...WEEKLY_MATCH_CONFIG, seed }, 'ru').map((q) => q.subject));
+  }
+  const names = Array.from(new Set(all.flat())).sort();
+  const number = new Map(names.map((name, i) => [name, i]));
+  const key = all.flat().map((name) => number.get(name)!.toString(36).padStart(2, '0')).join('');
+  return { key, count: names.length };
+}
+
+function subjectSource(subjects: { key: string; count: number }): string {
+  return `// GENERATED — do not edit by hand.
+//
+// Who every question of every tournament quiz is about: seed s, question q
+// is the two base-36 digits at ((s - 1) * ${GAME_QUESTIONS} + q) * 2. The same
+// number is the same character (or the same series' song or clip) in every
+// quiz, whatever was asked about them. ${subjects.count} subjects in all.
+// Built alongside the answer key by src/tournament/__tests__/answerKey.test.ts.
+
+export const SUBJECT_KEY =
+  '${subjects.key}';
+`;
 }
 
 function versionOf(key: string): string {
@@ -86,11 +118,19 @@ export const TOURNAMENT_KEY_VERSION = '${versionOf(key)}';
 
 describe('tournament answer key', () => {
   const key = buildKey('ru');
+  const subjects = buildSubjects();
 
   if (process.env.UPDATE_TOURNAMENT_KEY === '1') {
     writeFileSync(SERVER_FILE, serverSource(key));
     writeFileSync(CLIENT_FILE, clientSource(key));
+    writeFileSync(SUBJECT_FILE, subjectSource(subjects));
   }
+
+  it('names who every question is about, in two digits each', () => {
+    expect(subjects.key).toHaveLength(POOL * GAME_QUESTIONS * 2);
+    expect(subjects.count).toBeLessThanOrEqual(36 * 36);
+    expect(readFileSync(SUBJECT_FILE, 'utf8')).toBe(subjectSource(subjects));
+  });
 
   it('has one digit per question, each naming one of four options', () => {
     expect(key).toHaveLength(POOL * GAME_QUESTIONS);

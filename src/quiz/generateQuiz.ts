@@ -24,6 +24,13 @@ export type Question = {
   seriesId?: string;
   options: string[];
   correctIndex: number;
+  /**
+   * Who or what the question is about, the same for every type of question
+   * about it: `c:<character>`, `s:<series>` for a theme clip, `o:<series>`
+   * for a series' opening song. Two questions with one subject feel like the
+   * same question to a player, so this is what "seen it already" is kept by.
+   */
+  subject: string;
 };
 
 type Rng = () => number;
@@ -159,7 +166,7 @@ function questionFor(
   lang: Language,
   /** Whether the wrong answers should be drawn from near the right one. */
   close: boolean
-): Question {
+): Omit<Question, 'subject'> {
   const { character, series } = subject;
   const id = `${character.id}-${type}-${idSuffix}`;
   const t = getT(lang);
@@ -245,8 +252,30 @@ function questionFor(
   }
 }
 
-export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Question[] {
+/** What a question of this type about these is about — see Question.subject. */
+function subjectOf(type: QuestionType, character: Character, series: AnimeSeries): string {
+  if (type === 'guessSeriesByVideo') return `s:${series.id}`;
+  if (type === 'openingTrivia') {
+    const opening = OPENINGS.find((o) => o.seriesId === character.seriesId) ?? OPENINGS[0];
+    return `o:${opening.seriesId}`;
+  }
+  return `c:${character.id}`;
+}
+
+/**
+ * Builds a round.
+ *
+ * `recent` is what the player was asked about lately, oldest first (see
+ * recentSubjects). An unseeded round puts those at the back of its queue —
+ * the least recently seen of them first — so consecutive rounds ask about
+ * new characters while there are any. A seeded round (the daily challenge,
+ * a tournament game) ignores it: it has to be the same quiz on every phone,
+ * and the server's answer key is built from exactly that quiz.
+ */
+export function generateQuiz(config: RoundConfig, lang: Language = 'ru', recent: string[] = []): Question[] {
   const rng: Rng = config.seed !== undefined ? seededRng(config.seed) : Math.random;
+  const rank = new Map<string, number>();
+  if (config.seed === undefined) recent.forEach((subject, i) => rank.set(subject, i));
 
   let pool = config.tier ? CHARACTERS.filter((c) => c.tier === config.tier) : CHARACTERS;
   if (config.categoryId === 'hard' && !config.tier) {
@@ -267,20 +296,22 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
   const closeDistractors = config.tier ? getTier(config.tier).rules?.closeDistractors === true : false;
 
   const questions: Question[] = [];
-  const nextCharacter = cycleThrough(pool, rng);
+  const nextCharacter = cycleThrough(pool, rng, (c) => rank.get(`c:${c.id}`));
   // Quote questions draw from their own, smaller set: a written quote is
   // meant to be heard as well, and only some characters have a recording.
   // See voicedPool for what happens when the tier's own run out.
-  const nextVoiced = cycleThrough(voicedPool(pool, rng), rng);
+  const nextVoiced = cycleThrough(voicedPool(pool, rng), rng, (c) => rank.get(`c:${c.id}`));
   // Series get their own cycle: difficulty tiers describe characters, so a
   // tier filter says nothing about which openings to play, and drawing the
   // series from the character just picked would repeat the popular ones.
-  const nextSeries = cycleThrough(VIDEO_SERIES, rng);
+  const nextSeries = cycleThrough(VIDEO_SERIES, rng, (s) => rank.get(`s:${s.id}`));
 
   for (let i = 0; i < config.questionCount; i++) {
     const type = types[Math.floor(rng() * types.length)];
     const character = type === 'guessQuote' ? nextVoiced() : nextCharacter();
-    questions.push(questionFor(type, { character, series: nextSeries() }, i, rng, lang, closeDistractors));
+    const series = nextSeries();
+    const question = questionFor(type, { character, series }, i, rng, lang, closeDistractors);
+    questions.push({ ...question, subject: subjectOf(type, character, series) });
   }
 
   return questions;
@@ -290,9 +321,17 @@ export function generateQuiz(config: RoundConfig, lang: Language = 'ru'): Questi
  * Hands out one item at a time, shuffled, and starts a fresh shuffle once
  * the list is spent — so a round shows everything available before it shows
  * anything twice.
+ *
+ * `seenAt` says when an item was last asked about in an earlier round (a
+ * position in the recent list, higher is later) or undefined if not lately.
+ * The first pass puts the unseen first, in their shuffled order, then the
+ * seen from longest ago to most recent. Later passes are plain shuffles.
+ * With no `seenAt` — or nothing seen — the order, and every draw from the
+ * random source, is exactly what it was before, so a seeded quiz stays the
+ * quiz the server's answer key was built from.
  */
-function cycleThrough<T>(items: T[], rng: Rng): () => T {
-  let order = shuffle(items, rng);
+function cycleThrough<T>(items: T[], rng: Rng, seenAt?: (item: T) => number | undefined): () => T {
+  let order = byFreshness(shuffle(items, rng), seenAt);
   let index = 0;
   return () => {
     if (index >= order.length) {
@@ -301,6 +340,16 @@ function cycleThrough<T>(items: T[], rng: Rng): () => T {
     }
     return order[index++];
   };
+}
+
+function byFreshness<T>(order: T[], seenAt?: (item: T) => number | undefined): T[] {
+  if (!seenAt) return order;
+  const unseen = order.filter((item) => seenAt(item) === undefined);
+  if (unseen.length === order.length) return order;
+  const seen = order
+    .filter((item) => seenAt(item) !== undefined)
+    .sort((x, y) => (seenAt(x) as number) - (seenAt(y) as number));
+  return [...unseen, ...seen];
 }
 
 /**

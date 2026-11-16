@@ -27,6 +27,7 @@ import QuizTimer from '../quiz/QuizTimer';
 import { useLanguage } from '../i18n/LanguageContext';
 import { useT } from '../i18n/strings';
 import { useShop } from '../shop/ShopContext';
+import { noteAsked, recentSubjects } from '../quiz/recentSubjects';
 
 /** What the round turned out to be, beyond the score. */
 export type RoundOutcome = {
@@ -75,7 +76,13 @@ export default function QuizScreen({ config, onFinish, onClose, onAnswer, allowI
   const { playCorrect, playWrong, buzz } = useSound();
   const { language } = useLanguage();
   const t = useT();
-  const questions = useMemo<Question[]>(() => generateQuiz(config, language), [config, language]);
+  // Built once per round, steering away from whatever the last rounds were
+  // about; what it asks is noted straight away, so the next round knows.
+  const questions = useMemo<Question[]>(() => {
+    const built = generateQuiz(config, language, recentSubjects());
+    noteAsked(built.map((q) => q.subject));
+    return built;
+  }, [config, language]);
 
   const [index, setIndex] = useState(0);
   const [score, setScore] = useState(0);

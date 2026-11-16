@@ -15,6 +15,10 @@
 
 import { createClient, SupabaseClient } from 'https://esm.sh/@supabase/supabase-js@2';
 import { ANSWER_KEY, KEY_POOL, KEY_QUESTIONS, KEY_VERSION } from '../_shared/tournamentKey.ts';
+import { pickSeed, seenIn } from '../_shared/tournamentPick.ts';
+// The opening and start notices; this import was missing, so both threw
+// a ReferenceError the moment they were sent.
+import { pushToTokens, tokensFor, type PushCopy } from '../_shared/push.ts';
 
 const corsHeaders = {
   'Access-Control-Allow-Origin': '*',
@@ -695,7 +699,7 @@ function drawSeed(): number {
 
 type OpenGame =
   | { ok: false; error: string; status: number }
-  | { ok: true; side: 'a' | 'b'; gameNo: number; alreadyIn: boolean };
+  | { ok: true; side: 'a' | 'b'; gameNo: number; alreadyIn: boolean; bracket: Bracket; mySeat: number };
 
 /**
  * The game a player is entitled to play right now, or why there is none.
@@ -734,7 +738,37 @@ async function openGameFor(
   const open = bracket.openGame(matchId);
   if (!open) return { ok: false, error: 'no game to play', status: 409 };
 
-  return { ok: true, side, gameNo: open.game_no, alreadyIn: (side === 'a' ? open.score_a : open.score_b) !== null };
+  return {
+    ok: true,
+    side,
+    gameNo: open.game_no,
+    alreadyIn: (side === 'a' ? open.score_a : open.score_b) !== null,
+    bracket,
+    mySeat,
+  };
+}
+
+/**
+ * The quizzes this player has been dealt so far this tournament — every
+ * game of every match they sat on either side of, a restarted game's
+ * latest deal included — as the subjects those quizzes asked about.
+ */
+async function seenThisTournament(
+  admin: SupabaseClient,
+  tournamentId: string,
+  bracket: Bracket,
+  mySeat: number
+): Promise<Set<string>> {
+  const { data } = await admin
+    .from('tournament_tickets')
+    .select('match_id, side, seed')
+    .eq('tournament_id', tournamentId);
+  const mine = ((data ?? []) as { match_id: string; side: 'a' | 'b'; seed: number }[]).filter((ticket) => {
+    if (!DEF_BY_ID.has(ticket.match_id)) return false;
+    const [seatA, seatB] = bracket.participants(ticket.match_id);
+    return (ticket.side === 'a' ? seatA : seatB) === mySeat;
+  });
+  return seenIn(mine.map((ticket) => ticket.seed));
 }
 
 Deno.serve(async (req) => {
@@ -852,7 +886,10 @@ Deno.serve(async (req) => {
     const used = (existing as { attempts: number } | null)?.attempts ?? 0;
     if (used >= MAX_ATTEMPTS) return json({ error: 'noAttemptsLeft' }, 409);
 
-    const seed = drawSeed();
+    // Random as before, but steered off the characters this player has
+    // already been asked about this tournament — see _shared/tournamentPick.
+    const seen = await seenThisTournament(admin, tournament.id, game.bracket, game.mySeat);
+    const seed = pickSeed(seen, drawSeed);
     const { error } = await admin.from('tournament_tickets').upsert(
       {
         tournament_id: tournament.id,

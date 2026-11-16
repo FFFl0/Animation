@@ -41,6 +41,10 @@ import { NotificationTarget } from './src/notifications/notificationRoute';
 import { useNotificationTaps } from './src/notifications/useNotificationTaps';
 import { useStreakReminders } from './src/notifications/useStreakReminders';
 import { useStreakWidget } from './src/widget/useStreakWidget';
+import { loadRecentSubjects } from './src/quiz/recentSubjects';
+
+// Read early, so the first round already knows what was asked last time.
+void loadRecentSubjects();
 import TournamentScreen from './src/screens/TournamentScreen';
 import { ModerationProvider } from './src/moderation/ModerationContext';
 import { QuestsProvider, useQuests } from './src/quests/QuestsContext';
