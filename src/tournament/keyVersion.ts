@@ -6,4 +6,4 @@
 // its games marked against answers to different questions.
 // See src/tournament/__tests__/answerKey.test.ts.
 
-export const TOURNAMENT_KEY_VERSION = 'ce037b386adf';
+export const TOURNAMENT_KEY_VERSION = '551073cc8b69';

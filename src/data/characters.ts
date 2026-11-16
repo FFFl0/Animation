@@ -94,21 +94,20 @@ export const CHARACTERS: Character[] = [
   c('ds-2', 'Незуко Камадо', 'demonslayer', 'female', 'fan', 'Она защищает брата, даже не произнося ни слова.', 'Демоническое пламя крови', 'Семья Камадо'),
   c('demonslayer-7', 'Аказа', 'demonslayer', 'male', 'otaku', 'Становись сильнее или исчезни.', 'Техника разрушения, боевые искусства', 'Двенадцать лун'),
   c('ds-3', 'Зеницу Агацума', 'demonslayer', 'male', 'otaku', 'Я боюсь всего, но всё равно иду вперёд.', 'Дыхание грома', 'Корпус истребителей демонов'),
-  c('demonslayer-9', 'Тандзюро Камадо', 'demonslayer', 'male', 'otaku', 'Этот танец передаётся из поколения в поколение.', 'Танец бога огня', 'Семья Камадо'),
   c('demonslayer-10', 'Шинобу Кочо', 'demonslayer', 'female', 'expert', 'Улыбайся, пожалуйста.', 'Дыхание насекомого', 'Столп Насекомого'),
   c('demonslayer-11', 'Кёджуро Ренгоку', 'demonslayer', 'male', 'legend', 'Будь сильным сердцем!', 'Дыхание пламени', 'Столп Пламени'),
 
   // Магическая битва
   c('jjk-4', 'Махито', 'jjk', 'male', 'novice', 'Душа первична, тело — лишь её форма.', 'Праздная трансфигурация', 'Проклятые духи'),
-  c('jjk-1', 'Юджи Итадори', 'jjk', 'male', 'novice', 'Я просто хочу, чтобы люди умирали по-человечески.', 'Проклятая энергия и сила Сукуны', 'Техническая школа Токио'),
+  c('jjk-1', 'Юджи Итадори', 'jjk', 'male', 'novice', 'Я просто хочу, чтобы люди умирали по-человечески.', 'Проклятая энергия и сила Сукуны', 'Токийский колледж магии'),
   c('jjk-5', 'Маки Зенин', 'jjk', 'female', 'fan', 'Я сама выберу свой путь.', 'Мастерство оружия', 'Токийский колледж магии'),
-  c('jjk-2', 'Сатору Годзё', 'jjk', 'male', 'fan', 'Не переживай, я самый сильный.', 'Безграничность и Шесть глаз', 'Техническая школа Токио'),
+  c('jjk-2', 'Сатору Годзё', 'jjk', 'male', 'fan', 'Не переживай, я самый сильный.', 'Безграничность и Шесть глаз', 'Токийский колледж магии'),
   c('jjk-6', 'Тодзи Фусигуро', 'jjk', 'male', 'fan', 'Против магов проклятая энергия мне не нужна.', 'Небесное ограничение, арсенал проклятых орудий', 'Наёмный убийца'),
   c('jjk-7', 'Кэнто Нанами', 'jjk', 'male', 'otaku', 'Работа есть работа, и её надо делать хорошо.', 'Техника соотношения 7:3', 'Токийский колледж магии'),
   c('jjk-8', 'Нобара Кугисаки', 'jjk', 'female', 'otaku', 'Я люблю себя за то, что я собой являюсь.', 'Техника соломенной куклы', 'Токийский колледж магии'),
   c('jjk-9', 'Сугуру Гэто', 'jjk', 'male', 'otaku', 'Мир станет чище, когда останутся одни маги.', 'Манипуляция проклятыми духами', 'Секта Гэто'),
   c('jjk-10', 'Мэй Мэй', 'jjk', 'female', 'expert', 'Я иду туда, где платят.', 'Управление воронами', 'Маги первого ранга'),
-  c('jjk-3', 'Мегуми Фушигуро', 'jjk', 'male', 'legend', 'Я использую то, что у меня есть, чтобы защитить других.', 'Десять теней', 'Техническая школа Токио'),
+  c('jjk-3', 'Мегуми Фушигуро', 'jjk', 'male', 'legend', 'Я использую то, что у меня есть, чтобы защитить других.', 'Десять теней', 'Токийский колледж магии'),
   c('jjk-11', 'Рёмен Сукуна', 'jjk', 'male', 'legend', 'Знай своё место.', 'Расщепление и рассечение', 'Проклятия'),
 
   // Стальной алхимик
@@ -125,9 +124,9 @@ export const CHARACTERS: Character[] = [
   // Блич
   c('bleach-1', 'Ичиго Куросаки', 'bleach', 'male', 'novice', 'Я защищаю всех, кто мне дорог, своим мечом.', 'Гецуга Теншо', 'Синигами-заместитель'),
   c('bleach-4', 'Кенпачи Дзараки', 'bleach', 'male', 'novice', 'Драка ради драки — вот это жизнь.', 'Огромная духовная сила', '11-й отряд Готэй-13'),
-  c('bleach-5', 'Ренджи Абарай', 'bleach', 'male', 'fan', 'Я стану сильнее ради неё.', 'Забимару', '13 отрядов Готэй'),
+  c('bleach-5', 'Ренджи Абарай', 'bleach', 'male', 'fan', 'Я стану сильнее ради неё.', 'Забимару', 'Готей 13'),
   c('bleach-2', 'Рукия Кучики', 'bleach', 'female', 'otaku', 'Сила без сострадания — ничто.', 'Танцующий белый клинок', 'Готей 13'),
-  c('bleach-6', 'Бьякуя Кучики', 'bleach', 'male', 'expert', 'Правила существуют не просто так.', 'Сэнбонзакура', '13 отрядов Готэй'),
+  c('bleach-6', 'Бьякуя Кучики', 'bleach', 'male', 'expert', 'Правила существуют не просто так.', 'Сэнбонзакура', 'Готей 13'),
   c('bleach-7', 'Соскэ Айдзэн', 'bleach', 'male', 'expert', 'Никто не стоял на вершине с самого начала.', 'Кёка Суйгэцу, полный гипноз', 'Предатель Сообщества душ'),
   c('bleach-3', 'Тоширо Хицугая', 'bleach', 'male', 'expert', 'Не путай моё звание с моим возрастом.', 'Ледяное бандзюцу', 'Готей 13'),
   c('bleach-8', 'Урахара Киске', 'bleach', 'male', 'legend', 'Всё всегда происходит не просто так.', 'Бенихимэ', 'Общество душ / магазин Урахары'),
@@ -323,12 +322,12 @@ const CHARACTER_EN: Record<string, CharacterEn> = {
   'deathnote-5': { name: 'Near', quote: "I don't lose.", ability: 'Analytical intelligence', faction: 'SPK' },
   'deathnote-6': { name: 'Mello', quote: 'I have to make the first move.', ability: 'Tactics and investigation', faction: 'Mafia' },
 
-  'mha-1': { name: 'Izuku Midoriya', quote: 'I can become a hero too!', ability: 'One For All', faction: 'U.A. Academy' },
+  'mha-1': { name: 'Izuku Midoriya', quote: 'I can become a hero too!', ability: 'One For All', faction: 'U.A. High School' },
   'mha-4': { name: 'Shoto Todoroki', quote: 'I use my power my own way.', ability: 'Half-Cold Half-Hot', faction: 'Class 1-A' },
   'mha-5': { name: 'Shota Aizawa', quote: 'A logical ruse is part of the lesson.', ability: 'Erasure', faction: 'U.A. High School' },
-  'mha-2': { name: 'Katsuki Bakugo', quote: "I'll become the number one hero, nothing less.", ability: 'Explosive sweat', faction: 'U.A. Academy' },
+  'mha-2': { name: 'Katsuki Bakugo', quote: "I'll become the number one hero, nothing less.", ability: 'Explosive sweat', faction: 'U.A. High School' },
   'mha-6': { name: 'All Might', quote: 'I am here!', ability: 'One For All', faction: 'Pro Heroes' },
-  'mha-3': { name: 'Ochako Uraraka', quote: 'I want to be a hero who makes people smile.', ability: 'Zero Gravity', faction: 'U.A. Academy' },
+  'mha-3': { name: 'Ochako Uraraka', quote: 'I want to be a hero who makes people smile.', ability: 'Zero Gravity', faction: 'U.A. High School' },
   'mha-7': { name: 'Himiko Toga', quote: 'To love someone is to become them.', ability: 'Transform', faction: 'League of Villains' },
   'mha-8': { name: 'Tomura Shigaraki', quote: 'I will destroy everything.', ability: 'Decay', faction: 'League of Villains' },
 
@@ -340,7 +339,6 @@ const CHARACTER_EN: Record<string, CharacterEn> = {
   'ds-2': { name: 'Nezuko Kamado', quote: 'She protects her brother without saying a word.', ability: 'Blood Demon Art: flame', faction: 'Kamado Family' },
   'demonslayer-7': { name: 'Akaza', quote: 'Grow stronger or perish.', ability: 'Destructive Death techniques', faction: 'Twelve Kizuki' },
   'ds-3': { name: 'Zenitsu Agatsuma', quote: "I'm scared of everything, but I still move forward.", ability: 'Thunder Breathing', faction: 'Demon Slayer Corps' },
-  'demonslayer-9': { name: 'Tanjuro Kamado', quote: 'This dance passes from father to son.', ability: 'Hinokami Kagura', faction: 'Kamado family' },
   'demonslayer-10': { name: 'Shinobu Kocho', quote: 'Please smile.', ability: 'Insect Breathing', faction: 'Insect Hashira' },
   'demonslayer-11': { name: 'Kyojuro Rengoku', quote: 'Set your heart ablaze!', ability: 'Flame Breathing', faction: 'Flame Hashira' },
 

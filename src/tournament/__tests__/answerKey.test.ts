@@ -173,3 +173,23 @@ describe('tournament answer key', () => {
     expect(TOURNAMENT_KEY_VERSION).toBe(versionOf(key));
   });
 });
+
+describe('the cast, read in either language', () => {
+  it('names each faction once in Russian and once in English', () => {
+    // A faction question draws its wrong answers from every faction there is.
+    // If one Russian name had two English ones (or the other way round) the
+    // two languages would have different-sized pools, the quiz would come
+    // out differently in each, and one answer key could not mark both.
+    const { CHARACTERS, localizeCharacter } = require('../../data/characters');
+    const pairs = new Map<string, string>();
+    const back = new Map<string, string>();
+    for (const c of CHARACTERS) {
+      const ru = localizeCharacter(c, 'ru').faction;
+      const en = localizeCharacter(c, 'en').faction;
+      expect(pairs.get(ru) ?? en).toBe(en);
+      expect(back.get(en) ?? ru).toBe(ru);
+      pairs.set(ru, en);
+      back.set(en, ru);
+    }
+  });
+});
